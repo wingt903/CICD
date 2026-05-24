@@ -1,0 +1,42 @@
+sequenceDiagram
+    autonumber
+    actor Team as Project Migration Team
+    participant SN as ServiceNow (CMDB)
+    participant GH as GitHub Actions Runner
+    participant AWS_SSM as AWS Systems Manager
+    participant EC2 as Temporary Builder EC2
+
+    %% Phase 1: Intake & Governance
+    Team->>SN: Submit Catalog Migration Request
+    Note over SN: Approvals complete.<br>Create/Update CMDB CI Configuration.
+    SN->>GH: Trigger Workflow via REST Webhook (Repository Dispatch)<br>[Payload: AppID, Middleware Type, Env]
+
+    %% Phase 2: Orchestration & Checkout
+    activate GH
+    GH->>GH: Execute Git Checkout (App Code + Ansible Roles)
+    Note over GH: If Java (Tomcat/WebLogic):<br>Compile Source to .WAR / .EAR via Maven
+    GH->>AWS_SSM: Assume IAM Role via OIDC (Fetch Temp Security Token)
+    GH->>GH: Initialize Packer & Install AWS SSM Plugin
+
+    %% Phase 3: Cloud Execution via SSM
+    GH->>AWS_SSM: Trigger Packer Build Command
+    activate AWS_SSM
+    AWS_SSM->>EC2: Spin up EC2 in Private Subnet (No Public IP/No Port 22 Open)
+    Note over GH, EC2: Packer creates an encrypted secure tunnel<br>via SSM Session Manager Plugin
+    GH->>EC2: Push Application Artifacts & Ansible Playbooks across SSM Tunnel
+
+    %% Phase 4: Inner-Loop Configuration Management
+    activate EC2
+    Note over EC2: Local Ansible execution starts:<br>1. Hardens Base OS<br>2. Sets up selected Middleware (Tomcat/WebLogic/Python)<br>3. Injects Application Artifacts
+    EC2-->>GH: Streaming Logs / Success Code
+    deactivate EC2
+
+    %% Phase 5: Image Serialization & CMDB Loopback
+    AWS_SSM->>AWS_SSM: Stop Instance & Register New Golden AMI
+    AWS_SSM->>EC2: Terminate Temporary Builder Instance
+    AWS_SSM-->>GH: Return Target New AMI ID (e.g., ami-01234abcd)
+    deactivate AWS_SSM
+
+    GH->>SN: Send API Patch Request:<br>Update CMDB CI with New Active AMI ID
+    Note over SN: CMDB is updated with the active AMI ID<br>for Audit and Operations tracking
+    deactivate GH
