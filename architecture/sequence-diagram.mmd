@@ -34,7 +34,7 @@ sequenceDiagram
     %% Phase 5: Image Serialization & CMDB Loopback
     AWS_SSM->>AWS_SSM: Stop Instance & Register New Golden AMI
     AWS_SSM->>EC2: Terminate Temporary Builder Instance
-    AWS_SSM-->>GH: Return Target New AMI ID (e.g., ami-01234abcd)
+    AWS_SSM-->>GH: Return New AMI ID (e.g., ami-01234abcd)
     deactivate AWS_SSM
 
     GH->>SN: Send API Patch Request:<br>Update CMDB CI with New Active AMI ID
