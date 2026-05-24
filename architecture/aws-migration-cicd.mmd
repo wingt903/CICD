@@ -1,0 +1,17 @@
+graph LR
+    A[Developer Commit] --> B[GitHub Repository]
+    B --> C[GitHub Actions CI]
+    C --> D[Unit/Integration Tests]
+    C --> E[Build Container Images]
+    E --> F[Amazon ECR]
+    F --> G[Deploy Stage]
+
+    G --> H[WebLogic Runtime\n(EC2/EKS)]
+    G --> I[Tomcat Runtime\n(ECS/EKS)]
+    G --> J[Python Runtime\n(ECS/EKS/Lambda)]
+
+    H --> K[CloudWatch Logs & Metrics]
+    I --> K
+    J --> K
+
+    K --> L[Alarms/Rollback]
