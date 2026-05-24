@@ -1,0 +1,48 @@
+name: AWS Migration CI/CD Sample
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  validate-and-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [weblogic, tomcat, python]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: matrix.app == 'python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        if: matrix.app == 'python'
+        run: |
+          pip install -r sample-code/python/requirements.txt
+
+      - name: Run Python syntax check
+        if: matrix.app == 'python'
+        run: |
+          python -m py_compile sample-code/python/app.py
+
+      - name: Build sample image
+        run: |
+          docker build -t sample-${{ matrix.app }} ./sample-code/${{ matrix.app }}
+
+  deploy-placeholder:
+    needs: validate-and-build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Placeholder deploy step
+        run: |
+          echo "Authenticate to AWS"
+          echo "Push images to ECR"
+          echo "Deploy workloads to target runtime"
