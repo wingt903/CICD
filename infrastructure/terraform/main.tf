@@ -26,7 +26,7 @@ resource "aws_sns_topic_subscription" "email_alerts" {
 resource "aws_ssm_parameter" "approved_ami" {
   name  = "/${var.environment}/approved/ami/base"
   type  = "String"
-  value = "ami-PLACEHOLDER"
+  value = var.approved_ami_id
   tags  = local.common_tags
 }
 

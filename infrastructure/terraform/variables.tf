@@ -12,5 +12,10 @@ variable "environment" {
 variable "alarm_email" {
   type        = string
   description = "Notification endpoint for environment alarms"
-  default     = "ops@example.com"
+}
+
+variable "approved_ami_id" {
+  type        = string
+  description = "Approved AMI ID to publish into environment SSM parameter"
+  default     = "ami-00000000000000000"
 }
