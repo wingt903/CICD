@@ -13,6 +13,7 @@ It includes:
 ## Repository Structure
 
 - `architecture/aws-migration-cicd.mmd` - Mermaid architecture diagram for the end-to-end flow
+- `architecture/component-context-diagram.mmd` - Mermaid component context diagram for the key platform integrations
 - `cicd/github-actions/aws-migration-pipeline.yml` - Sample GitHub Actions pipeline for build, test, image publishing, and deployment trigger
 - `sample-code/weblogic/` - WebLogic sample deployment artifact and Dockerfile
 - `sample-code/tomcat/` - Tomcat sample web app and Dockerfile

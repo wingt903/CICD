@@ -1,0 +1,67 @@
+graph LR
+    %% Styling
+    classDef actor fill:#E1F5FE,stroke:#01579B,stroke-width:2px;
+    classDef governance fill:#E8EAF6,stroke:#283593,stroke-width:2px;
+    classDef pipeline fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px;
+    classDef aws fill:#FFF3E0,stroke:#E65100,stroke-width:2px;
+    classDef runtime fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px;
+
+    Team[Project / Migration Team]
+
+    subgraph Governance["Governance & Request Layer"]
+        SN[ServiceNow Catalog + CMDB]
+        IH[IntegrationHub]
+    end
+
+    subgraph Pipeline["CI/CD Orchestration Layer"]
+        GH[GitHub Repository]
+        GHA[GitHub Actions]
+        PK[Packer]
+        ANS[Ansible]
+    end
+
+    subgraph AWS["AWS Control Plane"]
+        OIDC[AWS IAM OIDC Provider]
+        SSMDOC[AWS SSM Documents / Automation]
+        SSMSESS[AWS SSM Session Manager]
+        PARAM[AWS SSM Parameter Store]
+        INV[AWS SSM Inventory]
+        AMI[Golden AMI Registry]
+    end
+
+    subgraph Runtime["AWS Runtime / Build Targets"]
+        EC2[Private Builder EC2]
+        APP[Target Workloads\nWebLogic / Tomcat / Python]
+    end
+
+    Team --> SN
+    SN --> IH
+    IH --> GHA
+    SN -. CMDB metadata / change context .-> GHA
+
+    GH --> GHA
+    GHA --> OIDC
+    OIDC --> GHA
+
+    GHA --> PK
+    GHA --> SSMDOC
+    PK --> EC2
+    SSMDOC --> EC2
+    SSMSESS --> EC2
+
+    GHA --> SSMSESS
+    GHA --> ANS
+    ANS --> EC2
+    PARAM --> EC2
+
+    EC2 --> AMI
+    AMI --> APP
+    EC2 --> INV
+    INV --> SN
+    SSMDOC --> SN
+
+    class Team actor;
+    class SN,IH governance;
+    class GH,GHA,PK,ANS pipeline;
+    class OIDC,SSMDOC,SSMSESS,PARAM,INV,AMI aws;
+    class EC2,APP runtime;
