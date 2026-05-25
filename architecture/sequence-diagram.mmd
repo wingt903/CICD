@@ -9,7 +9,7 @@ sequenceDiagram
     %% Phase 1: Intake & Governance
     Team->>SN: Submit Catalog Migration Request
     Note over SN: Approvals complete.<br>Create/Update CMDB CI Configuration.
-    SN->>GH: Trigger Workflow via REST Webhook (Repository Dispatch)<br>[Payload: AppID, Middleware Type, Env]
+    SN->>GH: Trigger Workflow via REST Webhook (Repository Dispatch)<br>[Payload: AppID, Middleware Type, Env, ChangeID, SSMDoc]
 
     %% Phase 2: Orchestration & Checkout
     activate GH
@@ -17,6 +17,8 @@ sequenceDiagram
     Note over GH: If Java (Tomcat/WebLogic):<br>Compile Source to .WAR / .EAR via Maven
     GH->>AWS_SSM: Assume IAM Role via OIDC (Fetch Temp Security Token)
     GH->>GH: Initialize Packer & Install AWS SSM Plugin
+    GH->>AWS_SSM: StartAutomationExecution (SSM Doc from CMDB)<br>Pre-check / compliance validation
+    AWS_SSM-->>GH: Return Automation status + execution ID
 
     %% Phase 3: Cloud Execution via SSM
     GH->>AWS_SSM: Trigger Packer Build Command
@@ -37,6 +39,8 @@ sequenceDiagram
     AWS_SSM-->>GH: Return New AMI ID (e.g., ami-01234abcd)
     deactivate AWS_SSM
 
-    GH->>SN: Send API Patch Request:<br>Update CMDB CI with New Active AMI ID
-    Note over SN: CMDB is updated with the active AMI ID<br>for Audit and Operations tracking
+    GH->>AWS_SSM: Execute post-build SSM Doc<br>Inventory and remediation baseline
+    AWS_SSM-->>GH: Return document execution summary
+    GH->>SN: Send API Patch Request:<br>Update CMDB CI with New Active AMI ID + SSM execution references
+    Note over SN: CMDB and Change Record are updated with<br>AMI + SSM automation evidence for audit tracking
     deactivate GH
