@@ -1,15 +1,27 @@
-name: AWS Migration CI/CD Sample
+name: AWS Migration CI/CD
 
 on:
-  push:
-    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  security-events: write
+
+env:
+  AWS_REGION: ap-southeast-1
+  ECR_REPOSITORY_PREFIX: cicd-sample
 
 jobs:
-  validate-and-build:
+  validate-build-scan:
+    name: Validate, build, and security scan
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         app: [weblogic, tomcat, python]
     steps:
@@ -24,25 +36,205 @@ jobs:
 
       - name: Install Python dependencies
         if: matrix.app == 'python'
-        run: |
-          pip install -r sample-code/python/requirements.txt
+        run: pip install -r sample-code/python/requirements.txt
 
       - name: Run Python syntax check
         if: matrix.app == 'python'
-        run: |
-          python -m py_compile sample-code/python/app.py
+        run: python -m py_compile sample-code/python/app.py
 
       - name: Build sample image
-        run: |
-          docker build -t sample-${{ matrix.app }} ./sample-code/${{ matrix.app }}
+        run: docker build -t local/${{ matrix.app }}:${{ github.sha }} ./sample-code/${{ matrix.app }}
 
-  deploy-placeholder:
-    needs: validate-and-build
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: local/${{ matrix.app }}:${{ github.sha }}
+          artifact-name: sbom-${{ matrix.app }}
+
+      - name: Scan filesystem with Trivy
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-${{ matrix.app }}.sarif
+
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.app }}.sarif
+
+  iac-validate:
+    name: Terraform and IaC policy checks
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: ${{ hashFiles('infrastructure/terraform/**/*.tf') != '' }}
     steps:
-      - name: Placeholder deploy step
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform format check
+        run: terraform -chdir=infrastructure/terraform fmt -check -recursive
+
+      - name: Terraform init (no backend)
+        run: terraform -chdir=infrastructure/terraform init -backend=false
+
+      - name: Terraform validate
+        run: terraform -chdir=infrastructure/terraform validate
+
+      - name: tfsec
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: infrastructure/terraform
+
+      - name: Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infrastructure/terraform
+
+  release-manifest:
+    name: Create release manifest
+    runs-on: ubuntu-latest
+    needs: [validate-build-scan, iac-validate]
+    if: ${{ always() && needs.validate-build-scan.result == 'success' && (needs.iac-validate.result == 'success' || needs.iac-validate.result == 'skipped') }}
+    outputs:
+      release_version: ${{ steps.manifest.outputs.release_version }}
+    steps:
+      - name: Create release manifest
+        id: manifest
         run: |
-          echo "Authenticate to AWS"
-          echo "Push images to ECR"
-          echo "Deploy workloads to target runtime"
+          release_version="${GITHUB_SHA::12}"
+          echo "release_version=$release_version" >> "$GITHUB_OUTPUT"
+          cat > release-manifest.json <<JSON
+          {
+            "releaseVersion": "$release_version",
+            "commit": "${GITHUB_SHA}",
+            "artifacts": {
+              "containerImages": [
+                "${ECR_REPOSITORY_PREFIX}/weblogic:${GITHUB_SHA}",
+                "${ECR_REPOSITORY_PREFIX}/tomcat:${GITHUB_SHA}",
+                "${ECR_REPOSITORY_PREFIX}/python:${GITHUB_SHA}"
+              ],
+              "amiParameterPaths": {
+                "dev": "/dev/approved/ami/base",
+                "test": "/test/approved/ami/base",
+                "prod": "/prod/approved/ami/base"
+              }
+            },
+            "iac": {
+              "path": "infrastructure/terraform",
+              "version": "${GITHUB_SHA}"
+            },
+            "governance": {
+              "promotionPath": ["dev", "test", "prod"],
+              "generatedAt": "$(date -u +%FT%TZ)"
+            }
+          }
+          JSON
+
+      - name: Upload release manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-manifest
+          path: release-manifest.json
+
+  deploy-dev:
+    name: Deploy to dev
+    runs-on: ubuntu-latest
+    needs: [release-manifest]
+    if: ${{ github.ref == 'refs/heads/main' && vars.AWS_DEV_ROLE_ARN != '' }}
+    environment: dev
+    steps:
+      - name: Download release manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: release-manifest
+
+      - name: Configure AWS credentials (dev)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEV_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy dev (placeholder)
+        run: |
+          echo "Deploying release $(jq -r .releaseVersion release-manifest.json) to dev"
+          echo "Use image digest pinning and apply Terraform dev variables"
+
+      - name: Post-deploy smoke check (dev)
+        run: echo "Run dev smoke checks"
+
+  deploy-test:
+    name: Deploy to test
+    runs-on: ubuntu-latest
+    needs: [deploy-dev, release-manifest]
+    if: ${{ github.ref == 'refs/heads/main' && vars.AWS_TEST_ROLE_ARN != '' }}
+    environment: test
+    steps:
+      - name: Download release manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: release-manifest
+
+      - name: Configure AWS credentials (test)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_TEST_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy test (placeholder)
+        run: |
+          echo "Deploying release $(jq -r .releaseVersion release-manifest.json) to test"
+          echo "Run integration, DAST/smoke, and performance baseline checks"
+
+      - name: Quality and security gate (test)
+        run: echo "Block promotion if unresolved HIGH/CRITICAL findings exist"
+
+  deploy-prod:
+    name: Deploy to prod
+    runs-on: ubuntu-latest
+    needs: [deploy-test, release-manifest]
+    if: ${{ github.ref == 'refs/heads/main' && vars.AWS_PROD_ROLE_ARN != '' }}
+    environment: prod
+    steps:
+      - name: Download release manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: release-manifest
+
+      - name: Configure AWS credentials (prod)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PROD_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy prod (placeholder)
+        run: |
+          echo "Deploying release $(jq -r .releaseVersion release-manifest.json) to prod"
+          echo "Use blue/green or canary strategy with automatic health rollback"
+
+      - name: Post-deploy verification (prod)
+        run: echo "Run production verification and SLO checks"
+
+  rollback-prod:
+    name: Rollback prod
+    runs-on: ubuntu-latest
+    needs: [deploy-prod]
+    if: ${{ failure() && needs.deploy-prod.result == 'failure' && vars.AWS_PROD_ROLE_ARN != '' }}
+    environment: prod
+    steps:
+      - name: Configure AWS credentials (prod)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PROD_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Trigger rollback strategy
+        run: |
+          echo "Rollback application to prior healthy target group/task set"
+          echo "Rollback ASG/Launch Template to previous approved AMI"
+          echo "Apply controlled Terraform revert if infra drift/change failed"

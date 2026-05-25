@@ -1,0 +1,79 @@
+graph TD
+    classDef source fill:#E3F2FD,stroke:#0D47A1,stroke-width:2px;
+    classDef artifact fill:#FFF3E0,stroke:#E65100,stroke-width:2px;
+    classDef delivery fill:#EDE7F6,stroke:#4A148C,stroke-width:2px;
+    classDef security fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px;
+    classDef runtime fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px;
+
+    subgraph Sources
+      A1[Application as Code Repo]
+      A2[OS/Image as Code Repo<br/>Packer + Ansible]
+      A3[Infrastructure as Code Repo<br/>Terraform]
+    end
+
+    subgraph CI and Governance
+      B1[GitHub Actions Pipeline]
+      B2[GitHub Environments<br/>dev/test/prod]
+      B3[Release Manifest<br/>Digest + AMI + IaC Version]
+    end
+
+    subgraph Security and Quality Gates
+      C1[SAST + Dependency + Secret Scans]
+      C2[IaC Policy Scans<br/>tfsec + Checkov]
+      C3[Container/AMI Scans<br/>ECR + Inspector]
+      C4[Runtime Security Posture<br/>Security Hub + GuardDuty + IAM Access Analyzer]
+    end
+
+    subgraph Artifact Management
+      D1[Amazon ECR<br/>Immutable Tags + Digest]
+      D2[AWS CodeArtifact<br/>Python/Java Packages]
+      D3[SSM Parameter Store<br/>/dev /test /prod Approved AMIs]
+      D4[SBOM + Build Provenance]
+    end
+
+    subgraph AWS Runtime by Environment
+      E1[Dev Account]
+      E2[Test Account]
+      E3[Prod Account]
+      E4[Terraform Provisioned Runtime<br/>VPC IAM ECS/EKS/ASG ALB]
+    end
+
+    subgraph Operations and Rollback
+      F1[CloudWatch + OpenTelemetry + X-Ray]
+      F2[CloudWatch Alarms + SNS]
+      F3[Blue/Green or Canary Rollback]
+      F4[AMI Rollback via Previous Approved ID]
+      F5[IaC Controlled Revert Pipeline]
+    end
+
+    A1 --> B1
+    A2 --> B1
+    A3 --> B1
+    B1 --> C1 --> B3
+    B1 --> C2 --> B3
+    B1 --> D4 --> B3
+    B1 --> D1
+    B1 --> D2
+    B1 --> D3
+
+    B3 --> B2
+    B2 --> E1 --> E4
+    E1 --> E2 --> E3
+
+    C3 --> E1
+    C3 --> E2
+    C3 --> E3
+    C4 --> E1
+    C4 --> E2
+    C4 --> E3
+
+    E4 --> F1 --> F2
+    F2 --> F3
+    F2 --> F4
+    F2 --> F5
+
+    class A1,A2,A3 source;
+    class D1,D2,D3,D4 artifact;
+    class B1,B2,B3 delivery;
+    class C1,C2,C3,C4 security;
+    class E1,E2,E3,E4,F1,F2,F3,F4,F5 runtime;
