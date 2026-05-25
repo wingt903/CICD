@@ -16,6 +16,6 @@ variable "alarm_email" {
 
 variable "approved_ami_id" {
   type        = string
-  description = "Approved AMI ID to publish into environment SSM parameter"
+  description = "Bootstrap AMI ID placeholder for SSM parameter initialization; replace with a real approved AMI before production rollout"
   default     = "ami-00000000000000000"
 }
