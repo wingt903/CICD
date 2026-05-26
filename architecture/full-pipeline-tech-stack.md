@@ -15,6 +15,7 @@
 | IaC Security | Policy and Static Checks | tfsec + Checkov | Blocks non-compliant infrastructure changes before apply. |
 | Application Security | Code and Dependency Scanning | GitHub Advanced Security / Dependency / Secret Scanning | Detects code, package, and secret risks early in PR workflow. |
 | Image Security | Runtime Artifact Scanning | Amazon Inspector + ECR Enhanced Scanning | Detects container and AMI vulnerabilities before environment promotion. |
+| Runtime Security | Application Detection & Response | Amazon GuardDuty + AWS Security Hub + Amazon EventBridge | Provides application-focused detection and response coverage by correlating runtime threats, centralizing findings, and triggering automated containment or remediation workflows. |
 | Runtime Security Posture | Continuous Threat Monitoring | Security Hub + GuardDuty + IAM Access Analyzer | Centralized security posture and threat detection across accounts. |
 | Communication Channel | Zero-Trust Tunnel | AWS SSM Session Manager | Secure control path for private build/configuration actions without SSH exposure. |
 | Config & Secret Store | Runtime Configuration | AWS Systems Manager Parameter Store + AWS Secrets Manager | Segregates environment config and secrets (`/dev`, `/test`, `/prod`) from code. |
