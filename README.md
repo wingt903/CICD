@@ -10,6 +10,7 @@ It now includes an AWS-only target design for full automated CI/CD with dev/test
 ## Repository Structure
 
 - `architecture/aws-migration-cicd.mmd` - baseline end-to-end migration flow
+- `architecture/component-context-diagram.mmd` - Mermaid component context diagram for key platform integrations
 - `architecture/sequence-diagram.mmd` - interaction sequence flow
 - `architecture/full-pipeline-tech-stack.md` - technology stack mapping
 - `architecture/target-component-context.mmd` - target component context diagram (artifact, IaC, security, governance, observability, rollback)
