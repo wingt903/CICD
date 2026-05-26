@@ -2,15 +2,27 @@
 
 | Layer | Component | Chosen Tool | Architectural Role & Business Value |
 |---|---|---|---|
-| Governance & Portal | Request & CMDB | ServiceNow (IntegrationHub) | The operational entry point. Captures user metadata and maps system relationships inside the CMDB. |
+| Governance & Portal | Request & CMDB | ServiceNow (IntegrationHub) | Operational intake and CMDB update source for migration activities. |
 | Governance Automation | Change-Controlled Runbooks | AWS SSM Documents / Automation | Executes CMDB-driven operational runbooks (pre-check, patch, remediation) with auditable execution status linked to change records. |
-| Orchestration | CI/CD Engine | GitHub Actions | Event-driven pipeline manager. Handles code checkouts, compiles Java code, and coordinates AWS actions. |
-| Identity / Trust | Security Gateway | AWS IAM OIDC Provider | Establishes cryptographic trust between GitHub and AWS, provisioning temporary IAM access keys. |
-| Image Assembly | Compute Packager | HashiCorp Packer (HCL2) | Automated engine that builds temporary EC2 environments, configures them, and registers final target AMIs. |
-| Configuration | Dynamic State Provisioner | Ansible | Orchestrates local configurations (installing WebLogic clusters, tuning Tomcat JVM pools, isolating Python environments). |
-| Communication Channel | Zero-Trust Tunnel | AWS SSM Session Manager | Enables GitHub and Packer to execute Ansible code inside isolated private AWS subnets. |
-| Data & Parameter Store | Config & Secrets Management | AWS SSM Parameter Store | Standardizes configuration by decoupling credentials and database connection strings from the application code. |
+| Orchestration | CI/CD Engine | GitHub Actions | Event-driven pipeline manager for build, test, scan, release, and controlled promotion. |
+| Environment Governance | Promotion Controls | GitHub Environments (`dev`, `test`, `prod`) | Enforces release order, approvals, and deployment protection rules per stage. |
+| Identity / Trust | Security Gateway | AWS IAM OIDC Provider | Federated short-lived credentials for GitHub deployments without long-lived keys. |
+| Artifact Registry | Container Repository | Amazon ECR | Stores immutable container tags and digest-based deployment references. |
+| Artifact Registry | Package Repository | AWS CodeArtifact | Manages versioned Python/Java package lifecycle for build reproducibility. |
+| Image Assembly | Compute Packager | HashiCorp Packer (HCL2) | Produces immutable AMIs for OS and middleware baseline standardization. |
+| Configuration | Dynamic State Provisioner | Ansible | Applies OS hardening and middleware/application configuration as code. |
+| Infrastructure Provisioning | Runtime Provisioner | Terraform | Provisions environment-specific AWS runtime infrastructure with isolated state. |
+| IaC Security | Policy and Static Checks | tfsec + Checkov | Blocks non-compliant infrastructure changes before apply. |
+| Application Security | Code and Dependency Scanning | GitHub Advanced Security / Dependency / Secret Scanning | Detects code, package, and secret risks early in PR workflow. |
+| Image Security | Runtime Artifact Scanning | Amazon Inspector + ECR Enhanced Scanning | Detects container and AMI vulnerabilities before environment promotion. |
+| Runtime Security Posture | Continuous Threat Monitoring | Security Hub + GuardDuty + IAM Access Analyzer | Centralized security posture and threat detection across accounts. |
+| Communication Channel | Zero-Trust Tunnel | AWS SSM Session Manager | Secure control path for private build/configuration actions without SSH exposure. |
+| Config & Secret Store | Runtime Configuration | AWS Systems Manager Parameter Store + AWS Secrets Manager | Segregates environment config and secrets (`/dev`, `/test`, `/prod`) from code. |
 | Operations Feedback | Asset State Reconciliation | AWS SSM Inventory + ServiceNow CMDB Sync | Reconciles runtime software/OS state from managed nodes back to CMDB to improve audit accuracy and operational visibility. |
+| Observability | Telemetry and Tracing | CloudWatch + OpenTelemetry + AWS X-Ray | Provides logs, metrics, traces, and release health visibility for triage. |
+| Incident Signaling | Alert Routing | CloudWatch Alarms + SNS | Enables centralized alert notifications and incident integration. |
+| Release Contract | Release Manifest | JSON Manifest Artifact | Carries approved digests, AMI paths, and IaC version as the deployable unit. |
+| Rollback | Safe Recovery Controls | Blue/Green/Canary + AMI rollback + IaC revert | Enables automated/controlled rollback for app, OS image, and infra failures. |
 
 ## Detailed Technology Stack
 
@@ -33,7 +45,7 @@
   - Python sample validation via `python -m py_compile sample-code/python/app.py`.
   - Java stacks compile to deployment artifacts (`.war` / `.ear`) where applicable.
 - **Containerization**
-  - Docker-based packaging from per-stack folders under `/tmp/workspace/wingt903/CICD/sample-code/`.
+  - Docker-based packaging from per-stack folders under `sample-code/`.
 
 ### 3) Identity, Access, and Trust
 - **AWS IAM OIDC Provider for GitHub**
