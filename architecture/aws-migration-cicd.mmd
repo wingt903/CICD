@@ -11,7 +11,7 @@ graph TD
         B --> C{Approved?}
         C -- No --> D[Reject & Close Ticket]
         C -- Yes --> E[Create/Update Configuration Item in CMDB]
-        E --> F[Generate Webhook Payload <br/> app_id, middleware_type, env, change_id]
+        E --> F[Generate Webhook Payload ]
     end
     class A,B,C,D,E,F intake;
 
