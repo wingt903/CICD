@@ -9,7 +9,7 @@
 | Identity / Trust | Security Gateway | AWS IAM OIDC Provider | Federated short-lived credentials for GitHub deployments without long-lived keys. |
 | Artifact Registry | Container Repository | Amazon ECR | Stores immutable container tags and digest-based deployment references. |
 | Artifact Registry | Package Repository | AWS CodeArtifact | Manages versioned Python/Java package lifecycle for build reproducibility. |
-| Image Assembly | Compute Packager | HashiCorp Packer (HCL2) | Produces immutable AMIs for OS and middleware baseline standardization. |
+| Image Assembly | AMI Build Automation | Ansible (`amazon.aws` modules + SSM connection) | Automates builder lifecycle over SSM connection (no SSH) and produces immutable golden AMIs for OS and middleware baselines. |
 | Configuration | Dynamic State Provisioner | Ansible | Applies OS hardening and middleware/application configuration as code. |
 | Infrastructure Provisioning | Runtime Provisioner | Terraform | Provisions environment-specific AWS runtime infrastructure with isolated state. |
 | IaC Security | Policy and Static Checks | tfsec + Checkov | Blocks non-compliant infrastructure changes before apply. |
@@ -56,14 +56,15 @@
   - Separate permissions for build orchestration, SSM automation, AMI registration, and inventory collection.
 
 ### 4) Image Assembly and Configuration
-- **HashiCorp Packer (HCL2)**
-  - Launches temporary private-subnet builder EC2 instances.
-  - Bakes immutable golden AMIs for each target middleware stack.
-- **Ansible**
+- **Ansible (Image Build + Configuration)**
+  - Launches temporary private-subnet builder EC2 instances via `amazon.aws.ec2_instance`.
   - Performs in-instance configuration:
     - WebLogic provisioning and domain setup
     - Tomcat deployment and JVM tuning
     - Python virtual environment and dependency setup
+  - Stops builder instances after configuration is complete.
+  - Creates immutable golden AMIs via `amazon.aws.ec2_ami`.
+  - Terminates temporary builders after AMI registration.
 - **AWS SSM Session Manager**
   - Provides encrypted control channel for private execution without SSH exposure.
 
