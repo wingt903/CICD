@@ -3,13 +3,13 @@
 | Layer | Component | Chosen Tool | Architectural Role & Business Value |
 |---|---|---|---|
 | Governance & Portal | Request & CMDB | ServiceNow (IntegrationHub) | Operational intake and CMDB update source for migration activities. |
-| Governance Automation | Change-Controlled Runbooks | AWS SSM Documents / Automation | Executes CMDB-driven operational runbooks (pre-check, patch, remediation) with auditable execution status linked to change records. |
+| Governance Automation | Change-Controlled Runbooks | Ansible Playbooks | Executes CMDB-driven pre-check, patch, and remediation runbooks as code, with auditable execution logs linked to change records. |
 | Orchestration | CI/CD Engine | GitHub Actions | Event-driven pipeline manager for build, test, scan, release, and controlled promotion. |
 | Environment Governance | Promotion Controls | GitHub Environments (`dev`, `test`, `prod`) | Enforces release order, approvals, and deployment protection rules per stage. |
 | Identity / Trust | Security Gateway | AWS IAM OIDC Provider | Federated short-lived credentials for GitHub deployments without long-lived keys. |
 | Artifact Registry | Container Repository | Amazon ECR | Stores immutable container tags and digest-based deployment references. |
 | Artifact Registry | Package Repository | AWS CodeArtifact | Manages versioned Python/Java package lifecycle for build reproducibility. |
-| Image Assembly | AMI Build Automation | Ansible (`amazon.aws` modules + SSM connection) | Automates builder lifecycle over SSM connection (no SSH) and produces immutable golden AMIs for OS and middleware baselines. |
+| Image Assembly | AMI Build Automation | Ansible (`amazon.aws` modules) | Automates builder lifecycle (launch, configure, stop, snapshot, terminate) and produces immutable golden AMIs for OS and middleware baselines. |
 | Configuration | Dynamic State Provisioner | Ansible | Applies OS hardening and middleware/application configuration as code. |
 | Infrastructure Provisioning | Runtime Provisioner | Terraform | Provisions environment-specific AWS runtime infrastructure with isolated state. |
 | IaC Security | Policy and Static Checks | tfsec + Checkov | Blocks non-compliant infrastructure changes before apply. |
@@ -33,10 +33,7 @@
   - Stores target app metadata (`app_id`, `middleware_type`, `env`) and change context (`change_id`).
 - **ServiceNow IntegrationHub**
   - Triggers GitHub repository dispatch events.
-  - Receives callback payloads (AMI ID, SSM execution IDs, run status).
-- **AWS SSM Documents / Automation**
-  - Executes CMDB-selected runbooks (pre-check, compliance, remediation, post-build inventory tasks).
-  - Produces auditable execution records tied to change tickets.
+  - Receives callback payloads (AMI ID, Ansible run status).
 
 ### 2) CI/CD Orchestration and Build Toolchain
 - **GitHub Actions**
@@ -53,7 +50,7 @@
   - Issues short-lived credentials to GitHub Actions jobs.
   - Removes the need for long-lived static AWS access keys.
 - **Least-privilege IAM roles**
-  - Separate permissions for build orchestration, SSM automation, AMI registration, and inventory collection.
+  - Separate permissions for build orchestration, Ansible automation, AMI registration, and inventory collection.
 
 ### 4) Image Assembly and Configuration
 - **Ansible (Image Build + Configuration)**
@@ -77,5 +74,5 @@
 - **AWS SSM Inventory**
   - Captures managed-node software/OS/runtime details after build/deployment steps.
 - **CMDB Sync Loop**
-  - Updates ServiceNow CIs with active AMI, execution evidence, and reconciled runtime state.
+  - Updates ServiceNow CIs with active AMI, Ansible execution evidence, and reconciled runtime state.
   - Improves audit readiness and operational traceability.

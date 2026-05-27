@@ -11,7 +11,7 @@ graph TD
         B --> C{Approved?}
         C -- No --> D[Reject & Close Ticket]
         C -- Yes --> E[Create/Update Configuration Item in CMDB]
-        E --> F[Generate Webhook Payload <br/> app_id, middleware_type, env, change_id, ssm_doc]
+        E --> F[Generate Webhook Payload <br/> app_id, middleware_type, env, change_id]
     end
     class A,B,C,D,E,F intake;
 
@@ -24,14 +24,13 @@ graph TD
         I -- No (Python) --> K[Skip Compilation Step]
         J --> L[Request Temp AWS Credentials via IAM OIDC]
         K --> L
-        L --> M[Initialize Ansible Image Build Runtime & SSM Session Manager Plugin]
-        M --> M1[Trigger SSM Automation Document <br/> CMDB-selected pre-check/compliance runbook]
+        L --> M[Initialize Ansible Controller Runtime & SSM Session Manager Plugin]
     end
-    class G,H,I,J,K,L,M,M1 orchestrator;
+    class G,H,I,J,K,L,M orchestrator;
 
     %% --- PHASE 3: SECURE CLOUD BAKING ---
     subgraph Phase 3: AWS Systems Manager & AMI Build Execution
-        M1 --> N[Ansible Launches Temp EC2 Instance in Private Subnet]
+        M --> N[Ansible Launches Temp EC2 Instance in Private Subnet]
         N --> O[Establish Encrypted SSM Session Manager Tunnel]
         O --> P[Stream Ansible Playbooks & App Binaries over SSM Tunnel]
         P --> Q{Evaluate 'middleware_type' from CMDB}
@@ -51,10 +50,9 @@ graph TD
         S --> T[Ansible Stops Builder Instance]
         T --> U[AWS Registers New Immutable Golden AMI]
         U --> V[Terminate Temporary Builder Instance]
-        V --> W[Run post-build SSM Document <br/> Inventory capture + remediation baseline]
-        W --> X[GitHub Actions Captures New AMI ID + SSM execution IDs]
-        X --> Y[Outbound API Patch Call Back to ServiceNow]
-        Y --> Z[Update CMDB CI and Change Record <br/> with AMI + SSM evidence]
-        Z --> AA[Terraform / Auto Scaling Group Triggered with New AMI]
+        V --> W[GitHub Actions Captures New AMI ID]
+        W --> X[Outbound API Patch Call Back to ServiceNow]
+        X --> Y[Update CMDB CI and Change Record <br/> with AMI + Ansible execution evidence]
+        Y --> Z[Terraform / Auto Scaling Group Triggered with New AMI]
     end
-    class T,U,V,W,X,Y,Z,AA targetState;
+    class T,U,V,W,X,Y,Z targetState;
