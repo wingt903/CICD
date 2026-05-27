@@ -1,58 +1,76 @@
-graph TD
-    %% Styling / Themes
-    classDef intake fill:#E3F2FD,stroke:#0D47A1,stroke-width:2px;
-    classDef orchestrator fill:#EDE7F6,stroke:#4A148C,stroke-width:2px;
-    classDef cloudEngine fill:#FFF3E0,stroke:#E65100,stroke-width:2px;
-    classDef targetState fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px;
+flowchart TD
+    %% Styling to mimic process-document workflow boards
+    classDef step fill:#f7f7f7,stroke:#6c6c6c,stroke-width:1.5px,color:#000;
+    classDef decision fill:#ffffff,stroke:#444,stroke-width:1.5px,color:#000;
+    classDef action fill:#e8f0fe,stroke:#1a73e8,stroke-width:1.5px,color:#000;
+    classDef governance fill:#fdecea,stroke:#d93025,stroke-width:1.5px,color:#000;
 
-    %% --- PHASE 1: INTAKE & GOVERNANCE ---
-    subgraph Phase 1: ServiceNow Entry Point
-        A[Project Team Raises Service Request] --> B(ServiceNow Catalog workflow)
-        B --> C{Approved?}
-        C -- No --> D[Reject & Close Ticket]
-        C -- Yes --> E[Create/Update Configuration Item in CMDB]
-        E --> F[Generate Webhook Payload ]
+    %% ---------------------------
+    %% Process 1 - New application
+    %% ---------------------------
+    subgraph P1["Process 1 - New application onboarding"]
+        direction LR
+        A1[New migration request raised<br/>by project team] --> A2[Create / update CI data in CMDB]
+        A2 --> A3[Draft HLD and target migration scope]
+        A3 --> A4{ADR approval<br/>for HLD?}
+        A4 -- Rejected --> A5[Update HLD]
+        A5 --> A4
+        A4 -- Approved --> A6[Write minimal viable LLD<br/>for first build]
+        A6 --> A7{ADR approval<br/>for LLD?}
+        A7 -- Rejected --> A8[Update LLD]
+        A8 --> A7
+        A7 -- Approved --> A9[Start CI/CD pipeline build]
+        A9 --> A10[As build progresses,<br/>update LLD evidence]
+        A10 --> A11[Delivery workshop<br/>with service design + ops]
+        A11 --> A12{Final sign-off<br/>completed?}
+        A12 -- Rejected --> A8
+        A12 -- Approved --> A13[Release architecture pack<br/>and close governance gate]
     end
-    class A,B,C,D,E,F intake;
 
-    %% --- PHASE 2: PIPELINE ORCHESTRATION ---
-    subgraph Phase 2: GitHub Actions Engine
-        F --> G[GitHub Actions Triggered via Repository Dispatch]
-        G --> H[Run Git Checkout <br/> App Code + Ansible Playbooks]
-        H --> I{Is Java Tech Stack?}
-        I -- Yes (Tomcat/WebLogic) --> J[Compile Source via Maven/Gradle to .WAR/.EAR]
-        I -- No (Python) --> K[Skip Compilation Step]
-        J --> L[Request Temp AWS Credentials via IAM OIDC]
-        K --> L
-        L --> M[Initialize Ansible Controller Runtime & SSM Session Manager Plugin]
+    %% ---------------------------
+    %% Process 2 - Updated app
+    %% ---------------------------
+    subgraph P2["Process 2 - Updated application"]
+        direction LR
+        B1[Technical change requested<br/>for existing application] --> B2{Does it change NFR<br/>or architecture risk?}
+        B2 -- Yes --> B3[Update HLD]
+        B3 --> B4{ADR approval<br/>for HLD update?}
+        B4 -- Rejected --> B3
+        B4 -- Approved --> B5[Continue delivery]
+        B2 -- No --> B6{Does it change deployed<br/>runtime / middleware?}
+        B6 -- Yes --> B7[Update LLD]
+        B7 --> B8{ADR approval<br/>for LLD update?}
+        B8 -- Rejected --> B7
+        B8 -- Approved --> B5
+        B6 -- No --> B9[Architecture review confirms<br/>no document updates required]
+        B9 --> B5
     end
-    class G,H,I,J,K,L,M orchestrator;
 
-    %% --- PHASE 3: SECURE CLOUD BAKING ---
-    subgraph Phase 3: AWS Systems Manager & AMI Build Execution
-        M --> N[Ansible Launches Temp EC2 Instance in Private Subnet]
-        N --> O[Establish Encrypted SSM Session Manager Tunnel]
-        O --> P[Stream Ansible Playbooks & App Binaries over SSM Tunnel]
-        P --> Q{Evaluate 'middleware_type' from CMDB}
-        
-        Q -- weblogic --> R1[Ansible: Run Silent WebLogic Provisioning & Domain Setup]
-        Q -- tomcat --> R2[Ansible: Deploy .WAR into /webapps + Configure JVM]
-        Q -- python --> R3[Ansible: Establish Python venv + Pip install requirements]
-        
-        R1 --> S[Verify Configurations & Shutdown Instance]
-        R2 --> S
-        R3 --> S
+    %% --------------------------------
+    %% Process 3 - Cyber remediation
+    %% --------------------------------
+    subgraph P3["Process 3 - Cyber remediation and migration execution"]
+        direction LR
+        C1[Application selected for migration wave] --> C2[Validate business app + service mapping in CMDB]
+        C2 --> C3[Generate GitHub dispatch payload<br/>app_id, middleware_type, env, change_id]
+        C3 --> C4[GitHub Actions checkout + quality gates]
+        C4 --> C5[Assume AWS role via OIDC]
+        C5 --> C6[Run Ansible over SSM to build golden AMI]
+        C6 --> C7{Middleware type?}
+        C7 -- weblogic --> C8[Provision WebLogic domain baseline]
+        C7 -- tomcat --> C9[Deploy WAR and tune JVM]
+        C7 -- python --> C10[Create venv and install dependencies]
+        C8 --> C11[Register AMI + collect SSM evidence]
+        C9 --> C11
+        C10 --> C11
+        C11 --> C12[Patch ServiceNow / CMDB with AMI + evidence]
+        C12 --> C13{Promotion criteria met<br/>for target env?}
+        C13 -- No --> C14[Open remediation task and loop back]
+        C14 --> C4
+        C13 -- Yes --> C15[Terraform / ASG rollout with approved AMI]
     end
-    class N,O,P,Q,R1,R2,R3,S cloudEngine;
 
-    %% --- PHASE 4: ASSET SERIALIZATION & FEEDBACK LOOP ---
-    subgraph Phase 4: Target State & CMDB Loopback
-        S --> T[Ansible Stops Builder Instance]
-        T --> U[AWS Registers New Immutable Golden AMI]
-        U --> V[Terminate Temporary Builder Instance]
-        V --> W[GitHub Actions Captures New AMI ID]
-        W --> X[Outbound API Patch Call Back to ServiceNow]
-        X --> Y[Update CMDB CI and Change Record <br/> with AMI + Ansible execution evidence]
-        Y --> Z[Terraform / Auto Scaling Group Triggered with New AMI]
-    end
-    class T,U,V,W,X,Y,Z targetState;
+    class A1,A2,A3,A5,A6,A8,A9,A10,A11,A13,B1,B3,B5,B7,B9,C1,C2,C3,C4,C5,C6,C8,C9,C10,C11,C12,C14,C15 step;
+    class A4,A7,A12,B2,B4,B6,B8,C7,C13 decision;
+    class B5,C15 action;
+    class A13,C14 governance;
