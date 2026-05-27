@@ -22,7 +22,6 @@ graph LR
 
     subgraph AWS["AWS Control Plane"]
         OIDC[AWS IAM OIDC Provider]
-        SSMDOC[AWS SSM Documents / Automation]
         SSMSESS[AWS SSM Session Manager]
         PARAM[AWS SSM Parameter Store]
         INV[AWS SSM Inventory]
@@ -44,9 +43,7 @@ graph LR
     OIDC --> GHA
 
     GHA --> IMG
-    GHA --> SSMDOC
     IMG --> EC2
-    SSMDOC --> EC2
     SSMSESS --> EC2
 
     GHA --> SSMSESS
@@ -58,10 +55,9 @@ graph LR
     AMI --> APP
     EC2 --> INV
     INV --> SN
-    SSMDOC --> SN
 
     class Team actor;
     class SN,IH governance;
     class GH,GHA,IMG,ANS pipeline;
-    class OIDC,SSMDOC,SSMSESS,PARAM,INV,AMI aws;
+    class OIDC,SSMSESS,PARAM,INV,AMI aws;
     class EC2,APP runtime;
