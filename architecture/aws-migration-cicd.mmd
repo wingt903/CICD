@@ -20,8 +20,8 @@ flowchart TD
         A7 -- Rejected --> A8[Update LLD]
         A8 --> A7
         A7 -- Approved --> A9[Start CI/CD pipeline build]
-        A9 --> A10[As build progresses,<br/>update LLD evidence]
-        A10 --> A11[Delivery workshop<br/>with service design + ops]
+        A9 --> A10[Update LLD evidence]
+        A10 --> A11[Conduct delivery workshop<br/>with service design + ops]
         A11 --> A12{Final sign-off<br/>completed?}
         A12 -- Rejected --> A8
         A12 -- Approved --> A13[Release architecture pack<br/>and close governance gate]
@@ -42,7 +42,7 @@ flowchart TD
         B7 --> B8{ADR approval<br/>for LLD update?}
         B8 -- Rejected --> B7
         B8 -- Approved --> B5
-        B6 -- No --> B9[Architecture review confirms<br/>no document updates required]
+        B6 -- No --> B9[Confirm no document<br/>updates required]
         B9 --> B5
     end
 
@@ -70,7 +70,9 @@ flowchart TD
         C13 -- Yes --> C15[Terraform / ASG rollout with approved AMI]
     end
 
-    class A1,A2,A3,A5,A6,A8,A9,A10,A11,A13,B1,B3,B5,B7,B9,C1,C2,C3,C4,C5,C6,C8,C9,C10,C11,C12,C14,C15 step;
+    class A1,A2,A3,A5,A6,A8,A9,A10,A11,A13 step;
+    class B1,B3,B5,B7,B9 step;
+    class C1,C2,C3,C4,C5,C6,C8,C9,C10,C11,C12,C14,C15 step;
     class A4,A7,A12,B2,B4,B6,B8,C7,C13 decision;
     class B5,C15 action;
     class A13,C14 governance;
