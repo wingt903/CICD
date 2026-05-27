@@ -18,6 +18,7 @@ This target context extends the reference migration diagram with full automated 
 
 - Artifact management: ECR + CodeArtifact + release manifest + SBOM/provenance
 - Infra provisioning: Terraform with isolated backend and environment tfvars
+- Image build and configuration: Ansible-driven EC2 build flow over SSM (no Packer dependency)
 - Security scanning: SAST/dependency/secret + tfsec/Checkov + Inspector/ECR scans
 - Release governance: GitHub Environments with environment protections and approvals
 - Observability: CloudWatch dashboards/logs/alarms + OpenTelemetry/X-Ray traces

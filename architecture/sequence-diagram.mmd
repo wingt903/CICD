@@ -16,15 +16,15 @@ sequenceDiagram
     GH->>GH: Execute Git Checkout (App Code + Ansible Roles)
     Note over GH: If Java (Tomcat/WebLogic):<br>Compile Source to .WAR / .EAR via Maven
     GH->>AWS_SSM: Assume IAM Role via OIDC (Fetch Temp Security Token)
-    GH->>GH: Initialize Packer & Install AWS SSM Plugin
+    GH->>GH: Initialize Ansible Controller Runtime & Install AWS SSM Plugin
     GH->>AWS_SSM: StartAutomationExecution (SSM Doc from CMDB)<br>Pre-check / compliance validation
     AWS_SSM-->>GH: Return Automation status + execution ID
 
     %% Phase 3: Cloud Execution via SSM
-    GH->>AWS_SSM: Trigger Packer Build Command
+    GH->>AWS_SSM: Trigger Ansible-driven Image Build Workflow
     activate AWS_SSM
     AWS_SSM->>EC2: Spin up EC2 in Private Subnet (No Public IP/No Port 22 Open)
-    Note over GH, EC2: Packer creates an encrypted secure tunnel<br>via SSM Session Manager Plugin
+    Note over GH, EC2: Ansible workflow uses an encrypted secure tunnel<br>via SSM Session Manager Plugin
     GH->>EC2: Push Application Artifacts & Ansible Playbooks across SSM Tunnel
 
     %% Phase 4: Inner-Loop Configuration Management

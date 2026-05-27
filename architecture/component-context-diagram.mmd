@@ -16,7 +16,7 @@ graph LR
     subgraph Pipeline["CI/CD Orchestration Layer"]
         GH[GitHub Repository]
         GHA[GitHub Actions]
-        PK[Packer]
+        IMG[Ansible Image Build Playbooks]
         ANS[Ansible]
     end
 
@@ -43,9 +43,9 @@ graph LR
     GHA --> OIDC
     OIDC --> GHA
 
-    GHA --> PK
+    GHA --> IMG
     GHA --> SSMDOC
-    PK --> EC2
+    IMG --> EC2
     SSMDOC --> EC2
     SSMSESS --> EC2
 
@@ -62,6 +62,6 @@ graph LR
 
     class Team actor;
     class SN,IH governance;
-    class GH,GHA,PK,ANS pipeline;
+    class GH,GHA,IMG,ANS pipeline;
     class OIDC,SSMDOC,SSMSESS,PARAM,INV,AMI aws;
     class EC2,APP runtime;
