@@ -14,8 +14,8 @@ flowchart TB
 
     subgraph S0[Notation]
         direction LR
-        L1[✍️ Manual process]
-        L2[⚙️ System process]
+        L1[[M] Manual process]
+        L2[[S] System process]
     end
 
     subgraph S1[Stage 1 - Intake and Architecture Governance]
@@ -74,7 +74,7 @@ flowchart TB
 
     subgraph S4[Stage 4 - Middleware Configuration and AMI Serialization]
         direction TB
-        D1{Which middleware profile applies?}
+        D1{Select middleware profile?}
         D2A[Apply WebLogic baseline]
         D2B[Apply Tomcat baseline]
         D2C[Apply Python baseline]
@@ -88,7 +88,7 @@ flowchart TB
         direction TB
         E1[Patch CMDB and change record with AMI and evidence]
         E2{Promotion criteria met for target environment?}
-        E3[Deploy via Terraform and ASG through dev → test → prod]
+        E3[Deploy via Terraform and ASG through dev -> test -> prod]
         E4[Execute rollback or remediation path]
         E1 --> E2
         E2 -- Yes --> E3
