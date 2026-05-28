@@ -10,13 +10,16 @@ graph TD
 
     %% --- PHASE 1: INTAKE & GOVERNANCE ---
     subgraph Phase 1: ServiceNow Entry Point
-        A[Project Team Raises Service Request] --> B(ServiceNow Catalog workflow)
-        B --> C{Approved?}
+        A0[Project Team Submits Migration Request for Initial Approval] --> A1{Initial Approval?}
+        A1 -- No --> A2[Request Declined]
+        A1 -- Yes --> A[Project Team Creates ServiceNow Service Request]
+        A --> B(ServiceNow Catalog Approval Workflow)
+        B --> C{SR Approved?}
         C -- No --> D[Reject & Close Ticket]
         C -- Yes --> E[Create/Update Configuration Item in CMDB]
         E --> F[Generate Webhook Payload <br> app_id, middleware_type, env, change_id, ssm_doc]
     end
-    class A,B,C,D,E,F intake;
+    class A0,A1,A2,A,B,C,D,E,F intake;
 
     %% --- PHASE 2: PIPELINE ORCHESTRATION ---
     subgraph Phase 2: GitHub Actions Engine
