@@ -13,53 +13,53 @@ flowchart LR
     classDef manualProcess fill:#FFF8E1,color:#000;
     classDef systemProcess fill:#E8F5E9,color:#000;
 
-    I1[New app onboarding request]
-    I2[Existing app technical change]
-    I3[Cyber remediation migration wave]
+    I1[TPAM: New app onboarding request]
+    I2[TPAM: Existing app technical change]
+    I3[TPAM: Cyber remediation migration wave]
 
     subgraph S1["Stage 1 - Intake and Architecture Governance"]
         direction LR
-        A1[Validate or create CMDB CI record]
-        A2[TPAM write or update app HLD/LLD scope]
-        A3{CAR architecture review and approvals complete?}
-        A4[TPAM refine architecture artifacts]
+        A1[TPAM: Validate or create CMDB CI record]
+        A2[TPAM: Write or update app HLD/LLD scope]
+        A3{CAR Architect: Architecture review and approval complete?}
+        A4[TPAM: Refine architecture artifacts]
         A1 --> A2 --> A3
         A3 -- No --> A4 --> A2
     end
 
     subgraph S2["Stage 2 - CI/CD Orchestration and Quality Gates"]
         direction LR
-        B1[Generate GitHub dispatch payload]
-        B2[Checkout source and IaC]
-        B3[Build and run quality/security checks]
-        B4{Pipeline gates passed?}
-        B5[Open remediation task]
+        B1[TPAM: Submit GitHub dispatch payload]
+        B2[System: Checkout source and IaC]
+        B3[System: Build and run quality/security checks]
+        B4{System: Pipeline gates passed?}
+        B5[TPAM: Open remediation task]
         B1 --> B2 --> B3 --> B4
         B4 -- No --> B5
     end
 
     subgraph S3["Stage 3 - Secure AWS Build Execution"]
         direction LR
-        C1[Assume AWS role via OIDC]
-        C2[Launch private builder via SSM]
-        C3[Run Ansible image build over SSM tunnel]
+        C1[System: Assume AWS role via OIDC]
+        C2[System: Launch private builder via SSM]
+        C3[System: Run Ansible image build over SSM tunnel]
         C1 --> C2 --> C3
     end
 
     subgraph S4["Stage 4 - Middleware Configuration and AMI Serialization"]
         direction LR
-        D1{Select middleware profile}
-        D2[Apply WebLogic, Tomcat, or Python baseline]
-        D3[Register immutable golden AMI and capture evidence]
+        D1{System: Select middleware profile}
+        D2[System: Apply WebLogic, Tomcat, or Python baseline]
+        D3[System: Register immutable golden AMI and capture evidence]
         D1 --> D2 --> D3
     end
 
     subgraph S5["Stage 5 - Promotion, Deployment, and CMDB Feedback"]
         direction LR
-        E1[Patch CMDB and change record with AMI and evidence]
-        E2{Promotion criteria met for target env?}
-        E3[Deploy via Terraform/ASG through dev -> test -> prod]
-        E4[Execute rollback or remediation path]
+        E1[System: Patch CMDB and change record with AMI and evidence]
+        E2{CAR Architect: Promotion approval for target env?}
+        E3[System: Deploy via Terraform/ASG through dev -> test -> prod]
+        E4[TPAM: Execute rollback or remediation path]
         E1 --> E2
         E2 -- Yes --> E3
         E2 -- No --> E4
@@ -82,8 +82,8 @@ flowchart LR
     class B5,E4 governance;
 
     %% Actor ownership (who is responsible)
-    class I1,I2,I3,A1,A2,A4,B1,E1 tpamOwner;
-    class A3,B2,B3,B4,B5,C1,C2,C3,D1,D2,D3,E2,E3,E4 carOwner;
+    class I1,I2,I3,A1,A2,A4,B1,B2,B3,B4,B5,C1,C2,C3,D1,D2,D3,E1,E3,E4 tpamOwner;
+    class A3,E2 carOwner;
 
     %% Process type (manual vs system)
     class I1,I2,I3,A1,A2,A3,A4,B1,B5,E2,E4 manualProcess;
