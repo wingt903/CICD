@@ -1,78 +1,73 @@
-flowchart TD
-    %% Styling to mimic process-document workflow boards
-    classDef step fill:#f7f7f7,stroke:#6c6c6c,stroke-width:1.5px,color:#000;
+flowchart LR
+    %% Styling for high-level 5-stage process
+    classDef stage fill:#f7f7f7,stroke:#6c6c6c,stroke-width:1.5px,color:#000;
     classDef decision fill:#ffffff,stroke:#444,stroke-width:1.5px,color:#000;
     classDef action fill:#e8f0fe,stroke:#1a73e8,stroke-width:1.5px,color:#000;
     classDef governance fill:#fdecea,stroke:#d93025,stroke-width:1.5px,color:#000;
 
-    %% ---------------------------
-    %% Process 1 - New application
-    %% ---------------------------
-    subgraph P1["Process 1 - New application onboarding"]
-        direction LR
-        A1[New migration request raised<br/>by project team] --> A2[Create / update CI data in CMDB]
-        A2 --> A3[Draft HLD and target migration scope]
-        A3 --> A4{ADR approval<br/>for HLD?}
-        A4 -- Rejected --> A5[Update HLD]
-        A5 --> A4
-        A4 -- Approved --> A6[Write minimal viable LLD<br/>for first build]
-        A6 --> A7{ADR approval<br/>for LLD?}
-        A7 -- Rejected --> A8[Update LLD]
-        A8 --> A7
-        A7 -- Approved --> A9[Start CI/CD pipeline build]
-        A9 --> A10[Update LLD evidence]
-        A10 --> A11[Conduct delivery workshop<br/>with service design + ops]
-        A11 --> A12{Final sign-off<br/>completed?}
-        A12 -- Rejected --> A8
-        A12 -- Approved --> A13[Release architecture pack<br/>and close governance gate]
+    I1[New app onboarding request]
+    I2[Existing app technical change]
+    I3[Cyber remediation migration wave]
+
+    subgraph S1["Stage 1 - Intake and Architecture Governance"]
+        direction TB
+        A1[Validate or create CMDB CI record]
+        A2[Define or update HLD/LLD scope]
+        A3{Architecture approvals complete?}
+        A4[Refine architecture artifacts]
+        A1 --> A2 --> A3
+        A3 -- No --> A4 --> A2
     end
 
-    %% ---------------------------
-    %% Process 2 - Updated app
-    %% ---------------------------
-    subgraph P2["Process 2 - Updated application"]
-        direction LR
-        B1[Technical change requested<br/>for existing application] --> B2{Does it change NFR<br/>or architecture risk?}
-        B2 -- Yes --> B3[Update HLD]
-        B3 --> B4{ADR approval<br/>for HLD update?}
-        B4 -- Rejected --> B3
-        B4 -- Approved --> B5[Continue delivery]
-        B2 -- No --> B6{Does it change deployed<br/>runtime / middleware?}
-        B6 -- Yes --> B7[Update LLD]
-        B7 --> B8{ADR approval<br/>for LLD update?}
-        B8 -- Rejected --> B7
-        B8 -- Approved --> B5
-        B6 -- No --> B9[Confirm no document<br/>updates required]
-        B9 --> B5
+    subgraph S2["Stage 2 - CI/CD Orchestration and Quality Gates"]
+        direction TB
+        B1[Generate GitHub dispatch payload]
+        B2[Checkout source and IaC]
+        B3[Build and run quality/security checks]
+        B4{Pipeline gates passed?}
+        B5[Open remediation task]
+        B1 --> B2 --> B3 --> B4
+        B4 -- No --> B5
     end
 
-    %% --------------------------------
-    %% Process 3 - Cyber remediation
-    %% --------------------------------
-    subgraph P3["Process 3 - Cyber remediation and migration execution"]
-        direction LR
-        C1[Application selected for migration wave] --> C2[Validate business app + service mapping in CMDB]
-        C2 --> C3[Generate GitHub dispatch payload<br/>app_id, middleware_type, env, change_id]
-        C3 --> C4[GitHub Actions checkout + quality gates]
-        C4 --> C5[Assume AWS role via OIDC]
-        C5 --> C6[Run Ansible over SSM to build golden AMI]
-        C6 --> C7{Middleware type?}
-        C7 -- weblogic --> C8[Provision WebLogic domain baseline]
-        C7 -- tomcat --> C9[Deploy WAR and tune JVM]
-        C7 -- python --> C10[Create venv and install dependencies]
-        C8 --> C11[Register AMI + collect SSM evidence]
-        C9 --> C11
-        C10 --> C11
-        C11 --> C12[Patch ServiceNow / CMDB with AMI + evidence]
-        C12 --> C13{Promotion criteria met<br/>for target env?}
-        C13 -- No --> C14[Open remediation task and loop back]
-        C14 --> C4
-        C13 -- Yes --> C15[Terraform / ASG rollout with approved AMI]
+    subgraph S3["Stage 3 - Secure AWS Build Execution"]
+        direction TB
+        C1[Assume AWS role via OIDC]
+        C2[Launch private builder via SSM]
+        C3[Run Ansible image build over SSM tunnel]
+        C1 --> C2 --> C3
     end
 
-    class A1,A2,A3,A5,A6,A8,A9,A10,A11,A13 step;
-    class B1,B3,B5,B7,B9 step;
-    class C1,C2,C3,C4,C5,C6,C8,C9,C10,C11,C12,C14,C15 step;
-    class A4,A7,A12,B2,B4,B6,B8,C7,C13 decision;
-    class B5,C15 action;
-    class A13,C14 governance;
+    subgraph S4["Stage 4 - Middleware Configuration and AMI Serialization"]
+        direction TB
+        D1{Select middleware profile}
+        D2[Apply WebLogic, Tomcat, or Python baseline]
+        D3[Register immutable golden AMI and capture evidence]
+        D1 --> D2 --> D3
+    end
+
+    subgraph S5["Stage 5 - Promotion, Deployment, and CMDB Feedback"]
+        direction TB
+        E1[Patch CMDB and change record with AMI and evidence]
+        E2{Promotion criteria met for target env?}
+        E3[Deploy via Terraform/ASG through dev -> test -> prod]
+        E4[Execute rollback or remediation path]
+        E1 --> E2
+        E2 -- Yes --> E3
+        E2 -- No --> E4
+    end
+
+    I1 --> A1
+    I2 --> A2
+    I3 --> A1
+
+    A3 -- Yes --> B1
+    B4 -- Yes --> C1
+    C3 --> D1
+    D3 --> E1
+    E4 --> B1
+
+    class I1,I2,I3,A1,A2,A4,B1,B2,B3,C1,C2,C3,D1,D2,D3,E1 stage;
+    class A3,B4,E2 decision;
+    class E3 action;
+    class B5,E4 governance;
