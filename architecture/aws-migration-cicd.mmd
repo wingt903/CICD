@@ -17,7 +17,7 @@ flowchart TB
         A2[TPAM - Manual: Validate app exists in ServiceNow CMDB inventory]
         A3{System - ServiceNow: App found in CMDB inventory?}
         A4[TPAM - Manual: Inform CAR team to create CMDB record]
-        A5[CAR Team - System: Create CMDB CI record]
+        A5[CAR Team - Manual: Create CMDB CI record]
         A6[CAR Architect - Manual: Review HLD/NFR]
         A7{CAR Architect - Manual: Approval granted?}
         A8[TPAM - Manual: Update artifacts per CAR feedback]
@@ -82,5 +82,5 @@ flowchart TB
     class A3,A7,B4,E2 decision;
     class E3 action;
     class B5,E4 governance;
-    class A1,A2,A4,A6,A8 manual;
-    class A5,A9 system;
+    class A1,A2,A4,A5,A6,A8 manual;
+    class A9 system;
