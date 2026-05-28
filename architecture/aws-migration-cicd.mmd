@@ -4,6 +4,8 @@ flowchart TB
     classDef decision fill:#ffffff,stroke:#444,stroke-width:1.5px,color:#000;
     classDef action fill:#e8f0fe,stroke:#1a73e8,stroke-width:1.5px,color:#000;
     classDef governance fill:#fdecea,stroke:#d93025,stroke-width:1.5px,color:#000;
+    classDef manual fill:#fff8e1,stroke:#ef6c00,stroke-width:1.5px,color:#000;
+    classDef system fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#000;
 
     I1[New app onboarding request]
     I2[Existing app technical change]
@@ -11,12 +13,19 @@ flowchart TB
 
     subgraph S1["Stage 1 - Intake and Architecture Governance"]
         direction TB
-        A1[Validate or create CMDB CI record]
-        A2[Define or update HLD/LLD scope]
-        A3{Architecture approvals complete?}
-        A4[Refine architecture artifacts]
+        A1[TPAM - Manual: Write/Update HLD and NFR]
+        A2[TPAM - Manual: Validate app exists in ServiceNow CMDB inventory]
+        A3{System - ServiceNow: App found in CMDB inventory?}
+        A4[TPAM - Manual: Inform CAR team to create CMDB record]
+        A5[CAR Team - System: Create CMDB CI record]
+        A6[CAR Architect - Manual: Review HLD/NFR]
+        A7{CAR Architect - Manual: Approval granted?}
+        A8[TPAM - Manual: Update artifacts per CAR feedback]
         A1 --> A2 --> A3
-        A3 -- No --> A4 --> A2
+        A3 -- No --> A4 --> A5 --> A6
+        A3 -- Yes --> A6
+        A6 --> A7
+        A7 -- No --> A8 --> A1
     end
 
     subgraph S2["Stage 2 - CI/CD Orchestration and Quality Gates"]
@@ -61,13 +70,15 @@ flowchart TB
     I2 --> A2
     I3 --> A1
 
-    A3 -- Yes --> B1
+    A7 -- Yes --> B1
     B4 -- Yes --> C1
     C3 --> D1
     D3 --> E1
     E4 --> B1
 
-    class I1,I2,I3,A1,A2,A4,B1,B2,B3,C1,C2,C3,D1,D2,D3,E1 stage;
-    class A3,B4,E2 decision;
+    class I1,I2,I3,B1,B2,B3,C1,C2,C3,D1,D2,D3,E1 stage;
+    class A3,A7,B4,E2 decision;
     class E3 action;
     class B5,E4 governance;
+    class A1,A2,A4,A6,A8 manual;
+    class A5 system;
