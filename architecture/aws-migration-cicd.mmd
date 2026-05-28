@@ -1,0 +1,103 @@
+flowchart LR
+    %% Styling for high-level 5-stage process
+    classDef stage fill:#f7f7f7,stroke:#6c6c6c,stroke-width:1.5px,color:#000;
+    classDef decision fill:#ffffff,stroke:#444,stroke-width:1.5px,color:#000;
+    classDef action fill:#e8f0fe,stroke:#1a73e8,stroke-width:1.5px,color:#000;
+    classDef governance fill:#fdecea,stroke:#d93025,stroke-width:1.5px,color:#000;
+
+    %% Responsibility markers (actor ownership)
+    classDef tpamOwner stroke:#1565C0,stroke-width:3px,stroke-dasharray: 5 3;
+    classDef carOwner stroke:#6A1B9A,stroke-width:3px;
+
+    %% Process type markers
+    classDef manualProcess fill:#FFF8E1,color:#000;
+    classDef systemProcess fill:#E8F5E9,color:#000;
+
+    I1[New app onboarding request]
+    I2[Existing app technical change]
+    I3[Cyber remediation migration wave]
+
+    subgraph S1["Stage 1 - Intake and Architecture Governance"]
+        direction TB
+        A1[Validate or create CMDB CI record]
+        A2[Define or update HLD/LLD scope]
+        A3{Architecture approvals complete?}
+        A4[Refine architecture artifacts]
+        A1 --> A2 --> A3
+        A3 -- No --> A4 --> A2
+    end
+
+    subgraph S2["Stage 2 - CI/CD Orchestration and Quality Gates"]
+        direction TB
+        B1[Generate GitHub dispatch payload]
+        B2[Checkout source and IaC]
+        B3[Build and run quality/security checks]
+        B4{Pipeline gates passed?}
+        B5[Open remediation task]
+        B1 --> B2 --> B3 --> B4
+        B4 -- No --> B5
+    end
+
+    subgraph S3["Stage 3 - Secure AWS Build Execution"]
+        direction TB
+        C1[Assume AWS role via OIDC]
+        C2[Launch private builder via SSM]
+        C3[Run Ansible image build over SSM tunnel]
+        C1 --> C2 --> C3
+    end
+
+    subgraph S4["Stage 4 - Middleware Configuration and AMI Serialization"]
+        direction TB
+        D1{Select middleware profile}
+        D2[Apply WebLogic, Tomcat, or Python baseline]
+        D3[Register immutable golden AMI and capture evidence]
+        D1 --> D2 --> D3
+    end
+
+    subgraph S5["Stage 5 - Promotion, Deployment, and CMDB Feedback"]
+        direction TB
+        E1[Patch CMDB and change record with AMI and evidence]
+        E2{Promotion criteria met for target env?}
+        E3[Deploy via Terraform/ASG through dev -> test -> prod]
+        E4[Execute rollback or remediation path]
+        E1 --> E2
+        E2 -- Yes --> E3
+        E2 -- No --> E4
+    end
+
+    I1 --> A1
+    I2 --> A2
+    I3 --> A1
+
+    A3 -- Yes --> B1
+    B4 -- Yes --> C1
+    C3 --> D1
+    D3 --> E1
+    E4 --> B1
+
+    %% Base node groups
+    class I1,I2,I3,A1,A2,A4,B1,B2,B3,C1,C2,C3,D1,D2,D3,E1 stage;
+    class A3,B4,E2 decision;
+    class E3 action;
+    class B5,E4 governance;
+
+    %% Actor ownership (who is responsible)
+    class I1,I2,I3,A1,B1,E1 tpamOwner;
+    class A2,A3,A4,B2,B3,B4,B5,C1,C2,C3,D1,D2,D3,E2,E3,E4 carOwner;
+
+    %% Process type (manual vs system)
+    class I1,I2,I3,A1,A2,A3,A4,B1,B5,E2,E4 manualProcess;
+    class B2,B3,B4,C1,C2,C3,D1,D2,D3,E1,E3 systemProcess;
+
+    %% Reading guide
+    subgraph L0["Legend - How to read this diagram"]
+        direction TB
+        L1[TPAM responsibility]
+        L2[CAR Architect responsibility]
+        L3[Manual process]
+        L4[System process]
+    end
+    class L1 tpamOwner;
+    class L2 carOwner;
+    class L3 manualProcess;
+    class L4 systemProcess;
