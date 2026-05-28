@@ -75,7 +75,7 @@ flowchart TB
 
     subgraph S4[Stage 4 - Middleware Configuration and AMI Serialization]
         direction TB
-        D1{Which middleware profile applies?}
+        D1[Select middleware profile]
         D2[Apply WebLogic, Tomcat, or Python baseline]
         D3[Register immutable golden AMI and capture evidence]
         D1 --> D2 --> D3
@@ -85,7 +85,7 @@ flowchart TB
         direction TB
         E1[Patch CMDB and change record with AMI and evidence]
         E2{Promotion criteria met for target environment?}
-        E3[Deploy via Terraform and ASG through dev to test to prod]
+        E3[Deploy via Terraform and ASG through dev → test → prod]
         E4[Execute rollback or remediation path]
         E1 --> E2
         E2 -- Yes --> E3
@@ -103,7 +103,7 @@ flowchart TB
     E4 --> B1
 
     class I1,I2,I3 stage;
-    class A2,A7,B4,D1,E2 decision;
+    class A2,A7,B4,E2 decision;
     class E3 action;
     class B5,E4 governance;
     class A1,A2,A4,A5,A6,A7,A8 manualProcess;
