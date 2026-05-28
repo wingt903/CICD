@@ -42,6 +42,13 @@ flowchart TB
             A7{Approval granted?}
         end
 
+        subgraph A_SN[ServiceNow]
+            direction TB
+            A10[Project team creates ServiceNow service request]
+            A11{ServiceNow request approved?}
+            A12[Update request and resubmit for approval]
+        end
+
         subgraph A_GH[GitHub]
             direction TB
             A9[Stage handoff to CI/CD orchestration]
@@ -52,7 +59,9 @@ flowchart TB
         A2 -- Yes --> A6
         A6 --> A7
         A7 -- No --> A8 --> A6
-        A7 -- Yes --> A9
+        A7 -- Yes --> A10 --> A11
+        A11 -- No --> A12 --> A10
+        A11 -- Yes --> A9
     end
 
     subgraph S2[Stage 2 - CI/CD Orchestration and Quality Gates]
@@ -112,10 +121,10 @@ flowchart TB
 
     class I1,I2,I3 stage;
     class Team actor;
-    class A2,A7,B4,D1,E2 decision;
+    class A2,A7,A11,B4,D1,E2 decision;
     class E3 action;
     class B5,E4 governance;
-    class A1,A4,A5,A6,A8 manualProcess;
+    class A1,A4,A5,A6,A8,A10,A12 manualProcess;
     class A9,B1,B2,B3,B4,B5,C1,C2,C3,D2A,D2B,D2C,D3,E1,E3,E4 systemProcess;
     class LegendManual,LegendSystem legend;
     class LegendManual manualProcess;
