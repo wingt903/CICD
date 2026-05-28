@@ -16,7 +16,7 @@ flowchart TB
         direction LR
         L1[✍️ Manual process]
         L2[⚙️ System process]
-        L3[Actor shown as lane header]
+        L3[🏷️ Actor lane header indicates process owner]
     end
 
     subgraph S1[Stage 1 - Intake and Architecture Governance]
@@ -75,7 +75,7 @@ flowchart TB
 
     subgraph S4[Stage 4 - Middleware Configuration and AMI Serialization]
         direction TB
-        D1{Select middleware profile}
+        D1{Which middleware profile applies?}
         D2[Apply WebLogic, Tomcat, or Python baseline]
         D3[Register immutable golden AMI and capture evidence]
         D1 --> D2 --> D3
@@ -106,7 +106,7 @@ flowchart TB
     class A2,A7,B4,D1,E2 decision;
     class E3 action;
     class B5,E4 governance;
-    class A1,A2,A4,A5,A6,A7,A8,E2 manualProcess;
+    class A1,A2,A4,A5,A6,A7,A8 manualProcess;
     class A9,B1,B2,B3,B4,B5,C1,C2,C3,D1,D2,D3,E1,E3,E4 systemProcess;
     class L1,L2,L3 legend;
     class L1 manualProcess;
