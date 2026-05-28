@@ -8,19 +8,19 @@ graph LR
 
     Team[Project / Migration Team]
 
-    subgraph Governance["Governance & Request Layer"]
+    subgraph Governance["Trust Boundary: Governance & Request Layer"]
         SN[ServiceNow Catalog + CMDB]
         IH[IntegrationHub]
     end
 
-    subgraph Pipeline["CI/CD Orchestration Layer"]
+    subgraph Pipeline["Trust Boundary: CI/CD Orchestration Layer"]
         GH[GitHub Repository]
         GHA[GitHub Actions]
         IMG[Ansible Image Build Playbooks]
         ANS[Ansible]
     end
 
-    subgraph AWS["AWS Control Plane"]
+    subgraph AWS["Trust Boundary: AWS Control Plane"]
         OIDC[AWS IAM OIDC Provider]
         SSMSESS[AWS SSM Session Manager]
         PARAM[AWS SSM Parameter Store]
@@ -28,33 +28,33 @@ graph LR
         AMI[Golden AMI Registry]
     end
 
-    subgraph Runtime["AWS Runtime / Build Targets"]
+    subgraph Runtime["Trust Boundary: AWS Runtime / Build Targets"]
         EC2[Private Builder EC2]
         APP[Target Workloads\nWebLogic / Tomcat / Python]
     end
 
-    Team --> SN
-    SN --> IH
-    IH --> GHA
+    Team -->|Submit service request| SN
+    SN -->|Trigger workflow event| IH
+    IH -->|Dispatch pipeline run| GHA
     SN -. CMDB metadata / change context .-> GHA
 
-    GH --> GHA
-    GHA --> OIDC
-    OIDC --> GHA
+    GH -->|Push/PR pipeline trigger| GHA
+    GHA -->|Request federated identity token| OIDC
+    OIDC -->|Return temporary AWS credentials| GHA
 
-    GHA --> IMG
-    IMG --> EC2
-    SSMSESS --> EC2
+    GHA -->|Invoke image build playbooks| IMG
+    IMG -->|Run playbook execution| EC2
+    SSMSESS -->|Open secure management session| EC2
 
-    GHA --> SSMSESS
-    GHA --> ANS
-    ANS --> EC2
-    PARAM --> EC2
+    GHA -->|Start SSM automation/session| SSMSESS
+    GHA -->|Launch configuration tasks| ANS
+    ANS -->|Configure builder host| EC2
+    PARAM -->|Provide approved build parameters| EC2
 
-    EC2 --> AMI
-    AMI --> APP
-    EC2 --> INV
-    INV --> SN
+    EC2 -->|Publish hardened image| AMI
+    AMI -->|Deploy image to workloads| APP
+    EC2 -->|Send inventory state| INV
+    INV -->|Sync inventory to CMDB| SN
 
     class Team actor;
     class SN,IH governance;
