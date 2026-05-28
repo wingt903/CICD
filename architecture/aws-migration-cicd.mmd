@@ -14,8 +14,8 @@ flowchart TB
 
     subgraph S0[Notation]
         direction LR
-        L1[[M] Manual process]
-        L2[[S] System process]
+        LegendManual[[M] Manual process]
+        LegendSystem[[S] System process]
     end
 
     subgraph S1[Stage 1 - Intake and Architecture Governance]
@@ -74,7 +74,7 @@ flowchart TB
 
     subgraph S4[Stage 4 - Middleware Configuration and AMI Serialization]
         direction TB
-        D1{Select middleware profile?}
+        D1{Select middleware profile}
         D2A[Apply WebLogic baseline]
         D2B[Apply Tomcat baseline]
         D2C[Apply Python baseline]
@@ -111,6 +111,6 @@ flowchart TB
     class B5,E4 governance;
     class A1,A4,A5,A6,A8 manualProcess;
     class A9,B1,B2,B3,B4,B5,C1,C2,C3,D2A,D2B,D2C,D3,E1,E3,E4 systemProcess;
-    class L1,L2 legend;
-    class L1 manualProcess;
-    class L2 systemProcess;
+    class LegendManual,LegendSystem legend;
+    class LegendManual manualProcess;
+    class LegendSystem systemProcess;
