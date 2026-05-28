@@ -1,58 +1,73 @@
-graph TD
-    %% Styling / Themes
-    classDef intake fill:#E3F2FD,stroke:#0D47A1,stroke-width:2px;
-    classDef orchestrator fill:#EDE7F6,stroke:#4A148C,stroke-width:2px;
-    classDef cloudEngine fill:#FFF3E0,stroke:#E65100,stroke-width:2px;
-    classDef targetState fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px;
+flowchart LR
+    %% Styling for high-level 5-stage process
+    classDef stage fill:#f7f7f7,stroke:#6c6c6c,stroke-width:1.5px,color:#000;
+    classDef decision fill:#ffffff,stroke:#444,stroke-width:1.5px,color:#000;
+    classDef action fill:#e8f0fe,stroke:#1a73e8,stroke-width:1.5px,color:#000;
+    classDef governance fill:#fdecea,stroke:#d93025,stroke-width:1.5px,color:#000;
 
-    %% --- PHASE 1: INTAKE & GOVERNANCE ---
-    subgraph Phase 1: ServiceNow Entry Point
-        A[Project Team Raises Service Request] --> B(ServiceNow Catalog workflow)
-        B --> C{Approved?}
-        C -- No --> D[Reject & Close Ticket]
-        C -- Yes --> E[Create/Update Configuration Item in CMDB]
-        E --> F[Generate Webhook Payload ]
-    end
-    class A,B,C,D,E,F intake;
+    I1[New app onboarding request]
+    I2[Existing app technical change]
+    I3[Cyber remediation migration wave]
 
-    %% --- PHASE 2: PIPELINE ORCHESTRATION ---
-    subgraph Phase 2: GitHub Actions Engine
-        F --> G[GitHub Actions Triggered via Repository Dispatch]
-        G --> H[Run Git Checkout <br/> App Code + Ansible Playbooks]
-        H --> I{Is Java Tech Stack?}
-        I -- Yes (Tomcat/WebLogic) --> J[Compile Source via Maven/Gradle to .WAR/.EAR]
-        I -- No (Python) --> K[Skip Compilation Step]
-        J --> L[Request Temp AWS Credentials via IAM OIDC]
-        K --> L
-        L --> M[Initialize Ansible Controller Runtime & SSM Session Manager Plugin]
+    subgraph S1["Stage 1 - Intake and Architecture Governance"]
+        direction TB
+        A1[Validate or create CMDB CI record]
+        A2[Define or update HLD/LLD scope]
+        A3{Architecture approvals complete?}
+        A4[Refine architecture artifacts]
+        A1 --> A2 --> A3
+        A3 -- No --> A4 --> A2
     end
-    class G,H,I,J,K,L,M orchestrator;
 
-    %% --- PHASE 3: SECURE CLOUD BAKING ---
-    subgraph Phase 3: AWS Systems Manager & AMI Build Execution
-        M --> N[Ansible Launches Temp EC2 Instance in Private Subnet]
-        N --> O[Establish Encrypted SSM Session Manager Tunnel]
-        O --> P[Stream Ansible Playbooks & App Binaries over SSM Tunnel]
-        P --> Q{Evaluate 'middleware_type' from CMDB}
-        
-        Q -- weblogic --> R1[Ansible: Run Silent WebLogic Provisioning & Domain Setup]
-        Q -- tomcat --> R2[Ansible: Deploy .WAR into /webapps + Configure JVM]
-        Q -- python --> R3[Ansible: Establish Python venv + Pip install requirements]
-        
-        R1 --> S[Verify Configurations & Shutdown Instance]
-        R2 --> S
-        R3 --> S
+    subgraph S2["Stage 2 - CI/CD Orchestration and Quality Gates"]
+        direction TB
+        B1[Generate GitHub dispatch payload]
+        B2[Checkout source and IaC]
+        B3[Build and run quality/security checks]
+        B4{Pipeline gates passed?}
+        B5[Open remediation task]
+        B1 --> B2 --> B3 --> B4
+        B4 -- No --> B5
     end
-    class N,O,P,Q,R1,R2,R3,S cloudEngine;
 
-    %% --- PHASE 4: ASSET SERIALIZATION & FEEDBACK LOOP ---
-    subgraph Phase 4: Target State & CMDB Loopback
-        S --> T[Ansible Stops Builder Instance]
-        T --> U[AWS Registers New Immutable Golden AMI]
-        U --> V[Terminate Temporary Builder Instance]
-        V --> W[GitHub Actions Captures New AMI ID]
-        W --> X[Outbound API Patch Call Back to ServiceNow]
-        X --> Y[Update CMDB CI and Change Record <br/> with AMI + Ansible execution evidence]
-        Y --> Z[Terraform / Auto Scaling Group Triggered with New AMI]
+    subgraph S3["Stage 3 - Secure AWS Build Execution"]
+        direction TB
+        C1[Assume AWS role via OIDC]
+        C2[Launch private builder via SSM]
+        C3[Run Ansible image build over SSM tunnel]
+        C1 --> C2 --> C3
     end
-    class T,U,V,W,X,Y,Z targetState;
+
+    subgraph S4["Stage 4 - Middleware Configuration and AMI Serialization"]
+        direction TB
+        D1{Select middleware profile}
+        D2[Apply WebLogic, Tomcat, or Python baseline]
+        D3[Register immutable golden AMI and capture evidence]
+        D1 --> D2 --> D3
+    end
+
+    subgraph S5["Stage 5 - Promotion, Deployment, and CMDB Feedback"]
+        direction TB
+        E1[Patch CMDB and change record with AMI and evidence]
+        E2{Promotion criteria met for target env?}
+        E3[Deploy via Terraform/ASG through dev -> test -> prod]
+        E4[Execute rollback or remediation path]
+        E1 --> E2
+        E2 -- Yes --> E3
+        E2 -- No --> E4
+    end
+
+    I1 --> A1
+    I2 --> A2
+    I3 --> A1
+
+    A3 -- Yes --> B1
+    B4 -- Yes --> C1
+    C3 --> D1
+    D3 --> E1
+    E4 --> B1
+
+    class I1,I2,I3,A1,A2,A4,B1,B2,B3,C1,C2,C3,D1,D2,D3,E1 stage;
+    class A3,B4,E2 decision;
+    class E3 action;
+    class B5,E4 governance;
