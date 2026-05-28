@@ -7,6 +7,8 @@ graph TD
     classDef orchestrator fill:#EDE7F6,stroke:#4A148C,stroke-width:2px;
     classDef cloudEngine fill:#FFF3E0,stroke:#E65100,stroke-width:2px;
     classDef targetState fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px;
+    classDef tpamOwner stroke:#1565C0,stroke-width:4px,stroke-dasharray: 5 3;
+    classDef carOwner stroke:#6A1B9A,stroke-width:4px;
 
     %% --- PHASE 1: INTAKE & GOVERNANCE ---
     subgraph Phase 1: ServiceNow Entry Point
@@ -58,4 +60,15 @@ graph TD
         X --> Y[Terraform / Auto Scaling Group Triggered with New AMI]
     end
     class T,U,V,W,X,Y targetState;
+
+    %% --- OWNERSHIP MARKERS ---
+    subgraph Ownership Legend
+        Z1[TPAM Responsibility]
+        Z2[CAR Architect Responsibility]
+    end
+    class Z1 tpamOwner;
+    class Z2 carOwner;
+
+    class A,B,C,D,E,F,W,X tpamOwner;
+    class G,H,I,J,K,L,M,N,O,P,Q,R1,R2,R3,S,T,U,V,Y carOwner;
 ```
