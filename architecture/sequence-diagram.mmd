@@ -1,17 +1,14 @@
 sequenceDiagram
     autonumber
     actor Team as Project Migration Team
-    actor Approver as Management / CAB Approver
     participant SN as ServiceNow (CMDB)
     participant GH as GitHub Actions Runner
     participant AWS_SSM as AWS Systems Manager
     participant EC2 as Temporary Builder EC2
 
     %% Phase 1: Intake & Governance
-    Team->>Approver: Submit Migration Request for Initial Approval
-    Approver-->>Team: Approval Granted
-    Team->>SN: Create ServiceNow Service Request
-    Note over SN: ServiceNow Approval Workflow completes.<br>Create/Update CMDB CI Configuration.
+    Team->>SN: Submit Catalog Migration Request
+    Note over SN: Approvals complete.<br>Create/Update CMDB CI Configuration.
     SN->>GH: Trigger Workflow via REST Webhook (Repository Dispatch)<br>[Payload: AppID, Middleware Type, Env, ChangeID]
 
     %% Phase 2: Orchestration & Checkout
