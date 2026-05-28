@@ -21,11 +21,13 @@ flowchart TB
         A6[CAR Architect - Manual: Review HLD/NFR]
         A7{CAR Architect - Manual: Approval granted?}
         A8[TPAM - Manual: Update artifacts per CAR feedback]
+        A9[Stage handoff to CI/CD orchestration]
         A1 --> A2 --> A3
         A3 -- No --> A4 --> A5 --> A6
         A3 -- Yes --> A6
         A6 --> A7
-        A7 -- No --> A8 --> A1
+        A7 -- No --> A8 --> A6
+        A7 -- Yes --> A9
     end
 
     subgraph S2["Stage 2 - CI/CD Orchestration and Quality Gates"]
@@ -70,7 +72,7 @@ flowchart TB
     I2 --> A2
     I3 --> A1
 
-    A7 -- Yes --> B1
+    A9 --> B1
     B4 -- Yes --> C1
     C3 --> D1
     D3 --> E1
@@ -80,5 +82,5 @@ flowchart TB
     class A3,A7,B4,E2 decision;
     class E3 action;
     class B5,E4 governance;
-    class A1,A2,A4,A6,A8 manual;
+    class A1,A2,A4,A6,A8,A9 manual;
     class A5 system;
