@@ -1,0 +1,380 @@
+App_as_Code_001
+
+Automated Application Deployment and Configuration
+As a Product Engineer / Platform Engineer,
+I want application deployments and configuration to be automated and repeatable across environments,
+so that reliance on manual activities is reduced, the risk of misconfiguration is lowered, and services can be delivered securely and at pace.
+
+ 
+
+.
+
+Scenario: Deployments and configuration are automated
+
+Given an application is ready to be deployed
+
+When deployment and configuration are executed
+
+Then they are performed automatically without manual steps
+
+And manual intervention is not required to complete a successful deployment.
+
+Scenario: Deployments are repeatable across environments
+
+Given the same application version is deployed to different environments
+
+When the deployment process is repeated
+
+Then deployments produce consistent and predictable outcomes
+
+And configuration does not vary due to manual actions.
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+App_as_Code_002
+
+Configuration Drift Control
+As a Product Team,
+We want the organisation to continuously detect and automatically remediate unauthorised or unsupported configuration changes across in-scope applications, middleware and databases, 
+So that systems remain aligned to approved secure baselines, vulnerability exposure is minimised, and operational or audit risk does not accumulate between deployments and patch cycles.
+
+Scenario: Detect unauthorised changes
+
+Given manual changes can be applied outside of the application deployment pipeline
+
+When scheduled scans or continuous checks run
+
+Then live configurations must be compared against the version stored in the repository. 
+
+ 
+
+Scenario: Remediate unauthorised changes
+
+Given a manual change has been applied
+
+When scheduled scans or continuous checks are ran 
+
+Then configuration is updated to match the version stored in the repository
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+App_as_Code_003
+
+Automated Security Hardening and Patching (middleware and database)
+As a Cyber Security Engineer,
+
+I want the system to automatically apply and validate approved security hardening and patches,
+
+So that we minimize our vulnerability window and ensure continuous audit compliance without manual intervention.
+
+Scenario: Automatically apply approved security hardening and patches
+
+Given middleware or database components are deployed, updated, or identified as requiring security remediation
+
+When automated security controls are executed
+
+Then approved security hardening controls and security patches are applied automatically
+
+ 
+
+Scenario: Security hardening and patches are validated after application
+
+Given security hardening controls and patches have been applied
+
+When validation is performed
+
+Then the system confirms that the required controls and patches are correctly applied
+
+And any failure, partial application, or non‑compliance is detected and recorded
+
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+App_as_Code_004
+
+Evidence‑Driven Configuration Assurance
+As a Cyber Security Engineer,
+I want clear, auditable evidence that deployed configurations and patch levels continuously follow approved standards,
+so that cyber assurance is maintained, regulatory compliance can be demonstrated, and audits or security incidents can be responded to quickly and effectively.
+
+Scenario: Continuous Configuration Compliance Monitoring
+
+Given an approved configuration and patch baseline exists
+
+When systems are deployed or updated in the environment
+
+Then the system must automatically assess and record whether configurations and patch levels align with the approved baseline
+
+ 
+
+Scenario: Evidence Generation and Storage
+
+Given configuration and patch compliance checks are performed
+
+When results are generated
+
+Then the system must store auditable evidence including timestamps, system identifiers, baseline references, and compliance status
+
+ 
+
+Scenario: Audit Reporting
+
+Given an auditor requests evidence of configuration and patch compliance
+
+When a report is generated
+
+Then the system must provide clear, exportable reports showing historical and current compliance status across systems
+
+ 
+
+Scenario: Integrity and Auditability of Evidence
+
+Given compliance evidence is stored
+
+When it is accessed or reviewed
+
+Then the evidence must be tamper‑evident and maintain a complete audit trail of changes and access 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+App_as_Code_005
+
+Reduction of Manual Controls and Rework
+As a Product Engineer,
+I want configuration checks, setup activities, and post‑deployment changes to be performed automatically and consistently,
+so that reliance on manual intervention is reduced, configuration‑related incidents are minimised, and engineering teams can focus on delivering value rather than rework.
+
+Scenario: Elimination of Manual Verification Steps
+
+Given a deployment pipeline exists
+
+When a release progresses through environments
+
+Then all configuration and security checks must be executed automatically within the pipeline, removing manual approval or verification steps wherever possible
+
+ 
+
+Scenario: Reduction of Post‑Deployment Fixes
+
+Given a deployment has completed
+
+When the system enters operational use
+
+Then there must be no requirement for manual configuration fixes due to missed or inconsistent setup activities
+
+ 
+
+Scenario: Security Risk Reduction through Automation
+
+Given manual configuration activities are identified as a source of risk
+
+When automation policies are implemented
+
+Then the number of configuration‑related security incidents must be reduced through consistent, repeatable automated controls
+
+ 
+
+Scenario: Auditability of Automated Controls
+
+Given automated processes replace manual controls
+
+When configuration actions and validations occur
+
+Then the system must produce auditable logs demonstrating that controls were executed consistently and successfully
+
+ 
+
+Scenario: Engineering Productivity Improvement
+
+Given engineering teams perform deployments and configuration tasks
+
+When automation is in place
+
+Then the time spent on manual setup, validation, and rework must be reduced, enabling focus on higher‑value engineering and security improvements
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+App_as_Code_006
+
+Configuration and Health Monitoring
+As a Cyber Security Operations Analyst / Platform Engineer,
+I want continuous monitoring and validation of the health and baseline configuration compliance of application platforms, middleware, runtime environments, and databases (excluding custom application code),
+So that I can detect security or stability issues early and support faster, evidence‑driven recovery during incidents.
+
+Scenario: Continuous Platform Health Monitoring
+
+Given application platforms, middleware, runtime environments, and databases are deployed
+
+When systems are in operation
+
+Then their baseline health (availability, performance, resource utilisation, and error conditions) must be continuously monitored
+
+ 
+
+Scenario: Exclusion of Custom Application Code
+
+Given application workloads include custom-developed code
+
+When monitoring and validation are performed
+
+Then only platform, middleware, runtime, and database layers are assessed, explicitly excluding custom application code
+
+ 
+
+Scenario: Evidence and Audit Logging
+
+Given monitoring and validation activities occur
+
+When results are generated
+
+Then logs must be retained with timestamps, system identifiers, and compliance/health status to support audit and forensic needs
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+App_as_Code_007
+
+Scalable and Governed Delivery Capability
+As an App Owner,
+I want to use a centralised library of governed CI/CD templates with embedded security controls,
+So that I can deploy applications consistently and securely at scale without manual security reconfiguration.
+
+Scenario: Standardised Deployment using a Governed Template
+
+Given a developer is onboarding a new application to the platform
+
+And a library of approved, hardened deployment templates exists
+
+When the developer references the governed template in their pipeline configuration
+
+Then the application is deployed using the organization's standard security configurations
+
+And all mandatory cyber controls (e.g., secret scanning, image signing) are automatically executed.
+
+ 
+
+Scenario: Detection of Non-Compliant Configuration
+
+Given an application is using a governed deployment template
+
+When a user attempts to override a mandatory security control (e.g., disabling port 443 requirement)
+
+Then the deployment pipeline must fail
+
+And an error message must be returned stating that the configuration violates organizational security policy.
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+App_as_Code_008
+
+Deployment Guardrails & Runtime Compliance
+As a Product Team,
+
+we want the CI/CD pipeline to automatically verify application, middleware and database versions against the approved runtime compatibility and security baseline,
+
+so that only supported, secure, and compliant technology stacks can be deployed into any environment.
+
+Scenario: Automatically verify against security baseline
+
+Given a deployment is initiated through the CI/CD pipeline
+
+When the pipeline validates the deployment contents
+
+Then all runtime technologies and versions are checked against the approved Runtime Technology Compatibility Matrix
+
+And validation occurs before any installation takes place
+
+Scenario: Unsupported runtime stacks are automatically blocked
+
+Given unapproved runtimes have been detected
+
+When deployment is initiated
+
+Then guardrails prevent deployment of unapproved/non-compliant technology stacks
+
+Scenario: Provide  clear audit trail of approved and rejected deployments
+
+Given a deployment is validated by the CI/CD pipeline
+
+When a validation decision is reached (approved or rejected)
+
+Then the decision is automatically logged for every validation without exception
+
+And the log records whether the deployment was approved or rejected
+
+And where rejected, the reason for rejection is captured
+
+And sufficient detail is recorded to identify the deployment
+
+And the logged information provides a clear, retrievable audit trail of validation decisions over time
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
