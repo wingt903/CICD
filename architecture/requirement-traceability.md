@@ -275,8 +275,62 @@ _Scenario 5 – Engineering Productivity Improvement_
 **Architect Verdict**
 - App_as_Code_005 is **fully met**. The architecture eliminates manual verification steps by automating all post-ServiceNow-approval pipeline stages (Stages 2–5 in `aws-migration-cicd.mmd`) including automated security gates (SAST, IaC scans, image scans) and system-driven deployment promotion. Post-deployment fixes are prevented by Ansible configuration-as-code baked into immutable golden AMIs before deployment, and a scheduled drift detection and auto-remediation loop (EventBridge → Drift Reconciler → Policy Gate → Enforce Baseline → Convergence Verification) that corrects any post-deployment drift without manual engineering action. Security risk is reduced through consistent, repeatable automated controls applied identically on every pipeline run (tfsec/Checkov, Inspector, GuardDuty, OIDC short-lived credentials, SSM zero-trust tunnel). Every automated control execution publishes a normalised, KMS-signed, tamper-evident evidence record to the compliance evidence store, providing complete auditability. Engineering productivity is improved because all build, configuration, scan, deployment, and reconciliation activities are orchestrated automatically, removing manual setup, verification, and rework from the engineering workflow.
 
-### 6) Requirement 6 (ID to be confirmed)
-**Status**: Pending input
+### 6) App_as_Code_006
+
+**Requirement Summary**
+- Continuously monitor and validate baseline health and baseline configuration compliance for platform, middleware, runtime, and database layers.
+- Detect issues across availability, performance, resource utilization, and error conditions while systems are in operation.
+- Exclude custom application code from this requirement’s monitoring/validation scope.
+- Retain timestamped, system-linked health/compliance evidence for audit and forensics.
+
+**Status**: **Partially Met** (core monitoring and evidence controls are present; explicit scope-exclusion control for custom application code must be formalized)
+
+**Scenario Compliance Summary**
+
+| Scenario | Requirement Expectation | Verdict | Key References |
+|---|---|---|---|
+| Continuous Platform Health Monitoring | Baseline health and baseline compliance for platform/middleware/runtime/database are continuously monitored in operation. | **Met** | `architecture/target-component-context.mmd:42-56,58-63,101-122`, `architecture/component-context-diagram.mmd:26,34,85-89,96-97`, `architecture/sequence-diagram.mmd:54-93`, `architecture/full-pipeline-tech-stack.md:19,22-24` |
+| Exclusion of Custom Application Code | Monitoring and validation for this control are restricted to platform, middleware, runtime, and database layers, excluding custom code. | **Partially Met** | `architecture/target-component-context.mmd:49-63`, `architecture/sequence-diagram.mmd:54-93`, `architecture/compliance-evidence-store.md:11-24,32-39` |
+| Evidence and Audit Logging | Monitoring/validation outputs are retained with timestamps, system identifiers, and health/compliance status for audit/forensics. | **Met** | `architecture/compliance-evidence-store.md:11-27,56-71,117-127`, `architecture/component-context-diagram.mmd:40-48,98-103`, `architecture/target-component-context.mmd:65-72,123-134`, `architecture/sequence-diagram.mmd:50-53,70-73,86-93` |
+
+**Traceability Evidence**
+
+_Scenario 1 – Continuous Platform Health Monitoring_
+
+| Evidence | Traceability |
+|---|---|
+| `architecture/target-component-context.mmd:42-56` | CloudWatch + OpenTelemetry + X-Ray telemetry, CloudWatch alarms/SNS, scheduled reconciliation, drift findings, baseline enforcement, and convergence verification establish continuous operational monitoring for runtime/platform layers. |
+| `architecture/target-component-context.mmd:58-63,118-122` | Dedicated database drift detector, migration orchestration, rollback path, and post-remediation validation provide continuous DB-layer health/compliance validation. |
+| `architecture/component-context-diagram.mmd:26,85-89` | Runtime security posture plus SSM inventory feedback continuously surfaces runtime and platform state into governance systems. |
+| `architecture/sequence-diagram.mmd:54-93` | EventBridge-driven recurring drift and DB control loops validate baseline compliance and publish outcomes continuously during operation. |
+| `architecture/full-pipeline-tech-stack.md:19,22-24` | Continuous threat/posture monitoring, asset state reconciliation, telemetry/tracing, and alarm routing provide sustained availability/performance/resource/error visibility. |
+
+_Scenario 2 – Exclusion of Custom Application Code_
+
+| Evidence | Traceability |
+|---|---|
+| `architecture/target-component-context.mmd:49-63` | Drift and DB control lanes are modeled around infrastructure baseline, middleware/runtime configuration, and database schema/parameter controls (not custom code logic validation). |
+| `architecture/sequence-diagram.mmd:54-93` | Continuous validation sequence is scoped to Terraform/config baseline convergence and DB schema/config drift control workflows. |
+| `architecture/compliance-evidence-store.md:11-24,32-39` | Evidence model and sources support control-scoped records (`control_id`, `source_system`) that can enforce non-code monitoring scope, but explicit exclusion policy is not yet defined. |
+
+_Scenario 3 – Evidence and Audit Logging_
+
+| Evidence | Traceability |
+|---|---|
+| `architecture/compliance-evidence-store.md:11-24` | Canonical evidence schema includes required timestamp (`timestamp`), system identifier (`system_id`), baseline reference (`baseline_ref`), and compliance/health outcome (`result`, `remediation_state`). |
+| `architecture/component-context-diagram.mmd:40-48,98-103` | EventBridge evidence bus, signing ingestor, immutable S3 evidence store, integrity verifier, and CloudTrail audit log provide retained, tamper-evident evidence. |
+| `architecture/target-component-context.mmd:65-72,123-134` | Central evidence ingest/index, daily integrity verification, and access/change audit logging are modeled as first-class architecture components. |
+| `architecture/sequence-diagram.mmd:50-53,70-73,86-93` | Pipeline, drift, and DB monitoring flows all emit normalized evidence and generate CloudTrail-captured write events for forensic traceability. |
+
+**Architectural Additions Required to Fully Meet App_as_Code_006**
+
+| Gap Area (Open) | Required Addition to Fulfill Requirement |
+|---|---|
+| Explicit exclusion of custom application code | Add a formal monitoring-scope policy for App_as_Code_006 that limits eligible `control_id` domains to `platform`, `middleware`, `runtime`, and `database`, and rejects/filters `application_code` controls at evidence ingest and reporting layers. |
+| Enforced evidence classification for scope auditing | Extend evidence governance with a mandatory layer-scope attribute and validation rule so auditors can prove all App_as_Code_006 records exclude custom code assessments. |
+
+**Architect Verdict**
+- App_as_Code_006 is **largely implemented** for continuous platform/runtime/database health and compliance monitoring with strong evidence retention and auditability. To fully satisfy the requirement, the architecture must add an explicit and enforceable scope-boundary control that excludes custom application code from this requirement’s monitoring and validation evidence set.
 
 ### 7) Requirement 7 (ID to be confirmed)
 **Status**: Pending input
