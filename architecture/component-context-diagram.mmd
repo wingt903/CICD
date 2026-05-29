@@ -12,6 +12,7 @@ graph TB
         direction TB
         GH[GitHub\nRepository]
         GHA[GitHub Actions]
+        RTCMVAL[RTCM Validator\nPre-install Version Policy]
         IMG[Ansible Image Build\nPlaybooks]
         ANS[Ansible]
         SGATE{Security and Quality Gates Passed?}
@@ -21,6 +22,7 @@ graph TB
         direction LR
         SAST[Code Security Scans\nSAST + Dependency + Secret]
         IAC[IaC Policy Scans\ntfsec + Checkov]
+        RTCM[Runtime Technology Compatibility Matrix\nApproved App + Middleware + DB Versions]
         AMISCAN[Artifact Security Scans\nECR + Inspector]
         IGATE{Image Scan Passed?}
         RUNTIMESEC[Runtime Security Posture\nSecurity Hub + GuardDuty + IAM Access Analyzer]
@@ -62,8 +64,13 @@ graph TB
     GHA -->|Request federated identity token| OIDC
     OIDC -->|Return temporary AWS credentials| GHA
 
+    GH -->|Versioned RTCM artifact| RTCM
+    PARAM -->|Mirror approved RTCM baseline| RTCM
+    GHA -->|Read declared stack versions| RTCMVAL
+    RTCM -->|Approved version policy| RTCMVAL
     GHA -->|Run application security scans| SAST
     GHA -->|Run IaC policy validation| IAC
+    RTCMVAL -->|Compatibility gate evidence| SGATE
     SAST -->|Gate evidence| SGATE
     IAC -->|Gate evidence| SGATE
     SGATE -->|Passed, proceed with image build| IMG
@@ -90,6 +97,7 @@ graph TB
 
     %% Evidence publication flows into the central evidence bus
     GHA -->|Publish pipeline stage evidence| EVTBUS
+    RTCMVAL -->|Publish approved or rejected RTCM evidence| EVTBUS
     SAST -->|Publish scan evidence| EVTBUS
     IAC -->|Publish IaC policy evidence| EVTBUS
     AMISCAN -->|Publish image scan evidence| EVTBUS
@@ -117,12 +125,14 @@ graph TB
     %% pipeline
     style GH fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
     style GHA fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
+    style RTCMVAL fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
     style IMG fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
     style ANS fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
     style SGATE fill:#ffffff,stroke:#444444,stroke-width:1.5px,color:#000
     %% security
     style SAST fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#000
     style IAC fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#000
+    style RTCM fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#000
     style AMISCAN fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#000
     style IGATE fill:#ffffff,stroke:#444444,stroke-width:1.5px,color:#000
     style RUNTIMESEC fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#000

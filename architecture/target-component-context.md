@@ -17,6 +17,7 @@ This target context extends the reference migration diagram with full automated 
 ## Capability mapping
 
 - Artifact management: ECR + CodeArtifact + release manifest + SBOM/provenance
+- Runtime compatibility governance: versioned RTCM artifact + SSM Parameter Store mirror + pre-install validation gate
 - Infra provisioning: Terraform with isolated backend and environment tfvars
 - Image build and configuration: Ansible-driven EC2 build flow over SSM (no Packer dependency)
 - Security scanning: SAST/dependency/secret + tfsec/Checkov + Inspector/ECR scans

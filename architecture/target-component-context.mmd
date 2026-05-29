@@ -15,6 +15,7 @@ graph TD
       B1[GitHub Actions Pipeline]
       B2[GitHub Environments<br/>dev/test/prod]
       B3[Release Manifest<br/>Digest + AMI + IaC Version]
+      B4[RTCM Validation Gate<br/>Pre-install Runtime Policy Check]
     end
 
     subgraph Security and Quality Gates
@@ -27,8 +28,9 @@ graph TD
     subgraph Artifact Management
       D1[Amazon ECR<br/>Immutable Tags + Digest]
       D2[AWS CodeArtifact<br/>Python/Java Packages]
-      D3[SSM Parameter Store<br/>/dev /test /prod Approved AMIs]
+      D3[SSM Parameter Store<br/>/dev /test /prod Approved AMIs + RTCM Baseline]
       D4[SBOM + Build Provenance]
+      D5[Runtime Technology Compatibility Matrix<br/>Approved App + Middleware + DB Versions]
     end
 
     subgraph AWS Runtime by Environment
@@ -80,12 +82,16 @@ graph TD
     A1 --> B1
     A2 --> B1
     A3 --> B1
-    B1 --> C1 --> B3
-    B1 --> C2 --> B3
-    B1 --> D4 --> B3
+    B1 --> B4
+    D3 --> B4
+    D5 --> B4
+    B4 --> C1 --> B3
+    B4 --> C2 --> B3
+    B4 --> D4 --> B3
     B1 --> D1
     B1 --> D2
     B1 --> D3
+    B1 --> D5
 
     B3 --> B2
     B2 --> E1 --> E4
@@ -122,6 +128,7 @@ graph TD
 
     %% Evidence ingest from all sources into the central evidence bus
     B1 --> I1
+    B4 --> I1
     G6 --> I1
     H4 --> I1
     C4 --> I1

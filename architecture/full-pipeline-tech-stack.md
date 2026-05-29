@@ -4,7 +4,9 @@
 |---|---|---|---|
 | Governance & Portal | Request & CMDB | ServiceNow (IntegrationHub) | Operational intake and CMDB update source for migration activities. |
 | Governance Automation | Change-Controlled Runbooks | Ansible Playbooks | Executes CMDB-driven pre-check, patch, and remediation runbooks as code, with auditable execution logs linked to change records. |
+| Runtime Baseline Governance | Runtime Technology Compatibility Matrix | Versioned JSON artifact + AWS SSM Parameter Store | Stores the approved application, middleware, and database version baseline consumed by the pipeline before any installation or deployment activity. |
 | Orchestration | CI/CD Engine | GitHub Actions | Event-driven pipeline manager for build, test, scan, release, and controlled promotion. |
+| Runtime Compliance Gate | Pre-install Version Validation | GitHub Actions + RTCM Validator | Reads declared stack versions from deployment payloads/manifests, checks them against the approved RTCM, fails closed on unsupported versions, and logs every approval/rejection decision. |
 | Environment Governance | Promotion Controls | GitHub Environments (`dev`, `test`, `prod`) | Enforces release order, approvals, and deployment protection rules per stage. |
 | Identity / Trust | Security Gateway | AWS IAM OIDC Provider | Federated short-lived credentials for GitHub deployments without long-lived keys. |
 | Artifact Registry | Container Repository | Amazon ECR | Stores immutable container tags and digest-based deployment references. |
@@ -25,7 +27,7 @@
 | Release Contract | Release Manifest | JSON Manifest Artifact | Carries approved digests, AMI paths, and IaC version as the deployable unit. |
 | Rollback | Safe Recovery Controls | Blue/Green/Canary + AMI rollback + IaC revert | Enables automated/controlled rollback for app, OS image, and infra failures. |
 | Compliance Evidence Store | Immutable Evidence Repository | Amazon S3 (Object Lock + Versioning) + AWS KMS CMK | Stores signed, append-only compliance evidence records from all pipeline and runtime sources. Object Lock (Governance mode, 7-year retention) prevents tampering or premature deletion. |
-| Evidence Ingest | Evidence Normalization Pipeline | EventBridge + AWS Lambda (Evidence Ingestor) | Receives normalized evidence events from GitHub Actions, SSM, Security Hub, Drift Reconciler, and DB Drift Controller; validates schema, signs records with KMS, and writes to the evidence store. |
+| Evidence Ingest | Evidence Normalization Pipeline | EventBridge + AWS Lambda (Evidence Ingestor) | Receives normalized evidence events from GitHub Actions, RTCM Validator, SSM, Security Hub, Drift Reconciler, and DB Drift Controller; validates schema, signs records with KMS, and writes to the evidence store. |
 | Evidence Integrity | Cryptographic Verification | AWS KMS (Sign/Verify) + AWS Lambda (Integrity Verifier) | Daily scheduled Lambda re-derives SHA-256 hashes and validates KMS signatures for every evidence record; publishes pass/fail metrics and alerts via CloudWatch and SNS on any anomaly. |
 | Evidence Audit Trail | Access and Change Logging | AWS CloudTrail (S3 data events + management events) | Captures every evidence read, write, delete attempt, and lock override as immutable CloudTrail records delivered to a separate write-once audit log bucket. |
 | Compliance Index | Evidence Query Layer | Amazon DynamoDB (GSIs on system_id, control_id, timestamp) | Maintains a queryable index of all evidence records to support point-in-time and historical reporting without scanning S3 directly. |
@@ -45,11 +47,18 @@
 - **GitHub Actions**
   - Workflow trigger on push/PR and external repository dispatch.
   - Matrix build flow for `weblogic`, `tomcat`, and `python` tracks.
+  - Dedicated pre-install RTCM validation job reads declared app, middleware, and database versions from the payload/manifests and blocks unsupported stacks before any image build or installation.
 - **Build runtimes**
   - Python sample validation via `python -m py_compile sample-code/python/app.py`.
   - Java stacks compile to deployment artifacts (`.war` / `.ear`) where applicable.
 - **Containerization**
   - Docker-based packaging from per-stack folders under `sample-code/`.
+
+### 2.1) Runtime Compatibility Baseline
+- **Runtime Technology Compatibility Matrix (`architecture/runtime-compatibility-matrix.json`)**
+  - Versioned approved matrix for application runtimes, middleware, and database engines.
+  - Each entry defines approved versions, support status, security baseline date, and fail-closed policy metadata.
+  - Mirrored to AWS SSM Parameter Store at `/cicd/rtcm/approved/current` for runtime retrieval by pipeline jobs.
 
 ### 3) Identity, Access, and Trust
 - **AWS IAM OIDC Provider for GitHub**
@@ -75,6 +84,7 @@
 - **AWS SSM Parameter Store**
   - Centralized storage for app/runtime parameters and sensitive references.
   - Decouples environment configuration from application artifacts.
+  - Mirrors the current approved Runtime Technology Compatibility Matrix baseline used by the RTCM validation gate.
 
 ### 6) Operational Feedback and CMDB Reconciliation
 - **AWS SSM Inventory**
@@ -85,7 +95,7 @@
 
 ### 7) Compliance Evidence Store and Audit Controls
 - **EventBridge Compliance Evidence Bus**
-  - All pipeline stages, SSM executions, Security Hub findings, drift reconciler, and DB drift controller publish normalized evidence events to a dedicated EventBridge event bus.
+  - All pipeline stages, RTCM validation decisions, SSM executions, Security Hub findings, drift reconciler, and DB drift controller publish normalized evidence events to a dedicated EventBridge event bus.
 - **Evidence Ingestor Lambda**
   - Validates incoming evidence against the canonical schema (see `architecture/compliance-evidence-store.md`).
   - Signs each record with KMS (`kms:Sign`) before writing to S3.
@@ -119,4 +129,3 @@
 - **Auditor Export API**
   - API Gateway + read-only Lambda authenticated via IAM Identity Center.
   - Issues S3 presigned URLs for report download; access logged to CloudTrail.
-

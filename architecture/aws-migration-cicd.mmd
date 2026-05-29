@@ -58,10 +58,12 @@ flowchart TB
         direction TB
         B1[Generate GitHub dispatch payload]
         B2[Checkout source and IaC]
+        B2A[Load approved RTCM from repo and SSM Parameter Store]
+        B2B[Validate app middleware and database versions against RTCM]
         B3[Build and run quality and security checks]
-        B4{Pipeline gates passed?}
-        B5[Open remediation task]
-        B1 --> B2 --> B3 --> B4
+        B4{All policy gates passed?}
+        B5[Open remediation task with RTCM and policy rejection detail]
+        B1 --> B2 --> B2A --> B2B --> B3 --> B4
         B4 -- No --> B5
     end
 
