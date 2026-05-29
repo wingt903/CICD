@@ -349,13 +349,13 @@ _Scenario 3 – Evidence and Audit Logging_
 - Automatically execute mandatory cyber controls (for example: secret scanning and image signing).
 - Detect and block attempts to override mandatory security controls, and return clear policy-violation errors.
 
-**Status**: **Partially Met** (standardized pipeline and gate controls are present, but centralized template-library/reuse and explicit image-signing + policy-violation messaging controls are not yet fully defined)
+**Status**: **Partially Met** (standardized pipeline, fail-closed gates, immutable release identity checks, and no-redeploy-after-failure controls are present, but centralized template-library reuse and cryptographic image-signing verification remain to be finalized)
 
 **Scenario Compliance Summary**
 
 | Scenario | Requirement Expectation | Verdict | Key References |
 |---|---|---|---|
-| Standardised Deployment using a Governed Template | New applications use approved governed templates that enforce standard security configuration and mandatory controls automatically. | **Partially Met** | `architecture/aws-migration-cicd.mmd:57-66,76-86`, `architecture/component-context-diagram.mmd integrations 13-16, 25-26, F1, F2` — fail-closed security and image gate flow, `architecture/full-pipeline-tech-stack.md:7-9,15-17`, `cicd/github-actions/aws-migration-pipeline.yml:20-67,69-103,145-203` |
+| Standardised Deployment using a Governed Template | New applications use approved governed templates that enforce standard security configuration and mandatory controls automatically. | **Partially Met** | `architecture/aws-migration-cicd.mmd:57-66,76-86`, `architecture/component-context-diagram.mmd integrations 13-16, 25-26, 49-52, F1, F2` — fail-closed security/image gates and no-redeploy decision record flow, `architecture/full-pipeline-tech-stack.md:7-10,15-18,24-25`, `cicd/github-actions/aws-migration-pipeline.yml:1-368` |
 | Detection of Non-Compliant Configuration | Attempts to override mandatory security controls fail the pipeline and return policy-violation feedback. | **Partially Met** | `architecture/aws-migration-cicd.mmd:61-66`, `architecture/component-context-diagram.mmd integrations 13-16, 25-26, F1, F2` — gate evidence, pass/fail decisions, remediation routing, `architecture/target-component-context.mmd integrations 38-40` — drift findings, policy decision, enforce baseline, `cicd/github-actions/aws-migration-pipeline.yml:99-103,194-195` |
 
 **Traceability Evidence**
@@ -367,8 +367,9 @@ _Scenario 1 – Standardised Deployment using a Governed Template_
 | `architecture/aws-migration-cicd.mmd:57-66,76-86` | The architecture defines a common CI/CD orchestration flow with quality/security gates and middleware baseline application paths, supporting standardized deployment behavior for onboarded applications. |
 | `architecture/component-context-diagram.mmd integrations 13-16, 25-26, F1, F2` — fail-closed security and image gate flow | Mandatory gate pattern is modeled (security/quality gate and image gate) with fail-closed behavior that prevents progression on control failure. |
 | `architecture/full-pipeline-tech-stack.md:7-9,15-17` | CI/CD orchestration, environment governance, and automated IaC/application/image security controls are defined as platform standards. |
-| `cicd/github-actions/aws-migration-pipeline.yml:20-67,69-103,145-203` | Repository includes a common pipeline workflow executing build/scan checks and promotion stages (`dev -> test -> prod`) for onboarded stacks. |
+| `cicd/github-actions/aws-migration-pipeline.yml:20-339` | Repository includes a common pipeline workflow executing build/scan checks and promotion stages (`dev -> test -> prod`) for onboarded stacks with immutable `releaseId`, mandatory-control declaration checks, and policy-violation failures for mutable image references. |
 | `architecture/component-context-diagram.mmd integrations 11-15` — code/IaC scans and gate evidence | Security controls include SAST/dependency/secret scanning and IaC policy checks as core pipeline gates. |
+| `cicd/github-actions/aws-migration-pipeline.yml:163-339`, `architecture/component-context-diagram.mmd integrations 49-52` | Governed no-redeploy control records deployment decisions per release/environment and blocks re-deploy when prior status is `failed`/`blocked` (fail-closed default deny). |
 
 _Scenario 2 – Detection of Non-Compliant Configuration_
 
@@ -377,16 +378,15 @@ _Scenario 2 – Detection of Non-Compliant Configuration_
 | `architecture/aws-migration-cicd.mmd:61-66` | Explicit gate decision (`Pipeline gates passed?`) routes failures to remediation task flow, preventing non-compliant deployments. |
 | `architecture/component-context-diagram.mmd integrations 13-16, 25-26, F1, F2` — gate evidence, pass/fail decisions, remediation routing | Gate outcomes are enforced automatically: failed checks do not proceed and are sent to remediation tracking. |
 | `architecture/target-component-context.mmd integrations 38-40` — drift findings, policy decision, enforce baseline | Policy decision gate authorizes or blocks baseline enforcement path, evidencing policy-driven control over runtime changes. |
-| `cicd/github-actions/aws-migration-pipeline.yml:99-103,194-195` | Promotion depends on successful upstream checks; unresolved high/critical findings are intended to block promotion. |
+| `cicd/github-actions/aws-migration-pipeline.yml:99-183,207-339` | Promotion depends on successful upstream checks and enforced release-governance checks; blocked/failed release identities fail with deterministic policy-violation messages. |
 
 **Architectural Additions Required to Fully Meet App_as_Code_007**
 
 | Gap Area (Open) | Required Addition to Fulfill Requirement |
 |---|---|
 | Centralized governed template library pattern | Add an explicit shared template model (for example reusable GitHub workflow templates via `workflow_call` in a centrally governed repo/path) and require application pipelines to consume only approved template versions. |
-| Mandatory image-signing control not explicit | Add a mandatory image-signing control (e.g., Sigstore/Cosign or equivalent) as a non-optional gate, with signed-artifact verification before promotion. |
-| Explicit policy-violation error messaging | Add a standardized policy engine/error contract so control overrides return deterministic failure messages (for example: “Configuration violates organizational security policy: port 443 is mandatory”). |
-| Non-bypass enforcement of mandatory controls | Add template guardrails that reject attempts to disable mandatory controls (secret scanning, signing, required transport/security settings) at PR/pipeline parse time. |
+| Mandatory image-signing cryptographic verification | Add an enforced signing implementation (e.g., Sigstore/Cosign with keyless or managed key), and verify signatures against expected identity/key before every promotion stage. |
+| Non-bypass enforcement of mandatory controls at PR parse time | Add a dedicated PR-time validator workflow that rejects pipeline changes removing mandatory controls (secret scanning, signing, required gates) before merge. |
 
 **Implementation Recommendations to Close App_as_Code_007 Gaps**
 

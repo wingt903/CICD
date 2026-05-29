@@ -21,6 +21,7 @@
 | Runtime Security Posture | Continuous Threat Monitoring | Security Hub + GuardDuty + IAM Access Analyzer | Centralized security posture and threat detection across accounts. |
 | Communication Channel | Zero-Trust Tunnel | AWS SSM Session Manager | Secure control path for private build/configuration actions without SSH exposure. |
 | Config & Secret Store | Runtime Configuration | AWS Systems Manager Parameter Store + AWS Secrets Manager | Segregates environment config and secrets (`/dev`, `/test`, `/prod`) from code. |
+| Deployment Governance | Fail-Closed Release Decision Record | AWS Systems Manager Parameter Store | Stores pass/fail deployment decisions per immutable release identity and environment; blocks re-deploy of previously failed/blocked releases by policy. |
 | Operations Feedback | Asset State Reconciliation | AWS SSM Inventory + ServiceNow CMDB Sync | Reconciles runtime software/OS state from managed nodes back to CMDB to improve audit accuracy and operational visibility. |
 | Observability | Telemetry and Tracing | CloudWatch + OpenTelemetry + AWS X-Ray | Provides logs, metrics, traces, and release health visibility for triage. |
 | Incident Signaling | Alert Routing | CloudWatch Alarms + SNS | Enables centralized alert notifications and incident integration. |
@@ -85,6 +86,7 @@
   - Centralized storage for app/runtime parameters and sensitive references.
   - Decouples environment configuration from application artifacts.
   - Mirrors the current approved Runtime Technology Compatibility Matrix baseline used by the RTCM validation gate.
+  - Stores governed deployment decision records at `/cicd/deployment-decisions/<release_id>/<environment>` so failed releases are blocked from re-deploy until a new release identity is produced and revalidated.
 
 ### 6) Operational Feedback and CMDB Reconciliation
 - **AWS SSM Inventory**

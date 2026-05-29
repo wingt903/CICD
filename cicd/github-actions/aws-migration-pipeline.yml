@@ -6,6 +6,17 @@ on:
   push:
     branches: ["main"]
   workflow_dispatch:
+    inputs:
+      break_glass_override:
+        description: "Request governed break-glass override for blocked prod deployment"
+        required: false
+        default: false
+        type: boolean
+      break_glass_ticket:
+        description: "Approved break-glass ticket/change ID"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -15,6 +26,7 @@ permissions:
 env:
   AWS_REGION: ap-southeast-1
   ECR_REPOSITORY_PREFIX: cicd-sample
+  DEPLOYMENT_DECISION_PARAM_PREFIX: /cicd/deployment-decisions
 
 jobs:
   validate-build-scan:
@@ -107,10 +119,13 @@ jobs:
       - name: Create release manifest
         id: manifest
         run: |
+          release_id="${GITHUB_SHA}"
           release_version="${GITHUB_SHA::12}"
           echo "release_version=$release_version" >> "$GITHUB_OUTPUT"
+          echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
           cat > release-manifest.json <<JSON
           {
+            "releaseId": "$release_id",
             "releaseVersion": "$release_version",
             "commit": "${GITHUB_SHA}",
             "artifacts": {
@@ -125,16 +140,57 @@ jobs:
                 "prod": "/prod/approved/ami/base"
               }
             },
+            "mandatoryControls": {
+              "secretScanning": "required",
+              "iacPolicyChecks": "required",
+              "imageSigning": "required",
+              "immutableReleaseIdentity": "required",
+              "noRedeployAfterFailure": "required"
+            },
             "iac": {
               "path": "infrastructure/terraform",
               "version": "${GITHUB_SHA}"
             },
             "governance": {
               "promotionPath": ["dev", "test", "prod"],
+              "overridePolicy": "default-deny",
               "generatedAt": "$(date -u +%FT%TZ)"
             }
           }
           JSON
+
+      - name: Enforce immutable release identity policy
+        run: |
+          set -euo pipefail
+          manifest_release_id="$(jq -r '.releaseId' release-manifest.json)"
+          if [ -z "$manifest_release_id" ] || [ "$manifest_release_id" = "null" ]; then
+            echo "Policy violation [CTRL-007-IMMUTABLE-RELEASE]: releaseId is required."
+            exit 1
+          fi
+          if [ "$manifest_release_id" != "${GITHUB_SHA}" ]; then
+            echo "Policy violation [CTRL-007-IMMUTABLE-RELEASE]: releaseId must equal immutable commit SHA."
+            exit 1
+          fi
+          if jq -e '.artifacts.containerImages[] | test(":(latest|main|master)$")' release-manifest.json > /dev/null; then
+            echo "Policy violation [CTRL-007-IMMUTABLE-IMAGE]: Mutable image tags are not permitted."
+            exit 1
+          fi
+          if ! jq -e --arg sha "${GITHUB_SHA}" 'all(.artifacts.containerImages[]; endswith(":" + $sha))' release-manifest.json > /dev/null; then
+            echo "Policy violation [CTRL-007-IMMUTABLE-IMAGE]: Container references must be pinned to the release SHA tag."
+            exit 1
+          fi
+
+      - name: Enforce mandatory control declarations
+        run: |
+          set -euo pipefail
+          required_controls=(secretScanning iacPolicyChecks imageSigning immutableReleaseIdentity noRedeployAfterFailure)
+          for control in "${required_controls[@]}"; do
+            value="$(jq -r --arg c "$control" '.mandatoryControls[$c]' release-manifest.json)"
+            if [ "$value" != "required" ]; then
+              echo "Policy violation [CTRL-007-MANDATORY-CONTROLS]: mandatory control '$control' is missing or disabled."
+              exit 1
+            fi
+          done
 
       - name: Upload release manifest
         uses: actions/upload-artifact@v4
@@ -160,13 +216,46 @@ jobs:
           role-to-assume: ${{ vars.AWS_DEV_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Read release identity (dev)
+        id: release_dev
+        run: |
+          release_id="$(jq -r '.releaseId' release-manifest.json)"
+          if [ -z "$release_id" ] || [ "$release_id" = "null" ]; then
+            echo "Policy violation [CTRL-007-RELEASE-ID]: releaseId is required for deployment."
+            exit 1
+          fi
+          echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce no re-deploy after failure (dev)
+        run: |
+          set -euo pipefail
+          decision_param="${DEPLOYMENT_DECISION_PARAM_PREFIX}/${{ steps.release_dev.outputs.release_id }}/dev"
+          decision="$(aws ssm get-parameter --name "$decision_param" --query 'Parameter.Value' --output text 2>/dev/null || true)"
+          if [ "$decision" = "failed" ] || [ "$decision" = "blocked" ]; then
+            echo "Policy violation [CTRL-007-NOREDEPLOY]: Release ${{ steps.release_dev.outputs.release_id }} is blocked in dev due to prior failure."
+            echo "Override not permitted. Build and scan a new release identity."
+            exit 1
+          fi
+
       - name: Deploy dev (placeholder)
+        id: deploy_dev
         run: |
           echo "Deploying release $(jq -r .releaseVersion release-manifest.json) to dev"
           echo "Use image digest pinning and apply Terraform dev variables"
 
       - name: Post-deploy smoke check (dev)
         run: echo "Run dev smoke checks"
+
+      - name: Persist deployment decision (dev)
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          decision_param="${DEPLOYMENT_DECISION_PARAM_PREFIX}/${{ steps.release_dev.outputs.release_id }}/dev"
+          outcome="failed"
+          if [ "${{ steps.deploy_dev.outcome }}" = "success" ]; then
+            outcome="passed"
+          fi
+          aws ssm put-parameter --name "$decision_param" --type String --value "$outcome" --overwrite
 
   deploy-test:
     name: Deploy to test
@@ -186,13 +275,46 @@ jobs:
           role-to-assume: ${{ vars.AWS_TEST_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Read release identity (test)
+        id: release_test
+        run: |
+          release_id="$(jq -r '.releaseId' release-manifest.json)"
+          if [ -z "$release_id" ] || [ "$release_id" = "null" ]; then
+            echo "Policy violation [CTRL-007-RELEASE-ID]: releaseId is required for deployment."
+            exit 1
+          fi
+          echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce no re-deploy after failure (test)
+        run: |
+          set -euo pipefail
+          decision_param="${DEPLOYMENT_DECISION_PARAM_PREFIX}/${{ steps.release_test.outputs.release_id }}/test"
+          decision="$(aws ssm get-parameter --name "$decision_param" --query 'Parameter.Value' --output text 2>/dev/null || true)"
+          if [ "$decision" = "failed" ] || [ "$decision" = "blocked" ]; then
+            echo "Policy violation [CTRL-007-NOREDEPLOY]: Release ${{ steps.release_test.outputs.release_id }} is blocked in test due to prior failure."
+            echo "Override not permitted. Build and scan a new release identity."
+            exit 1
+          fi
+
       - name: Deploy test (placeholder)
+        id: deploy_test
         run: |
           echo "Deploying release $(jq -r .releaseVersion release-manifest.json) to test"
           echo "Run integration, DAST/smoke, and performance baseline checks"
 
       - name: Quality and security gate (test)
         run: echo "Block promotion if unresolved HIGH/CRITICAL findings exist"
+
+      - name: Persist deployment decision (test)
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          decision_param="${DEPLOYMENT_DECISION_PARAM_PREFIX}/${{ steps.release_test.outputs.release_id }}/test"
+          outcome="failed"
+          if [ "${{ steps.deploy_test.outcome }}" = "success" ]; then
+            outcome="passed"
+          fi
+          aws ssm put-parameter --name "$decision_param" --type String --value "$outcome" --overwrite
 
   deploy-prod:
     name: Deploy to prod
@@ -212,13 +334,70 @@ jobs:
           role-to-assume: ${{ vars.AWS_PROD_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Read release identity (prod)
+        id: release_prod
+        run: |
+          release_id="$(jq -r '.releaseId' release-manifest.json)"
+          if [ -z "$release_id" ] || [ "$release_id" = "null" ]; then
+            echo "Policy violation [CTRL-007-RELEASE-ID]: releaseId is required for deployment."
+            exit 1
+          fi
+          echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce no re-deploy after failure (prod)
+        run: |
+          set -euo pipefail
+          decision_param="${DEPLOYMENT_DECISION_PARAM_PREFIX}/${{ steps.release_prod.outputs.release_id }}/prod"
+          decision="$(aws ssm get-parameter --name "$decision_param" --query 'Parameter.Value' --output text 2>/dev/null || true)"
+          if [ "$decision" = "failed" ] || [ "$decision" = "blocked" ]; then
+            echo "Policy violation [CTRL-007-NOREDEPLOY]: Release ${{ steps.release_prod.outputs.release_id }} is blocked in prod due to prior failure."
+            echo "Override not permitted. Build and scan a new release identity."
+            exit 1
+          fi
+
+      - name: Enforce break-glass governance (prod)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.break_glass_override == true }}
+        run: |
+          set -euo pipefail
+          if [ -z "${{ inputs.break_glass_ticket }}" ]; then
+            echo "Policy violation [CTRL-007-BREAKGLASS]: break_glass_ticket is required."
+            exit 1
+          fi
+          if [ "${{ vars.BREAK_GLASS_APPROVED }}" != "true" ]; then
+            echo "Policy violation [CTRL-007-BREAKGLASS]: security approval variable BREAK_GLASS_APPROVED must be true."
+            exit 1
+          fi
+          if [ -z "${{ vars.BREAK_GLASS_APPROVED_UNTIL }}" ]; then
+            echo "Policy violation [CTRL-007-BREAKGLASS]: BREAK_GLASS_APPROVED_UNTIL must be set."
+            exit 1
+          fi
+          now_epoch="$(date -u +%s)"
+          expiry_epoch="$(date -u -d "${{ vars.BREAK_GLASS_APPROVED_UNTIL }}" +%s 2>/dev/null || echo 0)"
+          if [ "$expiry_epoch" -le "$now_epoch" ]; then
+            echo "Policy violation [CTRL-007-BREAKGLASS]: override approval window is expired."
+            exit 1
+          fi
+          echo "Break-glass override accepted for ticket ${{ inputs.break_glass_ticket }} until ${{ vars.BREAK_GLASS_APPROVED_UNTIL }} UTC"
+
       - name: Deploy prod (placeholder)
+        id: deploy_prod
         run: |
           echo "Deploying release $(jq -r .releaseVersion release-manifest.json) to prod"
           echo "Use blue/green or canary strategy with automatic health rollback"
 
       - name: Post-deploy verification (prod)
         run: echo "Run production verification and SLO checks"
+
+      - name: Persist deployment decision (prod)
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          decision_param="${DEPLOYMENT_DECISION_PARAM_PREFIX}/${{ steps.release_prod.outputs.release_id }}/prod"
+          outcome="failed"
+          if [ "${{ steps.deploy_prod.outcome }}" = "success" ]; then
+            outcome="passed"
+          fi
+          aws ssm put-parameter --name "$decision_param" --type String --value "$outcome" --overwrite
 
   rollback-prod:
     name: Rollback prod
@@ -238,3 +417,14 @@ jobs:
           echo "Rollback application to prior healthy target group/task set"
           echo "Rollback ASG/Launch Template to previous approved AMI"
           echo "Apply controlled Terraform revert if infra drift/change failed"
+
+  remediation-notify:
+    name: Open remediation incident
+    runs-on: ubuntu-latest
+    needs: [deploy-dev, deploy-test, deploy-prod]
+    if: ${{ always() && (needs.deploy-dev.result == 'failure' || needs.deploy-test.result == 'failure' || needs.deploy-prod.result == 'failure') }}
+    steps:
+      - name: Create remediation payload
+        run: |
+          echo "Open ServiceNow remediation ticket for failed deployment control."
+          echo "Attach release manifest, failed control ID, and gate evidence from this run."

@@ -34,6 +34,7 @@ graph TB
         OIDC[IAM OIDC\nProvider]
         SSMSESS[SSM Session\nManager]
         PARAM[SSM Parameter\nStore]
+        DREC[Deployment Decision\nStore]
         INV[SSM\nInventory]
         AMI[Golden AMI\nRegistry]
     end
@@ -99,6 +100,10 @@ graph TB
     INV -->|28. sync to CMDB| SN
     APP -->|29. posture telemetry| RUNTIMESEC
     RUNTIMESEC -->|30. posture feedback| SN
+    GHA -->|49. check release status| DREC
+    DREC -->|50. block failed release| IGATE
+    IGATE -->|51. write pass/fail| DREC
+    DREC -->|52. no-redeploy policy| SN
 
     %% Evidence flows
     GHA -->|31. pipeline evidence| EVTBUS
@@ -145,6 +150,7 @@ graph TB
     style OIDC fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
     style SSMSESS fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
     style PARAM fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
+    style DREC fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
     style INV fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
     style AMI fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
     %% runtime
