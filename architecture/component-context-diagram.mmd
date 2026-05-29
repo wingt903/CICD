@@ -1,11 +1,4 @@
 graph LR
-    %% Styling
-    classDef actor fill:#E1F5FE,stroke:#01579B,stroke-width:2px;
-    classDef governance fill:#E8EAF6,stroke:#283593,stroke-width:2px;
-    classDef pipeline fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px;
-    classDef aws fill:#FFF3E0,stroke:#E65100,stroke-width:2px;
-    classDef runtime fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px;
-
     Team[Project / Migration Team]
 
     subgraph Governance["Trust Boundary: Governance & Request Layer"]
@@ -56,8 +49,22 @@ graph LR
     EC2 -->|Send inventory state| INV
     INV -->|Sync inventory to CMDB| SN
 
-    class Team actor;
-    class SN,IH governance;
-    class GH,GHA,IMG,ANS pipeline;
-    class OIDC,SSMSESS,PARAM,INV,AMI aws;
-    class EC2,APP runtime;
+    %% actor
+    style Team fill:#E1F5FE,stroke:#01579B,stroke-width:2px,color:#000
+    %% governance
+    style SN fill:#E8EAF6,stroke:#283593,stroke-width:2px,color:#000
+    style IH fill:#E8EAF6,stroke:#283593,stroke-width:2px,color:#000
+    %% pipeline
+    style GH fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
+    style GHA fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
+    style IMG fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
+    style ANS fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
+    %% aws
+    style OIDC fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
+    style SSMSESS fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
+    style PARAM fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
+    style INV fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
+    style AMI fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
+    %% runtime
+    style EC2 fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style APP fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
