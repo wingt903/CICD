@@ -46,7 +46,7 @@ graph TD
       F5[IaC Controlled Revert Pipeline]
     end
 
-    subgraph Drift Detection and Reconciliation Controls
+    subgraph Drift Detection and Reconciliation
       G1[EventBridge Scheduled Reconciliation]
       G2[Drift Reconciler Lambda/Step Function<br/>Compare Live AWS vs Git/Terraform State]
       G3[Drift Findings<br/>CloudWatch + Security Hub + CMDB]
@@ -55,7 +55,7 @@ graph TD
       G6[Convergence Verification]
     end
 
-    subgraph Database Drift Controls
+    subgraph Database Drift Management
       H1[Database Drift Detector<br/>Schema + Parameter Drift]
       H2[Migration Orchestrator<br/>Versioned DB Migration Plan]
       H3[DB Rollback Path<br/>Snapshot Restore + Previous Migration]
@@ -93,7 +93,8 @@ graph TD
     E2 --> G2
     E3 --> G2
     A3 --> G2
-    G2 --> G3 --> G4
+    G2 --> G3
+    G3 --> G4
     G4 --> G5 --> G6
     G6 --> G3
     G6 --> F1
@@ -108,4 +109,7 @@ graph TD
     class D1,D2,D3,D4 artifact;
     class B1,B2,B3 delivery;
     class C1,C2,C3,C4 security;
-    class E1,E2,E3,E4,F1,F2,F3,F4,F5,G1,G2,G3,G4,G5,G6,H1,H2,H3,H4 runtime;
+    class E1,E2,E3,E4 runtime;
+    class F1,F2,F3,F4,F5 runtime;
+    class G1,G2,G3,G4,G5,G6 runtime;
+    class H1,H2,H3,H4 runtime;

@@ -20,7 +20,7 @@ This document traces business requirements to the architecture artifacts under `
   Stage 2 onward models system-driven build, gates, AWS role assumption via OIDC, Ansible build/configuration, AMI registration, CMDB patch, and promotion deployment.
 - `architecture/sequence-diagram.mmd:12-40`  
   ServiceNow webhook triggers GitHub Actions; subsequent execution flow is automated through AWS SSM/EC2 and CMDB callback.
-- `architecture/target-component-context.mmd:49-73`  
+- `architecture/target-component-context.mmd:65-77`
   Pipeline-driven promotion and repeatability controls are modeled (release manifest, approved AMIs, `dev -> test -> prod` progression).
 - `architecture/full-pipeline-tech-stack.md:12-14,21,25`  
   Ansible and Terraform automation, environment parameterization, and release manifest support consistent, repeatable deployments.
@@ -45,13 +45,13 @@ This document traces business requirements to the architecture artifacts under `
   The solution defines remediation runbooks as code, continuous runtime security posture monitoring, and inventory reconciliation.
 - `process-flow-diagram.md:59-63`  
   Post-build SSM document includes inventory capture and remediation baseline, with evidence looped to ServiceNow.
-- `architecture/target-component-context.mmd:49-102`  
+- `architecture/target-component-context.mmd:49-56,91-100`
   Adds explicit scheduled reconciliation control, live-vs-repo drift comparison, policy gate, baseline enforcement, and convergence verification loop with compliance evidence feedback.
-- `architecture/target-component-context.mmd:92-102`  
+- `architecture/target-component-context.mmd:58-63,102-105`
   Adds dedicated database drift detection/remediation lane, including migration orchestration, rollback path, and post-remediation validation.
-- `architecture/sequence-diagram.mmd:45-78`  
+- `architecture/sequence-diagram.mmd:48-63`
   Models closed-loop control flow end to end: detect drift -> policy/approval decision -> enforce repository baseline -> verify convergence -> publish closure evidence.
-- `architecture/sequence-diagram.mmd:79-91`  
+- `architecture/sequence-diagram.mmd:65-79`
   Models dedicated database drift trigger, remediation decision, migration execution, rollback, and validation reporting.
 
 **Architect Verdict**

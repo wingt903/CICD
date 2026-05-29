@@ -3,11 +3,11 @@ sequenceDiagram
     actor Team as Project Migration Team
     participant SN as ServiceNow (CMDB)
     participant GH as GitHub Actions Runner
-    participant EV as EventBridge Scheduler
-    participant DR as Drift Reconciler
-    participant PG as Policy/Approval Gate
-    participant TF as Terraform/Config Enforcer
-    participant DB as Database Drift Controller
+    participant Scheduler as EventBridge Scheduler Service
+    participant DriftReconciler as Drift Reconciler
+    participant PolicyGate as Policy/Approval Gate
+    participant TerraformEnforcer as Terraform/Config Enforcer
+    participant DatabaseDriftController as Database Drift Controller
     participant AWS_SSM as AWS Systems Manager
     participant EC2 as Temporary Builder EC2
 
@@ -46,36 +46,35 @@ sequenceDiagram
     Note over SN: CMDB and Change Record are updated with<br>AMI + Ansible execution evidence for audit tracking
 
     %% Phase 6: Continuous Drift Detection and Closed-Loop Remediation
-    EV->>DR: Scheduled reconciliation trigger
-    DR->>DR: Compare live AWS configuration<br/>vs Git/Terraform desired state
-    DR->>SN: Publish drift findings and evidence
-    DR->>PG: Raise remediation decision request
+    Scheduler->>DriftReconciler: Scheduled reconciliation trigger
+    Note over DriftReconciler: Compare live AWS configuration<br/>vs Git repository Terraform baseline (source of truth)
+    DriftReconciler->>SN: Publish drift findings and evidence
+    DriftReconciler->>PolicyGate: Raise remediation decision request
     alt Policy allows auto-remediation
-        PG->>TF: Authorize enforce baseline execution
-        TF->>TF: Run Terraform apply/config re-run<br/>to match repository baseline
+        PolicyGate->>TerraformEnforcer: Authorize enforce baseline execution
     else Manual approval required
-        PG->>Team: Request approval for controlled remediation
-        Team->>PG: Approve remediation
-        PG->>TF: Authorize enforce baseline execution
-        TF->>TF: Run Terraform apply/config re-run<br/>to match repository baseline
+        PolicyGate->>Team: Request approval for controlled remediation
+        Team->>PolicyGate: Approve remediation
+        PolicyGate->>TerraformEnforcer: Authorize enforce baseline execution
     end
-    TF->>DR: Return post-remediation state
-    DR->>DR: Verify convergence to desired baseline
-    DR->>SN: Update CMDB/compliance status with closure evidence
+    TerraformEnforcer->>TerraformEnforcer: Run Terraform apply/config re-run<br/>to match repository baseline
+    TerraformEnforcer->>DriftReconciler: Return post-remediation state
+    DriftReconciler->>DriftReconciler: Verify convergence to desired baseline
+    DriftReconciler->>SN: Update CMDB/compliance status with closure evidence
 
     %% Phase 7: Dedicated Database Drift Detection and Remediation
-    EV->>DB: Scheduled database drift control trigger
-    DB->>DB: Detect schema/config drift against versioned migration baseline
+    Scheduler->>DatabaseDriftController: Scheduled database drift control trigger
+    DatabaseDriftController->>DatabaseDriftController: Detect schema/config drift against versioned migration baseline
     alt DB drift detected
-        DB->>PG: Request migration remediation decision
-        PG->>DB: Approve migration execution policy
-        DB->>DB: Execute migration orchestration
+        DatabaseDriftController->>PolicyGate: Request migration remediation decision
+        PolicyGate->>DatabaseDriftController: Approve migration execution policy
+        DatabaseDriftController->>DatabaseDriftController: Execute migration orchestration
         alt Migration validation fails
-            DB->>DB: Execute rollback (snapshot restore/previous migration)
+            DatabaseDriftController->>DatabaseDriftController: Execute rollback (snapshot restore/previous migration)
         end
-        DB->>DB: Perform post-remediation validation
-        DB->>SN: Publish DB drift status and remediation evidence
+        DatabaseDriftController->>DatabaseDriftController: Perform post-remediation validation
+        DatabaseDriftController->>SN: Publish DB drift status and remediation evidence
     else No DB drift
-        DB->>SN: Record compliant DB baseline state
+        DatabaseDriftController->>SN: Record compliant DB baseline state
     end
     deactivate GH
