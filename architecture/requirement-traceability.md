@@ -196,6 +196,16 @@ _Scenario 5 – Security hardening and patches are validated after application_
 
 **Status**: **Met**
 
+**Acceptance Criteria**
+
+| Scenario | Given | When | Then | Verdict |
+|---|---|---|---|---|
+| Elimination of Manual Verification Steps | A deployment pipeline exists | A release progresses through environments | All configuration and security checks must be executed automatically within the pipeline, removing manual approval or verification steps wherever possible | ✅ Met |
+| Reduction of Post-Deployment Fixes | A deployment has completed | The system enters operational use | There must be no requirement for manual configuration fixes due to missed or inconsistent setup activities | ✅ Met |
+| Security Risk Reduction through Automation | Manual configuration activities are identified as a source of risk | Automation policies are implemented | The number of configuration-related security incidents must be reduced through consistent, repeatable automated controls | ✅ Met |
+| Auditability of Automated Controls | Automated processes replace manual controls | Configuration actions and validations occur | The system must produce auditable logs demonstrating that controls were executed consistently and successfully | ✅ Met |
+| Engineering Productivity Improvement | Engineering teams perform deployments and configuration tasks | Automation is in place | The time spent on manual setup, validation, and rework must be reduced, enabling focus on higher-value engineering and security improvements | ✅ Met |
+
 **Scenario Compliance Summary**
 
 | Scenario | Requirement Expectation | Verdict | Key References |
