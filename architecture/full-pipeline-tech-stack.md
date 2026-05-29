@@ -24,6 +24,12 @@
 | Incident Signaling | Alert Routing | CloudWatch Alarms + SNS | Enables centralized alert notifications and incident integration. |
 | Release Contract | Release Manifest | JSON Manifest Artifact | Carries approved digests, AMI paths, and IaC version as the deployable unit. |
 | Rollback | Safe Recovery Controls | Blue/Green/Canary + AMI rollback + IaC revert | Enables automated/controlled rollback for app, OS image, and infra failures. |
+| Compliance Evidence Store | Immutable Evidence Repository | Amazon S3 (Object Lock + Versioning) + AWS KMS CMK | Stores signed, append-only compliance evidence records from all pipeline and runtime sources. Object Lock (Governance mode, 7-year retention) prevents tampering or premature deletion. |
+| Evidence Ingest | Evidence Normalization Pipeline | EventBridge + AWS Lambda (Evidence Ingestor) | Receives normalized evidence events from GitHub Actions, SSM, Security Hub, Drift Reconciler, and DB Drift Controller; validates schema, signs records with KMS, and writes to the evidence store. |
+| Evidence Integrity | Cryptographic Verification | AWS KMS (Sign/Verify) + AWS Lambda (Integrity Verifier) | Daily scheduled Lambda re-derives SHA-256 hashes and validates KMS signatures for every evidence record; publishes pass/fail metrics and alerts via CloudWatch and SNS on any anomaly. |
+| Evidence Audit Trail | Access and Change Logging | AWS CloudTrail (S3 data events + management events) | Captures every evidence read, write, delete attempt, and lock override as immutable CloudTrail records delivered to a separate write-once audit log bucket. |
+| Compliance Index | Evidence Query Layer | Amazon DynamoDB (GSIs on system_id, control_id, timestamp) | Maintains a queryable index of all evidence records to support point-in-time and historical reporting without scanning S3 directly. |
+| Audit Reporting | Compliance Report Generation | AWS Audit Manager + Amazon Athena + Amazon S3 | Audit Manager aggregates evidence per App_as_Code control framework. Athena provides ad-hoc and scheduled SQL queries over the partitioned evidence store. Reports are exported as PDF or CSV via a read-only auditor API. |
 
 ## Detailed Technology Stack
 
@@ -76,3 +82,41 @@
 - **CMDB Sync Loop**
   - Updates ServiceNow CIs with active AMI, Ansible execution evidence, and reconciled runtime state.
   - Improves audit readiness and operational traceability.
+
+### 7) Compliance Evidence Store and Audit Controls
+- **EventBridge Compliance Evidence Bus**
+  - All pipeline stages, SSM executions, Security Hub findings, drift reconciler, and DB drift controller publish normalized evidence events to a dedicated EventBridge event bus.
+- **Evidence Ingestor Lambda**
+  - Validates incoming evidence against the canonical schema (see `architecture/compliance-evidence-store.md`).
+  - Signs each record with KMS (`kms:Sign`) before writing to S3.
+  - Writes the record to S3 and inserts the index entry into DynamoDB.
+- **Amazon S3 — Compliance Evidence Bucket**
+  - Object Lock enabled in Governance mode with a minimum 7-year retention period.
+  - Versioning enabled; SSE-KMS encryption with a dedicated Customer Managed Key.
+  - S3 server access logging and CloudTrail S3 data events (read + write) enabled for all objects.
+  - Partitioned by `year/month/day/env` for efficient Athena querying.
+- **Amazon DynamoDB — Evidence Index**
+  - Global Secondary Indexes on `system_id`, `control_id`, and `timestamp` allow point-in-time and historical queries without S3 scans.
+- **AWS KMS — Evidence Signing CMK**
+  - Customer Managed Key used exclusively for evidence signing and verification.
+  - Key policy restricts usage to the Ingestor Lambda role and the Integrity Verifier Lambda role.
+- **Integrity Verifier Lambda**
+  - Scheduled daily via EventBridge.
+  - Re-derives SHA-256 hash of each evidence record and validates the KMS signature.
+  - Publishes `EvidenceIntegrityPass` / `EvidenceIntegrityFailure` metrics to CloudWatch.
+  - Real-time SNS alert on any failure.
+- **AWS CloudTrail — Evidence Access and Change Audit Trail**
+  - Org-level trail with S3 data events enabled for the evidence bucket.
+  - Captures every read, write, delete attempt, and Object Lock override attempt with full actor, timestamp, and request metadata.
+  - Logs delivered to a separate write-once audit log bucket (Object Lock, Compliance mode, 7-year retention).
+- **AWS Audit Manager**
+  - Custom framework mapping App_as_Code controls (001–004) to evidence sources.
+  - Automatically aggregates evidence records from S3 into assessment cycles.
+  - Generates assessment reports for auditor review and export.
+- **Amazon Athena — Ad-hoc and Scheduled Reporting**
+  - SQL queries over partitioned evidence S3 prefix for current posture, historical trend, remediation history, integrity, and access audit reports.
+  - Report outputs written to `s3://compliance-evidence-<account>/reports/`.
+- **Auditor Export API**
+  - API Gateway + read-only Lambda authenticated via IAM Identity Center.
+  - Issues S3 presigned URLs for report download; access logged to CloudTrail.
+

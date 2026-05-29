@@ -10,6 +10,9 @@ sequenceDiagram
     participant DatabaseDriftController as Database Drift Controller
     participant AWS_SSM as AWS Systems Manager
     participant EC2 as Temporary Builder EC2
+    participant EvidenceBus as EventBridge Evidence Bus
+    participant EvidenceStore as Evidence Store (S3 + DynamoDB + KMS)
+    participant AuditTrail as CloudTrail Evidence Audit Log
 
     %% Phase 1: Intake & Governance
     Team->>SN: Submit Catalog Migration Request
@@ -44,6 +47,9 @@ sequenceDiagram
 
     GH->>SN: Send API Patch Request:<br>Update CMDB CI with New Active AMI ID + Ansible execution references
     Note over SN: CMDB and Change Record are updated with<br>AMI + Ansible execution evidence for audit tracking
+    GH->>EvidenceBus: Publish normalized evidence event<br>[system_id, env, baseline_ref, control_id, result, run_id, source=github-actions]
+    EvidenceBus->>EvidenceStore: Ingestor Lambda validates schema, signs record (KMS), writes to S3 (Object Lock) + indexes in DynamoDB
+    EvidenceStore->>AuditTrail: S3 PutObject event captured (actor, timestamp, key, requestId)
 
     %% Phase 6: Continuous Drift Detection and Closed-Loop Remediation
     Scheduler->>DriftReconciler: Scheduled reconciliation trigger
@@ -61,6 +67,9 @@ sequenceDiagram
     TerraformEnforcer->>DriftReconciler: Return post-remediation state
     DriftReconciler->>DriftReconciler: Verify convergence to desired baseline
     DriftReconciler->>SN: Update CMDB/compliance status with closure evidence
+    DriftReconciler->>EvidenceBus: Publish drift remediation evidence event<br>[system_id, baseline_ref, result=PASS/FAIL, remediation_state=COMPLETE, source=drift-reconciler]
+    EvidenceBus->>EvidenceStore: Ingestor Lambda signs and writes evidence record (S3 Object Lock + DynamoDB index)
+    EvidenceStore->>AuditTrail: S3 PutObject event captured
 
     %% Phase 7: Dedicated Database Drift Detection and Remediation
     Scheduler->>DatabaseDriftController: Scheduled database drift control trigger
@@ -74,7 +83,16 @@ sequenceDiagram
         end
         DatabaseDriftController->>DatabaseDriftController: Perform post-remediation validation
         DatabaseDriftController->>SN: Publish DB drift status and remediation evidence
+        DatabaseDriftController->>EvidenceBus: Publish DB remediation evidence event<br>[system_id, baseline_ref, control_id=db-schema, result, remediation_state, source=db-drift-controller]
+        EvidenceBus->>EvidenceStore: Ingestor Lambda signs and writes evidence record (S3 Object Lock + DynamoDB index)
+        EvidenceStore->>AuditTrail: S3 PutObject event captured
     else No DB drift
         DatabaseDriftController->>SN: Record compliant DB baseline state
+        DatabaseDriftController->>EvidenceBus: Publish compliant DB evidence event<br>[result=PASS, remediation_state=NOT_REQUIRED, source=db-drift-controller]
+        EvidenceBus->>EvidenceStore: Ingestor Lambda signs and writes evidence record
     end
     deactivate GH
+
+    %% Phase 8: Daily Integrity Verification and Audit Reporting
+    Note over EvidenceStore,AuditTrail: Daily: Integrity Verifier Lambda re-hashes all evidence records,<br/>validates KMS signatures, and publishes pass/fail metrics.<br/>CloudWatch alarm fires on any verification failure → SNS alert.
+    Note over EvidenceStore,AuditTrail: Auditors access compliance reports via Auditor Export API<br/>(AWS Audit Manager PDF + Athena CSV/JSON).<br/>All report access is logged to CloudTrail.

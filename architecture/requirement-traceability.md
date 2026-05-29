@@ -113,16 +113,16 @@ _Scenario 2 – Validate security hardening and patches after application_
 - Ensure stored evidence is tamper-evident and preserves a complete audit trail of changes and access.
 - Validate applied hardening and patch controls and record failures or non-compliance.
 
-**Status**: **Partially Met**
+**Status**: **Met**
 
 **Scenario Compliance Summary**
 
 | Scenario | Requirement Expectation | Verdict | Key References |
 |---|---|---|---|
 | Continuous Configuration Compliance Monitoring | Systems are automatically assessed against approved configuration and patch baselines when deployed or updated. | **Met** | `architecture/target-component-context.mmd:49-56,91-99`, `architecture/sequence-diagram.mmd:48-79`, `architecture/component-context-diagram.mmd:74-78`, `architecture/full-pipeline-tech-stack.md:18-22` |
-| Evidence Generation and Storage | Results are stored with timestamps, system identifiers, baseline references, and compliance status. | **Partially Met** | `architecture/sequence-diagram.mmd:45-46,51,63,76,78`, `process-flow-diagram.md:59-62`, `architecture/component-context-diagram.mmd:77-78`, `architecture/target-component-context.mmd:17-25` |
-| Audit Reporting | Historical and current compliance status can be exported in clear reports across systems. | **Partially Met** | `architecture/target-component-context.md:22-24`, `architecture/full-pipeline-tech-stack.md:22-24`, `architecture/component-context-diagram.mmd:74-78` |
-| Integrity and Auditability of Evidence | Evidence storage is tamper-evident and all changes/access maintain a complete audit trail. | **Not Met** | No explicit immutable evidence store, access audit trail, or tamper-evident control is modeled in the current diagrams. |
+| Evidence Generation and Storage | Results are stored with timestamps, system identifiers, baseline references, and compliance status. | **Met** | `architecture/compliance-evidence-store.md:§1-§2`, `architecture/sequence-diagram.mmd` (evidence publish steps), `architecture/target-component-context.mmd:I1-I4` |
+| Audit Reporting | Historical and current compliance status can be exported in clear reports across systems. | **Met** | `architecture/compliance-evidence-store.md:§6`, `architecture/target-component-context.mmd:J1-J3`, `architecture/full-pipeline-tech-stack.md` (Audit Reporting row) |
+| Integrity and Auditability of Evidence | Evidence storage is tamper-evident and all changes/access maintain a complete audit trail. | **Met** | `architecture/compliance-evidence-store.md:§4-§5`, `architecture/target-component-context.mmd:I3,I5,I6`, `architecture/full-pipeline-tech-stack.md` (Evidence Integrity + Evidence Audit Trail rows) |
 | Security hardening and patches are validated after application | Applied controls and patches are verified, and failures/non-compliance are detected and recorded. | **Met** | `architecture/component-context-diagram.mmd:24-26,69-78`, `architecture/sequence-diagram.mmd:35-46`, `process-flow-diagram.md:49-62`, `architecture/target-component-context.mmd:55-56,62,96-106` |
 
 **Traceability Evidence**
@@ -140,28 +140,30 @@ _Scenario 2 – Evidence Generation and Storage_
 
 | Evidence | Traceability |
 |---|---|
-| `architecture/sequence-diagram.mmd:45-46` | CMDB and change records are updated with AMI identifiers and Ansible execution evidence, forming auditable deployment records. |
-| `architecture/sequence-diagram.mmd:51,63,76,78` | Drift findings, closure evidence, DB remediation evidence, and compliant-state records are published to ServiceNow, providing stored compliance outcomes over time. |
-| `process-flow-diagram.md:59-62` | Post-build SSM inventory capture and execution IDs are collected and sent back to ServiceNow, supporting evidence records with system context. |
-| `architecture/component-context-diagram.mmd:77-78` | SSM Inventory syncs runtime state into CMDB, improving evidence completeness for software/OS compliance status. |
-| `architecture/target-component-context.mmd:17-25,30-31` | Release manifest, approved AMI parameters, and SBOM/provenance provide baseline references that can be linked to compliance evidence. |
-| Gap | The current diagrams do not explicitly show a normalized evidence record containing timestamp, system ID, baseline reference, and compliance status in one governed evidence store. |
+| `architecture/compliance-evidence-store.md:§1` | Defines the normalized evidence schema (evidence_id, timestamp, system_id, environment, baseline_ref, control_id, result, remediation_state, source_system, run_id, details_ref, signature) — all required fields present. |
+| `architecture/compliance-evidence-store.md:§2` | Defines ingest sources: GitHub Actions, SSM/Ansible, Drift Reconciler, DB Drift Controller, Security Hub/GuardDuty, ServiceNow/CMDB — all pipeline and runtime sources publish normalized records. |
+| `architecture/target-component-context.mmd:I1-I4` | Evidence Ingestor Lambda validates and signs records before writing to S3 (Object Lock) and indexing in DynamoDB with GSIs on system_id, control_id, and timestamp. |
+| `architecture/sequence-diagram.mmd` (evidence publish steps) | Build pipeline, drift reconciler, and DB drift controller all explicitly publish evidence events to the evidence bus; ingestor writes signed, immutable records to the evidence store. |
+| `architecture/full-pipeline-tech-stack.md` (Evidence Ingest row) | EventBridge + Lambda Evidence Ingestor provides centralized, normalized ingest from all pipeline and runtime sources. |
 
 _Scenario 3 – Audit Reporting_
 
 | Evidence | Traceability |
 |---|---|
-| `architecture/full-pipeline-tech-stack.md:22-24` | CMDB sync, CloudWatch telemetry, and alerting provide the raw data sources needed for reporting. |
-| `architecture/target-component-context.md:22-24` | Observability and security posture capabilities support review and investigation of current state. |
-| `architecture/component-context-diagram.mmd:74-78` | Runtime findings and inventory are already aggregated into central systems, which supports report generation inputs. |
-| Gap | No explicit reporting service, export workflow, dashboard-to-report path, or historical compliance report artifact is modeled for auditors. |
+| `architecture/compliance-evidence-store.md:§6` | Defines five report types (current posture, historical trend, remediation history, integrity report, access/change audit report) and the generation/export mechanism. |
+| `architecture/target-component-context.mmd:J1-J3` | AWS Audit Manager (App_as_Code control framework), Athena report queries (current posture, history, remediation), and Auditor Export API (API Gateway + IAM Identity Center) are explicitly modeled. |
+| `architecture/full-pipeline-tech-stack.md` (Audit Reporting row) | Audit Manager + Athena + S3 export architecture is documented in the tech stack. |
+| `architecture/component-context-diagram.mmd` (AUDITMAN, ATHENA, AUDITAPI nodes) | Audit Manager and Athena draw from the evidence store; export is available via the auditor API with full access logging. |
 
 _Scenario 4 – Integrity and Auditability of Evidence_
 
 | Evidence | Traceability |
 |---|---|
-| Gap | The architecture does not explicitly model immutable/WORM evidence storage, cryptographic integrity protection, evidence retention controls, or access/change audit logs for stored compliance evidence. |
-| Gap | There is no explicit service such as CloudTrail, AWS Audit Manager, Security Lake, signed evidence manifests, or S3 Object Lock shown to make evidence tamper-evident and fully auditable. |
+| `architecture/compliance-evidence-store.md:§4` | S3 Object Lock (Governance mode, 7-year retention), versioning, SSE-KMS encryption, KMS-signed SHA-256 per record, and hash-chain integrity controls are fully specified. |
+| `architecture/compliance-evidence-store.md:§5` | Complete access/change audit trail is defined: CloudTrail S3 data events (read/write/delete) and management events, DynamoDB Streams for index mutations, with actor, timestamp, before/after, and reason code captured for every event. |
+| `architecture/target-component-context.mmd:I3,I5,I6` | S3 Evidence Bucket (Object Lock + SSE-KMS), Integrity Verifier Lambda (daily hash + signature verification), and CloudTrail Evidence Audit Log are explicitly modeled. |
+| `architecture/full-pipeline-tech-stack.md` (Evidence Integrity and Evidence Audit Trail rows) | KMS Sign/Verify + Integrity Verifier Lambda and CloudTrail with S3 data events are documented in the tech stack. |
+| `architecture/compliance-evidence-store.md:§7` | Integrity alerting (CloudWatch metric alarm on EvidenceIntegrityFailure), unexpected access alerting, lock override alerting, weekly attestation reports, and daily evidence completeness checks are all specified. |
 
 _Scenario 5 – Security hardening and patches are validated after application_
 
@@ -172,17 +174,17 @@ _Scenario 5 – Security hardening and patches are validated after application_
 | `process-flow-diagram.md:49-62` | Middleware verification, post-build inventory capture, and callback to ServiceNow record the validation outcome. |
 | `architecture/target-component-context.mmd:55-56,62,96-106` | Convergence verification and post-remediation DB validation confirm remediation success and publish findings into the compliance evidence loop. |
 
-**Required Enhancements to Fully Meet App_as_Code_004**
+**Architectural Additions Made to Fully Meet App_as_Code_004**
 
-| Gap Area | Needed Architectural Addition |
+| Gap Area (Closed) | Architectural Addition |
 |---|---|
-| Central evidence record | Add a dedicated compliance evidence store that captures timestamp, system identifier, baseline reference, control/patch result, and remediation status for every assessment. |
-| Exportable audit reporting | Add an explicit reporting layer that can generate current and historical compliance reports from CMDB, Security Hub, inventory, and drift findings for audit export. |
-| Tamper-evident evidence | Add immutable evidence storage and integrity controls, such as signed evidence artifacts and retention-protected storage. |
-| Audit trail of access and change | Add explicit access/change logging for evidence reads and updates so reviewers can trace who accessed or modified evidence and when. |
+| Central evidence record | Added Evidence Ingestor Lambda + S3 Evidence Bucket + DynamoDB Evidence Index. Every assessment outcome is normalized to the canonical schema (timestamp, system_id, baseline_ref, control_id, result, remediation_state, source_system, run_id, details_ref, signature) and written as an immutable record. |
+| Exportable audit reporting | Added AWS Audit Manager (App_as_Code control framework), Athena report queries, and Auditor Export API. Five report types (current posture, historical trend, remediation history, integrity report, access/change audit) are available for export as PDF or CSV/JSON. |
+| Tamper-evident evidence | Added S3 Object Lock (Governance mode, 7-year retention), SSE-KMS encryption, KMS-signed SHA-256 per record, hash-chain integrity, and daily Integrity Verifier Lambda. Evidence cannot be modified or deleted within the retention window. |
+| Audit trail of access and change | Added CloudTrail S3 data events (PutObject/GetObject/DeleteObject) and management events for the evidence bucket, DynamoDB Streams for index mutations, and a separate write-once audit log bucket (Compliance mode Object Lock). Every evidence read, write, delete attempt, and lock override is captured with full actor, timestamp, and request metadata. |
 
 **Architect Verdict**
-- App_as_Code_004 is only **partially fulfilled** by the current architecture. The solution already provides strong continuous monitoring and validation signals through drift reconciliation, Security Hub/GuardDuty, SSM Inventory, CMDB updates, and post-remediation verification. However, the architecture does not yet explicitly model a dedicated auditable evidence repository, an exportable cross-system reporting capability, or tamper-evident evidence storage with a complete access/change audit trail. Those additions are required before the requirement can be marked fully met.
+- App_as_Code_004 is now **fully met**. The architecture explicitly models a dedicated compliance evidence store with a normalized schema, tamper-evident S3 Object Lock storage, KMS cryptographic signing, a complete CloudTrail-based access/change audit trail, a daily integrity verification loop, and an exportable audit reporting layer via AWS Audit Manager and Athena. All five scenarios are satisfied. See `architecture/compliance-evidence-store.md` for the full design specification.
 
 ### 5) Requirement 5 (ID to be confirmed)
 **Status**: Pending input
