@@ -59,7 +59,7 @@ graph TB
     SN -->|2. Trigger workflow event| IH
     IH -->|3. Dispatch pipeline run| GHA
     SN -.->|1. CMDB metadata / change context| GHA
-    SN -->|31. Failed scan remediation request| Team
+    SN -->|F3. Failed scan remediation request| Team
 
     GH -->|4. Push/PR pipeline trigger| GHA
     GHA -->|5. Request federated identity token| OIDC
@@ -75,7 +75,7 @@ graph TB
     SAST -->|14. Gate evidence| SGATE
     IAC -->|15. Gate evidence| SGATE
     SGATE -->|16. Passed, proceed with image build| IMG
-    SGATE -->|32. Failed, remediation required - tracked in ServiceNow| SN
+    SGATE -->|F1. Failed, remediation required - tracked in ServiceNow| SN
 
     IMG -->|17. Run playbook execution| EC2
     SSMSESS -->|19. Open secure management session| EC2
@@ -89,7 +89,7 @@ graph TB
     AMI -->|24. Submit candidate image for scan| AMISCAN
     AMISCAN -->|25. Scan evidence| IGATE
     IGATE -->|26. Passed, deploy to workloads| APP
-    IGATE -->|33. Failed, remediation required - tracked in ServiceNow| SN
+    IGATE -->|F2. Failed, remediation required - tracked in ServiceNow| SN
     APP -->|27. Runtime findings and posture telemetry| RUNTIMESEC
     RUNTIMESEC -->|28. Security posture feedback| SN
 
