@@ -35,13 +35,24 @@ graph TB
         AMI[Golden AMI Registry]
     end
 
+    subgraph Compliance["Trust Boundary: Compliance Evidence & Audit"]
+        direction LR
+        EVTBUS[EventBridge<br/>Compliance Evidence Bus]
+        INGESTOR[Evidence Ingestor Lambda<br/>Schema Validation + KMS Signing]
+        EVIDENCES3[S3 Evidence Bucket<br/>Object Lock WORM + SSE-KMS]
+        EVIDX[DynamoDB Evidence Index<br/>GSI: system_id + control_id + ts]
+        INTVERIFY[Integrity Verifier Lambda<br/>Daily Hash + Signature Check]
+        CLOUDTRAIL[CloudTrail Evidence Audit Log<br/>S3 Data Events + Mgmt Events]
+        AUDITMAN[AWS Audit Manager<br/>App_as_Code Control Framework]
+        ATHENA[Athena Report Queries<br/>Posture + History + Remediation]
+        AUDITAPI[Auditor Export API<br/>API Gateway + IAM Identity Center]
+    end
+
     subgraph Runtime["Trust Boundary: AWS Runtime / Build Targets"]
         direction LR
         EC2[Private Builder EC2]
         APP[Target Workloads\nWebLogic / Tomcat / Python]
     end
-
-    Team -->|Submit service request| SN
     SN -->|Trigger workflow event| IH
     IH -->|Dispatch pipeline run| GHA
     SN -. CMDB metadata / change context .-> GHA
@@ -77,6 +88,27 @@ graph TB
     EC2 -->|Send inventory state| INV
     INV -->|Sync inventory to CMDB| SN
 
+    %% Evidence publication flows into the central evidence bus
+    GHA -->|Publish pipeline stage evidence| EVTBUS
+    SAST -->|Publish scan evidence| EVTBUS
+    IAC -->|Publish IaC policy evidence| EVTBUS
+    AMISCAN -->|Publish image scan evidence| EVTBUS
+    RUNTIMESEC -->|Publish runtime posture evidence| EVTBUS
+    INV -->|Publish inventory evidence| EVTBUS
+    EVTBUS -->|Validate + sign evidence record| INGESTOR
+    INGESTOR -->|Write signed evidence| EVIDENCES3
+    INGESTOR -->|Index evidence record| EVIDX
+    EVIDENCES3 -->|Daily integrity check| INTVERIFY
+    EVIDENCES3 -->|All S3 events logged| CLOUDTRAIL
+    INTVERIFY -->|Alert on tamper anomaly| CLOUDTRAIL
+
+    %% Audit reporting
+    EVIDENCES3 -->|Evidence aggregation| AUDITMAN
+    EVIDENCES3 -->|Ad-hoc + scheduled queries| ATHENA
+    EVIDX -->|Index-driven report queries| ATHENA
+    AUDITMAN -->|Compliance report export| AUDITAPI
+    ATHENA -->|Report export| AUDITAPI
+
     %% actor
     style Team fill:#E1F5FE,stroke:#01579B,stroke-width:2px,color:#000
     %% governance
@@ -103,3 +135,13 @@ graph TB
     %% runtime
     style EC2 fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
     style APP fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    %% compliance evidence
+    style EVTBUS fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
+    style INGESTOR fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
+    style EVIDENCES3 fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
+    style EVIDX fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
+    style INTVERIFY fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
+    style CLOUDTRAIL fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
+    style AUDITMAN fill:#EDE7F6,stroke:#4A148C,stroke-width:2px,color:#000
+    style ATHENA fill:#EDE7F6,stroke:#4A148C,stroke-width:2px,color:#000
+    style AUDITAPI fill:#EDE7F6,stroke:#4A148C,stroke-width:2px,color:#000

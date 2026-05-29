@@ -62,6 +62,21 @@ graph TD
       H4[Post-Remediation DB Validation]
     end
 
+    subgraph Compliance Evidence Store
+      I1[EventBridge Compliance Evidence Bus]
+      I2[Evidence Ingestor Lambda<br/>Schema Validation + KMS Signing]
+      I3[S3 Evidence Bucket<br/>Object Lock WORM + SSE-KMS + Versioning]
+      I4[DynamoDB Evidence Index<br/>GSI: system_id + control_id + timestamp]
+      I5[Integrity Verifier Lambda<br/>Daily Hash + Signature Verification]
+      I6[CloudTrail Evidence Audit Log<br/>S3 Data Events + Management Events]
+    end
+
+    subgraph Audit Reporting
+      J1[AWS Audit Manager<br/>App_as_Code Control Framework]
+      J2[Athena Report Queries<br/>Current Posture + Historical Trend + Remediation]
+      J3[Auditor Export API<br/>API Gateway + IAM Identity Center]
+    end
+
     A1 --> B1
     A2 --> B1
     A3 --> B1
@@ -105,6 +120,25 @@ graph TD
     H2 --> H3 --> H4
     H4 --> G3
 
+    %% Evidence ingest from all sources into the central evidence bus
+    B1 --> I1
+    G6 --> I1
+    H4 --> I1
+    C4 --> I1
+    G3 --> I1
+    I1 --> I2 --> I3
+    I2 --> I4
+    I3 --> I5
+    I5 --> I6
+    I3 --> I6
+
+    %% Audit reporting draws from evidence store and index
+    I3 --> J1
+    I3 --> J2
+    I4 --> J2
+    J1 --> J3
+    J2 --> J3
+
     class A1,A2,A3 source;
     class D1,D2,D3,D4 artifact;
     class B1,B2,B3 delivery;
@@ -113,3 +147,5 @@ graph TD
     class F1,F2,F3,F4,F5 runtime;
     class G1,G2,G3,G4,G5,G6 runtime;
     class H1,H2,H3,H4 runtime;
+    class I1,I2,I3,I4,I5,I6 security;
+    class J1,J2,J3 delivery;
