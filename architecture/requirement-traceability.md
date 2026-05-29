@@ -186,8 +186,84 @@ _Scenario 5 – Security hardening and patches are validated after application_
 **Architect Verdict**
 - App_as_Code_004 is now **fully met**. The architecture explicitly models a dedicated compliance evidence store with a normalized schema, tamper-evident S3 Object Lock storage, KMS cryptographic signing, a complete CloudTrail-based access/change audit trail, a daily integrity verification loop, and an exportable audit reporting layer via AWS Audit Manager and Athena. All five scenarios are satisfied. See `architecture/compliance-evidence-store.md` for the full design specification.
 
-### 5) Requirement 5 (ID to be confirmed)
-**Status**: Pending input
+### 5) App_as_Code_005
+
+**Requirement Summary**
+- Configuration checks, setup activities, and post-deployment changes must be performed automatically and consistently.
+- Reliance on manual intervention must be reduced.
+- Configuration-related incidents must be minimised.
+- Engineering teams should focus on delivering value rather than rework.
+
+**Status**: **Met**
+
+**Scenario Compliance Summary**
+
+| Scenario | Requirement Expectation | Verdict | Key References |
+|---|---|---|---|
+| Elimination of Manual Verification Steps | All configuration and security checks executed automatically within the pipeline; manual approval or verification steps removed wherever possible. | **Met** | `architecture/aws-migration-cicd.mmd:57-109`, `architecture/component-context-diagram.mmd:SGATE,IGATE`, `architecture/full-pipeline-tech-stack.md:rows 5,15-17`, `architecture/sequence-diagram.mmd:22-52` |
+| Reduction of Post-Deployment Fixes | No manual configuration fixes required due to missed or inconsistent setup activities after a deployment completes. | **Met** | `architecture/aws-migration-cicd.mmd:76-109`, `architecture/full-pipeline-tech-stack.md:rows 8,13,22`, `architecture/target-component-context.mmd:G1-G6,H1-H4`, `architecture/sequence-diagram.mmd:54-72` |
+| Security Risk Reduction through Automation | Automation policies reduce configuration-related security incidents through consistent, repeatable automated controls. | **Met** | `architecture/component-context-diagram.mmd:SAST,IAC,AMISCAN,RUNTIMESEC`, `architecture/full-pipeline-tech-stack.md:rows 5,7,15-18`, `architecture/target-component-context.mmd:C1-C4,G4-G5` |
+| Auditability of Automated Controls | System produces auditable logs demonstrating that automated controls were executed consistently and successfully. | **Met** | `architecture/component-context-diagram.mmd:EVTBUS,INGESTOR,CLOUDTRAIL`, `architecture/sequence-diagram.mmd:50-52,70-72,86-88`, `architecture/full-pipeline-tech-stack.md:rows 6,27-30`, `architecture/aws-migration-cicd.mmd:E1` |
+| Engineering Productivity Improvement | Time spent on manual setup, validation, and rework is reduced, enabling focus on higher-value engineering. | **Met** | `architecture/aws-migration-cicd.mmd:57-109`, `architecture/sequence-diagram.mmd:20-52`, `architecture/target-component-context.mmd:G1-G6`, `architecture/full-pipeline-tech-stack.md:rows 3,26` |
+
+**Traceability Evidence**
+
+_Scenario 1 – Elimination of Manual Verification Steps_
+
+| Evidence | Traceability |
+|---|---|
+| `architecture/aws-migration-cicd.mmd:57-109` | Stages 2–5 are entirely system-driven (blue nodes). From the GitHub dispatch payload through quality gates, builder execution, middleware configuration, AMI serialization, and promotion deployment, every step is executed by the pipeline without requiring a human verification action. |
+| `architecture/component-context-diagram.mmd:SGATE,IGATE` | Security and quality gate decisions (`SGATE`, `IGATE`) are evaluated automatically by the pipeline. Failures auto-route to remediation tasks tracked in ServiceNow; passing gates auto-proceed to the next stage. |
+| `architecture/full-pipeline-tech-stack.md:rows 5,15-17` | GitHub Actions (CI/CD engine), tfsec + Checkov (IaC policy), GitHub Advanced Security / Dependency / Secret Scanning, and Amazon Inspector + ECR Enhanced Scanning all run automatically on every pipeline execution without manual trigger or approval. |
+| `architecture/sequence-diagram.mmd:22-52` | Steps 2–13 model fully automated orchestration: Git checkout, OIDC token acquisition, Ansible controller initialisation, SSM session, EC2 launch, OS hardening, middleware setup, AMI registration, and CMDB patch — no human action between ServiceNow webhook and CMDB update. |
+
+_Scenario 2 – Reduction of Post-Deployment Fixes_
+
+| Evidence | Traceability |
+|---|---|
+| `architecture/aws-migration-cicd.mmd:76-109` | Middleware-specific Ansible baselines (D2A WebLogic, D2B Tomcat, D2C Python) are applied automatically before AMI serialization, ensuring all required configuration is baked into the golden image before any deployment occurs. |
+| `architecture/full-pipeline-tech-stack.md:rows 8,13` | Ansible applies OS hardening and middleware/application configuration as code; Terraform provisions environment-specific runtime infrastructure with isolated state — both mechanisms guarantee consistent, complete setup with no room for missed manual steps. |
+| `architecture/full-pipeline-tech-stack.md:row 22` | AWS SSM Inventory + ServiceNow CMDB Sync reconciles live runtime software and OS state back to CMDB after build and deployment, detecting any gap between expected and actual configuration. |
+| `architecture/target-component-context.mmd:G1-G6` | EventBridge scheduled reconciliation (G1) triggers the Drift Reconciler (G2) to compare live AWS state against the Git/Terraform baseline. Drift findings (G3) feed a policy gate (G4) that authorises automatic baseline enforcement (G5), followed by convergence verification (G6) — eliminating any manual correction cycle. |
+| `architecture/sequence-diagram.mmd:54-72` | The closed-loop drift detection and auto-remediation sequence runs on a schedule: detect → policy gate → Terraform/config enforce → convergence verify → CMDB closure. Where policy permits, no human action is needed to correct post-deployment configuration drift. |
+| `architecture/target-component-context.mmd:H1-H4` | Database Drift Detector and Migration Orchestrator address database configuration drift automatically, including rollback path and post-remediation validation, removing manual database fix activities. |
+
+_Scenario 3 – Security Risk Reduction through Automation_
+
+| Evidence | Traceability |
+|---|---|
+| `architecture/component-context-diagram.mmd:SAST,IAC,AMISCAN,RUNTIMESEC` | SAST + Dependency + Secret Scanning, IaC Policy Scans, Inspector/ECR image scanning, and Security Hub/GuardDuty runtime posture monitoring are all automated controls applied consistently on every pipeline run and in continuous runtime operation. |
+| `architecture/full-pipeline-tech-stack.md:rows 15-18` | tfsec + Checkov block non-compliant infrastructure changes before apply. GitHub Advanced Security detects code/package/secret risks at PR stage. Inspector scans every AMI before promotion. GuardDuty + Security Hub + EventBridge automatically trigger containment or remediation workflows at runtime — every layer is repeatable and consistent. |
+| `architecture/full-pipeline-tech-stack.md:row 7` | AWS IAM OIDC Provider issues short-lived federated credentials for every pipeline run, removing long-lived static keys as a source of configuration-related credential risk. |
+| `architecture/full-pipeline-tech-stack.md:row 20` | AWS SSM Session Manager provides a zero-trust encrypted control channel, eliminating SSH exposure as a manual configuration risk surface. |
+| `architecture/target-component-context.mmd:G4-G5` | Policy Gate + Enforce Repo Baseline ensures that every approved security control is consistently re-applied whenever drift is detected, rather than relying on a human to remember and execute manual hardening. |
+| `architecture/aws-migration-cicd.mmd:B3-B5` | Pipeline quality and security gate evaluation (B3) blocks non-compliant builds (B4 → B5) and opens a tracked remediation task automatically, preventing insecure configurations from progressing. |
+
+_Scenario 4 – Auditability of Automated Controls_
+
+| Evidence | Traceability |
+|---|---|
+| `architecture/component-context-diagram.mmd:EVTBUS,INGESTOR` | Every automated control execution (pipeline stages, scan gates, SSM executions, Security Hub findings, drift reconciler, DB drift controller) publishes a normalised evidence event to the EventBridge Compliance Evidence Bus. The Evidence Ingestor Lambda validates schema and signs each record with KMS before writing to S3. |
+| `architecture/sequence-diagram.mmd:50-52` | The build pipeline publishes a normalised 12-field evidence event immediately after the CMDB patch step; the Evidence Ingestor Lambda writes a signed, immutable record to S3 Object Lock and indexes it in DynamoDB — creating an auditable log of the automated build and configuration controls. |
+| `architecture/sequence-diagram.mmd:70-72` | The Drift Reconciler publishes a drift remediation evidence event after every automated enforcement cycle; the Evidence Ingestor creates a signed, immutable record demonstrating the automated control was executed and converged. |
+| `architecture/sequence-diagram.mmd:86-88` | The DB Drift Controller publishes evidence events for both detected and compliant states, creating a complete auditable log of all database configuration control executions. |
+| `architecture/full-pipeline-tech-stack.md:row 6` | Ansible execution logs are linked to ServiceNow change records, providing per-change-record evidence that automated configuration controls ran and what the outcome was. |
+| `architecture/full-pipeline-tech-stack.md:rows 27-30` | S3 Object Lock (Governance mode, 7-year retention), KMS signing, CloudTrail S3 data events, and Integrity Verifier Lambda collectively ensure that all auditable logs of automated controls are tamper-evident, complete, and verifiable. |
+| `architecture/aws-migration-cicd.mmd:E1` | CMDB and change record are patched with AMI ID plus Ansible execution evidence immediately after the automated build — the audit trail is closed in the same pipeline run that executed the controls. |
+
+_Scenario 5 – Engineering Productivity Improvement_
+
+| Evidence | Traceability |
+|---|---|
+| `architecture/aws-migration-cicd.mmd:57-109` | All post-approval pipeline stages (2–5) are system-driven with no manual engineering action required for build, configuration, image bake, or deployment. Engineering time is freed from repetitive setup and verification tasks. |
+| `architecture/sequence-diagram.mmd:20-52` | The ServiceNow webhook → GitHub Actions → SSM → Ansible → AMI registration → CMDB update flow is fully automated end-to-end, removing engineer involvement from routine deployment and configuration activities. |
+| `architecture/target-component-context.mmd:G1-G6` | Automated drift detection and reconciliation eliminates the need for engineers to manually identify and correct post-deployment configuration deviations, which is a primary source of unplanned rework. |
+| `architecture/full-pipeline-tech-stack.md:row 26` | Blue/Green/Canary rollback, AMI rollback via previous approved ID, and IaC-controlled revert pipeline provide automated safe recovery paths, reducing the engineering effort required to resolve deployment failures. |
+| `architecture/full-pipeline-tech-stack.md:row 3` | GitHub Actions event-driven pipeline manager handles build, test, scan, release, and controlled promotion automatically on code push or external dispatch, freeing engineers from orchestrating individual pipeline steps. |
+| `architecture/full-pipeline-tech-stack.md:rows 21,22` | SSM Parameter Store segregates environment configuration from code (no manual environment-specific edits at deployment time); SSM Inventory + CMDB Sync automates asset state reconciliation (no manual CMDB update work). |
+
+**Architect Verdict**
+- App_as_Code_005 is **fully met**. The architecture eliminates manual verification steps by automating all post-ServiceNow-approval pipeline stages (Stages 2–5 in `aws-migration-cicd.mmd`) including automated security gates (SAST, IaC scans, image scans) and system-driven deployment promotion. Post-deployment fixes are prevented by Ansible configuration-as-code baked into immutable golden AMIs before deployment, and a scheduled drift detection and auto-remediation loop (EventBridge → Drift Reconciler → Policy Gate → Enforce Baseline → Convergence Verification) that corrects any post-deployment drift without manual engineering action. Security risk is reduced through consistent, repeatable automated controls applied identically on every pipeline run (tfsec/Checkov, Inspector, GuardDuty, OIDC short-lived credentials, SSM zero-trust tunnel). Every automated control execution publishes a normalised, KMS-signed, tamper-evident evidence record to the compliance evidence store, providing complete auditability. Engineering productivity is improved because all build, configuration, scan, deployment, and reconciliation activities are orchestrated automatically, removing manual setup, verification, and rework from the engineering workflow.
 
 ### 6) Requirement 6 (ID to be confirmed)
 **Status**: Pending input
