@@ -13,7 +13,7 @@ This POC is rewritten to match your requirement:
 After completing this POC:
 
 1. A developer only pushes code (or triggers `workflow_dispatch`).
-2. GitHub Actions builds the Tomcat image from `sample-code/tomcat/`.
+2. GitHub Actions builds the Tomcat image from `sample-code/tomcat`.
 3. GitHub Actions pushes the image to ECR.
 4. GitHub Actions applies Terraform for ECS/Fargate infrastructure.
 5. GitHub Actions updates ECS service to the new image.
@@ -134,11 +134,11 @@ Use `cicd/github-actions/aws-migration-pipeline.yml` as your source workflow and
 
 1. **Authenticate to AWS** with `aws-actions/configure-aws-credentials@v4` via OIDC role.
 2. **Build Tomcat image** from `sample-code/tomcat`.
-3. **Login to ECR** and push image with immutable tag (`${{ github.sha }}`).
+3. **Log in to ECR** and push image with immutable tag (`${{ github.sha }}`).
 4. **Terraform apply (dev)** using `infrastructure/terraform` + `environments/dev.tfvars`.
 5. **Render/register ECS task definition** using new image tag.
 6. **Update ECS service** and wait for steady state.
-7. **Smoke test** `http://<alb_dns_name>/`.
+7. **Smoke test** `http://<alb_dns_name>/` (HTTP for POC only; use HTTPS in non-POC environments).
 8. **Publish deployment summary** (image, service, URL, commit SHA).
 
 Also keep existing gates:
