@@ -69,10 +69,10 @@ This document explains each numbered integration in the component context diagra
 | 28 | SSM Inventory → ServiceNow | SSM Inventory syncs the up-to-date host inventory data back to the ServiceNow CMDB to keep configuration records current. |
 | 29 | Target Workloads → Runtime Posture (SecHub + GuardDuty + IAM AA) | Deployed workloads emit runtime security telemetry to AWS Security Hub, GuardDuty, and IAM Access Analyzer for continuous posture monitoring. |
 | 30 | Runtime Posture → ServiceNow | Posture findings and alerts from Security Hub/GuardDuty are fed back to ServiceNow to trigger remediation workflows. |
-| 49 | GitHub Actions → Deployment Decision Store | Before each deployment, the governed template queries the centralized decision record for the release identity to enforce fail-closed no-redeploy controls. |
-| 50 | Deployment Decision Store → Image Scan Gate | If the release identity is already marked failed/blocked, the gate rejects progression and prevents re-deploy of that same release. |
-| 51 | Image Scan Gate → Deployment Decision Store | Gate outcomes (passed/failed) are written back as authoritative deployment decisions for the release identity and target environment. |
-| 52 | Deployment Decision Store → ServiceNow | Failed/blocked decisions are propagated to ServiceNow as remediation context so operational teams can track and resolve security control violations. |
+| 49 | GitHub Actions → SSM Decision Records | Before each deployment, the governed template queries the centralized SSM decision record for the release identity to enforce fail-closed no-redeploy controls. |
+| 50 | SSM Decision Records → GitHub Actions | If the release identity is already marked failed/blocked, the governed deployment stage is denied and re-deploy of that same release is prevented. |
+| 51 | GitHub Actions → SSM Decision Records | Deployment outcomes (passed/failed) are written back as authoritative decisions for the release identity and target environment. |
+| 52 | SSM Decision Records → ServiceNow | Failed/blocked decisions are propagated to ServiceNow as remediation context so operational teams can track and resolve security control violations. |
 
 ---
 
@@ -125,7 +125,7 @@ This document explains each numbered integration in the component context diagra
 | IaC | Infrastructure as Code |
 | IAM | Identity and Access Management |
 | OIDC | OpenID Connect |
-| DREC | Deployment Decision Store |
+| DREC | SSM Decision Records |
 | RTCM | Runtime Compatibility Matrix |
 | S3 | Amazon Simple Storage Service |
 | SAST | Static Application Security Testing |

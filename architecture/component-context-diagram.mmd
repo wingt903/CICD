@@ -34,7 +34,7 @@ graph TB
         OIDC[IAM OIDC\nProvider]
         SSMSESS[SSM Session\nManager]
         PARAM[SSM Parameter\nStore]
-        DREC[Deployment Decision\nStore]
+        DREC[SSM Decision\nRecords]
         INV[SSM\nInventory]
         AMI[Golden AMI\nRegistry]
     end
@@ -101,8 +101,8 @@ graph TB
     APP -->|29. posture telemetry| RUNTIMESEC
     RUNTIMESEC -->|30. posture feedback| SN
     GHA -->|49. check release status| DREC
-    DREC -->|50. block failed release| IGATE
-    IGATE -->|51. write pass/fail| DREC
+    DREC -->|50. allow/block deploy| GHA
+    GHA -->|51. write pass/fail| DREC
     DREC -->|52. no-redeploy policy| SN
 
     %% Evidence flows

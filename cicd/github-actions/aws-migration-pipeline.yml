@@ -171,11 +171,12 @@ jobs:
             echo "Policy violation [CTRL-007-IMMUTABLE-RELEASE]: releaseId must equal immutable commit SHA."
             exit 1
           fi
-          if jq -e '.artifacts.containerImages[] | test(":(latest|main|master)$")' release-manifest.json > /dev/null; then
+          if jq -e '.artifacts.containerImages[] | test(":(latest|main|master|dev|develop|staging|stable)$")' release-manifest.json > /dev/null; then
             echo "Policy violation [CTRL-007-IMMUTABLE-IMAGE]: Mutable image tags are not permitted."
             exit 1
           fi
-          if ! jq -e --arg sha "${GITHUB_SHA}" 'all(.artifacts.containerImages[]; endswith(":" + $sha))' release-manifest.json > /dev/null; then
+          sha_pinned_result="$(jq -r --arg sha "${GITHUB_SHA}" 'all(.artifacts.containerImages[]; endswith(":" + $sha))' release-manifest.json)"
+          if [ "$sha_pinned_result" != "true" ]; then
             echo "Policy violation [CTRL-007-IMMUTABLE-IMAGE]: Container references must be pinned to the release SHA tag."
             exit 1
           fi
@@ -230,7 +231,24 @@ jobs:
         run: |
           set -euo pipefail
           decision_param="${DEPLOYMENT_DECISION_PARAM_PREFIX}/${{ steps.release_dev.outputs.release_id }}/dev"
-          decision="$(aws ssm get-parameter --name "$decision_param" --query 'Parameter.Value' --output text 2>/dev/null || true)"
+          decision_err="$(mktemp)"
+          trap 'rm -f "$decision_err"' EXIT
+          if decision="$(aws ssm get-parameter --name "$decision_param" --query 'Parameter.Value' --output text 2>"$decision_err")"; then
+            echo "Existing decision record for dev release ${{ steps.release_dev.outputs.release_id }}: $decision"
+          else
+            if grep -q "ParameterNotFound" "$decision_err"; then
+              echo "No existing decision record for dev release ${{ steps.release_dev.outputs.release_id }} (first deployment)."
+              decision=""
+            else
+              echo "Policy violation [CTRL-007-DECISION-STORE]: unable to read decision record $decision_param."
+              cat "$decision_err"
+              exit 1
+            fi
+          fi
+          if [ -n "$decision" ] && [ "$decision" != "passed" ] && [ "$decision" != "failed" ] && [ "$decision" != "blocked" ]; then
+            echo "Policy violation [CTRL-007-DECISION-STORE]: unsupported decision value '$decision' in $decision_param."
+            exit 1
+          fi
           if [ "$decision" = "failed" ] || [ "$decision" = "blocked" ]; then
             echo "Policy violation [CTRL-007-NOREDEPLOY]: Release ${{ steps.release_dev.outputs.release_id }} is blocked in dev due to prior failure."
             echo "Override not permitted. Build and scan a new release identity."
@@ -254,6 +272,8 @@ jobs:
           outcome="failed"
           if [ "${{ steps.deploy_dev.outcome }}" = "success" ]; then
             outcome="passed"
+          elif [ "${{ steps.deploy_dev.outcome }}" = "skipped" ]; then
+            outcome="blocked"
           fi
           aws ssm put-parameter --name "$decision_param" --type String --value "$outcome" --overwrite
 
@@ -289,7 +309,24 @@ jobs:
         run: |
           set -euo pipefail
           decision_param="${DEPLOYMENT_DECISION_PARAM_PREFIX}/${{ steps.release_test.outputs.release_id }}/test"
-          decision="$(aws ssm get-parameter --name "$decision_param" --query 'Parameter.Value' --output text 2>/dev/null || true)"
+          decision_err="$(mktemp)"
+          trap 'rm -f "$decision_err"' EXIT
+          if decision="$(aws ssm get-parameter --name "$decision_param" --query 'Parameter.Value' --output text 2>"$decision_err")"; then
+            echo "Existing decision record for test release ${{ steps.release_test.outputs.release_id }}: $decision"
+          else
+            if grep -q "ParameterNotFound" "$decision_err"; then
+              echo "No existing decision record for test release ${{ steps.release_test.outputs.release_id }} (first deployment)."
+              decision=""
+            else
+              echo "Policy violation [CTRL-007-DECISION-STORE]: unable to read decision record $decision_param."
+              cat "$decision_err"
+              exit 1
+            fi
+          fi
+          if [ -n "$decision" ] && [ "$decision" != "passed" ] && [ "$decision" != "failed" ] && [ "$decision" != "blocked" ]; then
+            echo "Policy violation [CTRL-007-DECISION-STORE]: unsupported decision value '$decision' in $decision_param."
+            exit 1
+          fi
           if [ "$decision" = "failed" ] || [ "$decision" = "blocked" ]; then
             echo "Policy violation [CTRL-007-NOREDEPLOY]: Release ${{ steps.release_test.outputs.release_id }} is blocked in test due to prior failure."
             echo "Override not permitted. Build and scan a new release identity."
@@ -313,6 +350,8 @@ jobs:
           outcome="failed"
           if [ "${{ steps.deploy_test.outcome }}" = "success" ]; then
             outcome="passed"
+          elif [ "${{ steps.deploy_test.outcome }}" = "skipped" ]; then
+            outcome="blocked"
           fi
           aws ssm put-parameter --name "$decision_param" --type String --value "$outcome" --overwrite
 
@@ -348,7 +387,24 @@ jobs:
         run: |
           set -euo pipefail
           decision_param="${DEPLOYMENT_DECISION_PARAM_PREFIX}/${{ steps.release_prod.outputs.release_id }}/prod"
-          decision="$(aws ssm get-parameter --name "$decision_param" --query 'Parameter.Value' --output text 2>/dev/null || true)"
+          decision_err="$(mktemp)"
+          trap 'rm -f "$decision_err"' EXIT
+          if decision="$(aws ssm get-parameter --name "$decision_param" --query 'Parameter.Value' --output text 2>"$decision_err")"; then
+            echo "Existing decision record for prod release ${{ steps.release_prod.outputs.release_id }}: $decision"
+          else
+            if grep -q "ParameterNotFound" "$decision_err"; then
+              echo "No existing decision record for prod release ${{ steps.release_prod.outputs.release_id }} (first deployment)."
+              decision=""
+            else
+              echo "Policy violation [CTRL-007-DECISION-STORE]: unable to read decision record $decision_param."
+              cat "$decision_err"
+              exit 1
+            fi
+          fi
+          if [ -n "$decision" ] && [ "$decision" != "passed" ] && [ "$decision" != "failed" ] && [ "$decision" != "blocked" ]; then
+            echo "Policy violation [CTRL-007-DECISION-STORE]: unsupported decision value '$decision' in $decision_param."
+            exit 1
+          fi
           if [ "$decision" = "failed" ] || [ "$decision" = "blocked" ]; then
             echo "Policy violation [CTRL-007-NOREDEPLOY]: Release ${{ steps.release_prod.outputs.release_id }} is blocked in prod due to prior failure."
             echo "Override not permitted. Build and scan a new release identity."
@@ -372,7 +428,10 @@ jobs:
             exit 1
           fi
           now_epoch="$(date -u +%s)"
-          expiry_epoch="$(date -u -d "${{ vars.BREAK_GLASS_APPROVED_UNTIL }}" +%s 2>/dev/null || echo 0)"
+          if ! expiry_epoch="$(date -u -d "${{ vars.BREAK_GLASS_APPROVED_UNTIL }}" +%s 2>/dev/null)"; then
+            echo "Policy violation [CTRL-007-BREAKGLASS]: BREAK_GLASS_APPROVED_UNTIL is not a valid UTC timestamp."
+            exit 1
+          fi
           if [ "$expiry_epoch" -le "$now_epoch" ]; then
             echo "Policy violation [CTRL-007-BREAKGLASS]: override approval window is expired."
             exit 1
@@ -396,6 +455,8 @@ jobs:
           outcome="failed"
           if [ "${{ steps.deploy_prod.outcome }}" = "success" ]; then
             outcome="passed"
+          elif [ "${{ steps.deploy_prod.outcome }}" = "skipped" ]; then
+            outcome="blocked"
           fi
           aws ssm put-parameter --name "$decision_param" --type String --value "$outcome" --overwrite
 
