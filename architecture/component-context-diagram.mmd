@@ -1,121 +1,126 @@
+%%{init: {'flowchart': {'nodeSpacing': 6, 'rankSpacing': 10, 'diagramPadding': 2, 'curve': 'linear'}}}%%
 graph TB
-    %% Top-to-bottom layout is used for full-screen readability in draw.io
+    %% Edge labels: short verb phrases describe each flow; F1/F2/F3 = failure/remediation paths.
     Team[Project / Migration Team]
 
-    subgraph Governance["Trust Boundary: Governance & Request Layer"]
+    subgraph Governance["Governance & Request"]
         direction LR
         SN[ServiceNow\nCatalog + CMDB]
         IH[IntegrationHub]
     end
 
-    subgraph Pipeline["Trust Boundary: CI/CD Orchestration Layer"]
-        direction TB
+    subgraph Pipeline["CI/CD Orchestration"]
+        direction LR
         GH[GitHub\nRepository]
         GHA[GitHub Actions]
-        RTCMVAL[RTCM Validator\nPre-install Version Policy]
-        IMG[Ansible Image Build\nPlaybooks]
+        RTCMVAL[RTCM Validator]
+        IMG[Ansible Image Build]
         ANS[Ansible]
-        SGATE{Security and Quality Gates Passed?}
+        SGATE{Security Gates\nPassed?}
     end
 
-    subgraph Security["Trust Boundary: Security & Quality Gates"]
+    subgraph Security["Security & Quality Gates"]
         direction LR
-        SAST[Code Security Scans\nSAST + Dependency + Secret]
-        IAC[IaC Policy Scans\ntfsec + Checkov]
-        RTCM[Runtime Technology Compatibility Matrix\nApproved App + Middleware + DB Versions]
-        AMISCAN[Artifact Security Scans\nECR + Inspector]
-        IGATE{Image Scan Passed?}
-        RUNTIMESEC[Runtime Security Posture\nSecurity Hub + GuardDuty + IAM Access Analyzer]
+        SAST[Code Scans\nSAST + Dep + Secret]
+        IAC[IaC Scans\ntfsec + Checkov]
+        RTCM[RTCM\nApproved Versions]
+        AMISCAN[Artifact Scans\nECR + Inspector]
+        IGATE{Image Scan\nPassed?}
+        RUNTIMESEC[Runtime Posture\nSecHub + GuardDuty + IAM AA]
     end
 
-    subgraph AWS["Trust Boundary: AWS Control Plane"]
+    subgraph AWS["AWS Control Plane"]
         direction LR
-        OIDC[AWS IAM OIDC\nProvider]
-        SSMSESS[AWS SSM Session Manager]
-        PARAM[AWS SSM Parameter Store]
-        INV[AWS SSM Inventory]
-        AMI[Golden AMI Registry]
+        OIDC[IAM OIDC\nProvider]
+        SSMSESS[SSM Session\nManager]
+        PARAM[SSM Parameter\nStore]
+        INV[SSM\nInventory]
+        AMI[Golden AMI\nRegistry]
     end
 
-    subgraph Compliance["Trust Boundary: Compliance Evidence & Audit"]
+    subgraph Compliance["Compliance Evidence & Audit"]
         direction LR
-        EVTBUS[EventBridge<br/>Compliance Evidence Bus]
-        INGESTOR[Evidence Ingestor Lambda<br/>Schema Validation + KMS Signing]
-        EVIDENCES3[S3 Evidence Bucket<br/>Object Lock WORM + SSE-KMS]
-        EVIDX[DynamoDB Evidence Index<br/>GSI: system_id + control_id + ts]
-        INTVERIFY[Integrity Verifier Lambda<br/>Daily Hash + Signature Check]
-        CLOUDTRAIL[CloudTrail Evidence Audit Log<br/>S3 Data Events + Mgmt Events]
-        AUDITMAN[AWS Audit Manager<br/>App_as_Code Control Framework]
-        ATHENA[Athena Report Queries<br/>Posture + History + Remediation]
-        AUDITAPI[Auditor Export API<br/>API Gateway + IAM Identity Center]
+        EVTBUS[EventBridge\nEvidence Bus]
+        INGESTOR[Evidence Ingestor\nLambda]
+        EVIDENCES3[S3 Evidence Bucket\nObject Lock + SSE-KMS]
+        EVIDX[DynamoDB\nEvidence Index]
+        INTVERIFY[Integrity Verifier\nLambda]
+        CLOUDTRAIL[CloudTrail\nEvidence Audit]
+        AUDITMAN[Audit Manager]
+        ATHENA[Athena\nReport Queries]
+        AUDITAPI[Auditor\nExport API]
     end
 
-    subgraph Runtime["Trust Boundary: AWS Runtime / Build Targets"]
+    subgraph Runtime["AWS Runtime / Build Targets"]
         direction LR
         EC2[Private Builder EC2]
         APP[Target Workloads\nWebLogic / Tomcat / Python]
     end
-    SN -->|Trigger workflow event| IH
-    IH -->|Dispatch pipeline run| GHA
-    SN -. CMDB metadata / change context .-> GHA
-    SN -->|Failed scan remediation request| Team
 
-    GH -->|Push/PR pipeline trigger| GHA
-    GHA -->|Request federated identity token| OIDC
-    OIDC -->|Return temporary AWS credentials| GHA
+    %% Governance → Pipeline
+    SN -.->|1. CMDB context| GHA
+    SN -->|2. trigger event| IH
+    IH -->|3. dispatch run| GHA
+    SN -->|F3: remediation| Team
 
-    GH -->|Versioned RTCM artifact| RTCM
-    PARAM -->|Mirror approved RTCM baseline| RTCM
-    GHA -->|Read declared stack versions| RTCMVAL
-    RTCM -->|Approved version policy| RTCMVAL
-    GHA -->|Run application security scans| SAST
-    GHA -->|Run IaC policy validation| IAC
-    RTCMVAL -->|Compatibility gate evidence| SGATE
-    SAST -->|Gate evidence| SGATE
-    IAC -->|Gate evidence| SGATE
-    SGATE -->|Passed, proceed with image build| IMG
-    SGATE -->|Failed, remediation required - tracked in ServiceNow| SN
+    %% Pipeline bootstrap
+    GH -->|4. pipeline trigger| GHA
+    GHA -->|5. request token| OIDC
+    OIDC -->|6. temp credentials| GHA
 
-    IMG -->|Run playbook execution| EC2
-    SSMSESS -->|Open secure management session| EC2
+    %% RTCM + security scan gates
+    GH -->|7. RTCM artifact| RTCM
+    PARAM -->|8. mirror baseline| RTCM
+    GHA -->|9. read stack versions| RTCMVAL
+    RTCM -->|10. version policy| RTCMVAL
+    GHA -->|11. run code scans| SAST
+    GHA -->|12. run IaC scans| IAC
+    RTCMVAL -->|13. gate evidence| SGATE
+    SAST -->|14. gate evidence| SGATE
+    IAC -->|15. gate evidence| SGATE
+    SGATE -->|16. passed: build| IMG
+    SGATE -->|F1: remediation| SN
 
-    GHA -->|Start SSM automation/session| SSMSESS
-    GHA -->|Launch configuration tasks| ANS
-    ANS -->|Configure builder host| EC2
-    PARAM -->|Provide approved build parameters| EC2
+    %% Image build
+    IMG -->|17. run playbook| EC2
+    GHA -->|18. start session| SSMSESS
+    SSMSESS -->|19. secure channel| EC2
+    GHA -->|20. launch config| ANS
+    ANS -->|21. configure host| EC2
+    PARAM -->|22. build params| EC2
 
-    EC2 -->|Publish hardened image| AMI
-    AMI -->|Submit candidate image for scan| AMISCAN
-    AMISCAN -->|Scan evidence| IGATE
-    IGATE -->|Passed, deploy to workloads| APP
-    IGATE -->|Failed, remediation required - tracked in ServiceNow| SN
-    APP -->|Runtime findings and posture telemetry| RUNTIMESEC
-    RUNTIMESEC -->|Security posture feedback| SN
+    %% AMI scan + deploy
+    EC2 -->|23. publish AMI| AMI
+    AMI -->|24. scan candidate| AMISCAN
+    AMISCAN -->|25. scan evidence| IGATE
+    IGATE -->|26. passed: deploy| APP
+    IGATE -->|F2: remediation| SN
+    EC2 -->|27. inventory state| INV
+    INV -->|28. sync to CMDB| SN
+    APP -->|29. posture telemetry| RUNTIMESEC
+    RUNTIMESEC -->|30. posture feedback| SN
 
-    EC2 -->|Send inventory state| INV
-    INV -->|Sync inventory to CMDB| SN
-
-    %% Evidence publication flows into the central evidence bus
-    GHA -->|Publish pipeline stage evidence| EVTBUS
-    RTCMVAL -->|Publish approved or rejected RTCM evidence| EVTBUS
-    SAST -->|Publish scan evidence| EVTBUS
-    IAC -->|Publish IaC policy evidence| EVTBUS
-    AMISCAN -->|Publish image scan evidence| EVTBUS
-    RUNTIMESEC -->|Publish runtime posture evidence| EVTBUS
-    INV -->|Publish inventory evidence| EVTBUS
-    EVTBUS -->|Validate + sign evidence record| INGESTOR
-    INGESTOR -->|Write signed evidence| EVIDENCES3
-    INGESTOR -->|Index evidence record| EVIDX
-    EVIDENCES3 -->|Daily integrity check| INTVERIFY
-    EVIDENCES3 -->|All S3 events logged| CLOUDTRAIL
-    INTVERIFY -->|Alert on tamper anomaly| CLOUDTRAIL
+    %% Evidence flows
+    GHA -->|31. pipeline evidence| EVTBUS
+    RTCMVAL -->|32. RTCM evidence| EVTBUS
+    SAST -->|33. scan evidence| EVTBUS
+    IAC -->|34. IaC evidence| EVTBUS
+    AMISCAN -->|35. image evidence| EVTBUS
+    RUNTIMESEC -->|36. posture evidence| EVTBUS
+    INV -->|37. inventory evidence| EVTBUS
+    EVTBUS -->|38. validate + sign| INGESTOR
+    INGESTOR -->|39. write record| EVIDENCES3
+    INGESTOR -->|40. index record| EVIDX
+    EVIDENCES3 -->|41. daily check| INTVERIFY
+    EVIDENCES3 -->|42. S3 events| CLOUDTRAIL
+    INTVERIFY -->|43. tamper alert| CLOUDTRAIL
 
     %% Audit reporting
-    EVIDENCES3 -->|Evidence aggregation| AUDITMAN
-    EVIDENCES3 -->|Ad-hoc + scheduled queries| ATHENA
-    EVIDX -->|Index-driven report queries| ATHENA
-    AUDITMAN -->|Compliance report export| AUDITAPI
-    ATHENA -->|Report export| AUDITAPI
+    EVIDENCES3 -->|44. aggregate| AUDITMAN
+    EVIDENCES3 -->|45. ad-hoc queries| ATHENA
+    EVIDX -->|46. index queries| ATHENA
+    AUDITMAN -->|47. report export| AUDITAPI
+    ATHENA -->|48. report export| AUDITAPI
 
     %% actor
     style Team fill:#E1F5FE,stroke:#01579B,stroke-width:2px,color:#000
