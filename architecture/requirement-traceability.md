@@ -401,5 +401,74 @@ _Scenario 2 – Detection of Non-Compliant Configuration_
 **Architect Verdict**
 - App_as_Code_007 is **partially met**. The architecture already demonstrates standardized automated pipelines and fail-closed security gates, but it does not yet explicitly define a centralized governed template-library consumption model nor fully specify mandatory image-signing and standardized policy-violation error responses for override attempts. The four implementation recommendations above — a versioned template library with PR enforcement, a mandatory Cosign/Sigstore signing and verification gate, a standardized policy-violation error contract, and a PR-time pipeline guardrail validator — together close all remaining gaps and will bring this requirement to fully met status.
 
-### 8) Requirement 8 (ID to be confirmed)
-**Status**: Pending input
+### 8) App_as_Code_008
+
+**Requirement Summary**
+- The CI/CD pipeline must automatically verify application, middleware, and database versions against an approved Runtime Technology Compatibility Matrix (RTCM) and security baseline.
+- Only supported, secure, and compliant technology stacks are permitted to be deployed into any environment.
+- Validation must occur before any installation takes place.
+- Unapproved or non-compliant runtimes must be automatically blocked by pipeline guardrails.
+- Every validation decision (approved or rejected) must be automatically logged with the deployment identity, decision outcome, and, where rejected, the reason for rejection — forming a retrievable audit trail over time.
+
+**Status**: **Partially Met** (pipeline gates, security scanning, and evidence infrastructure are present; an explicit Runtime Technology Compatibility Matrix validation step and its associated evidence record type are not yet modeled in the architecture)
+
+**Scenario Compliance Summary**
+
+| Scenario | Requirement Expectation | Verdict | Key References |
+|---|---|---|---|
+| Automatically verify against security baseline | All runtime technologies and versions are checked against the approved RTCM before any installation takes place. | **Partially Met** | `architecture/aws-migration-cicd.mmd:B2-B4`, `architecture/component-context-diagram.mmd:SAST,SGATE`, `architecture/full-pipeline-tech-stack.md:rows 16-17`, `architecture/sequence-diagram.mmd:22-27` |
+| Unsupported runtime stacks are automatically blocked | Guardrails prevent deployment of unapproved or non-compliant technology stacks. | **Partially Met** | `architecture/aws-migration-cicd.mmd:B4-B5`, `architecture/component-context-diagram.mmd:SGATE`, `architecture/full-pipeline-tech-stack.md:rows 6,15` |
+| Provide clear audit trail of approved and rejected deployments | Every validation decision is automatically logged with deployment identity, outcome, and rejection reason. | **Partially Met** | `architecture/compliance-evidence-store.md:§1-§2`, `architecture/component-context-diagram.mmd:EVTBUS,INGESTOR,CLOUDTRAIL`, `architecture/sequence-diagram.mmd:50-52` |
+
+**Traceability Evidence**
+
+_Scenario 1 – Automatically verify against security baseline_
+
+| Evidence | Traceability |
+|---|---|
+| `architecture/aws-migration-cicd.mmd:B2-B4` | Stage 2 models a "Build and run quality and security checks" step (B3) followed by a gate decision (B4) before any image build or installation occurs, satisfying the pre-installation sequence. However, this gate is generic; no explicit RTCM version-lookup step is modeled within it. |
+| `architecture/component-context-diagram.mmd:SAST` | SAST + Dependency scanning checks packages and dependencies; dependency version advisories may surface unsupported versions indirectly. However, this is vulnerability-driven, not compatibility-matrix-driven. |
+| `architecture/full-pipeline-tech-stack.md:rows 16-17` | GitHub Advanced Security / Dependency Scanning and Amazon Inspector detect package and runtime risks, but neither references a centralized RTCM that defines the approved name-version pairs for application, middleware, and database technology stacks. |
+| `architecture/sequence-diagram.mmd:22-27` | Steps 2–5 of the sequence model Git checkout and OIDC token acquisition before any EC2 launch or configuration; a version-check step would logically fit here, but it is not shown. |
+
+_Scenario 2 – Unsupported runtime stacks are automatically blocked_
+
+| Evidence | Traceability |
+|---|---|
+| `architecture/aws-migration-cicd.mmd:B4-B5` | The pipeline gate (B4: "Pipeline gates passed?") routes failures to a remediation task (B5) and prevents progression — the blocking infrastructure exists. It is not yet wired to an RTCM decision. |
+| `architecture/component-context-diagram.mmd:SGATE` | The Security and Quality Gate (`SGATE`) is a fail-closed gate pattern that stops the pipeline and routes non-compliant builds to ServiceNow for remediation. Extension to include RTCM failures is architecturally straightforward. |
+| `architecture/full-pipeline-tech-stack.md:row 15` | tfsec + Checkov block non-compliant IaC before apply; an analogous runtime-version policy check is not yet defined for application/middleware/database versions. |
+| `architecture/full-pipeline-tech-stack.md:row 6` | Ansible Playbooks execute CMDB-driven pre-checks before configuration. This pre-check step is a candidate insertion point for RTCM validation before image bake. |
+
+_Scenario 3 – Provide clear audit trail of approved and rejected deployments_
+
+| Evidence | Traceability |
+|---|---|
+| `architecture/compliance-evidence-store.md:§1` | The canonical evidence schema (evidence_id, timestamp, system_id, environment, baseline_ref, control_id, result, remediation_state, source_system, run_id, details_ref, signature) already supports a complete RTCM validation record — `control_id` would carry `rtcm-compatibility-check`, `result` carries PASS/FAIL, and `details_ref` points to the per-field rejection detail log. |
+| `architecture/compliance-evidence-store.md:§2` | GitHub Actions is an already-registered ingest source; RTCM validation decisions would be published by the pipeline step to the EventBridge Compliance Evidence Bus without schema changes. |
+| `architecture/component-context-diagram.mmd:EVTBUS,INGESTOR,CLOUDTRAIL` | The EventBridge bus, Evidence Ingestor Lambda (KMS-signed, schema-validated), and CloudTrail already provide a tamper-evident, retrievable audit trail for every pipeline evidence event. RTCM validation events would be captured within this existing trail. |
+| `architecture/sequence-diagram.mmd:50-52` | The pipeline explicitly publishes a normalized evidence event including `run_id` and `result` after each pipeline stage; an RTCM gate step would emit an equivalent record (approved or rejected with reason) into the same evidence bus. |
+
+**Architectural Additions Required to Fully Meet App_as_Code_008**
+
+| Gap Area (Open) | Required Addition to Fulfill Requirement |
+|---|---|
+| No Runtime Technology Compatibility Matrix (RTCM) artifact | Define and maintain a versioned RTCM — a governed document (signed JSON/YAML) specifying approved name-version combinations for application runtimes (e.g., Python 3.11, Java 17 LTS), middleware (e.g., WebLogic 14.1.1, Tomcat 10.1), and database engines (e.g., Oracle 19c, PostgreSQL 15). Store in SSM Parameter Store and/or a centrally governed repository path, versioned and signed. |
+| No dedicated RTCM validation pipeline step | Add an explicit "Validate Runtime Compatibility Matrix" job in Stage 2 (after source checkout, before image build/installation). The job reads the declared runtime versions from the deployment payload and manifests, queries the RTCM, and fails the pipeline gate if any version is absent from or rejected by the approved matrix. |
+| RTCM gate not wired into the blocking flow | Wire the RTCM validation outcome into the existing `B4` pipeline gate pattern so a rejected version stack fails the gate, triggers the `B5` remediation task in ServiceNow, and prevents any image build or installation from proceeding. |
+| No RTCM evidence record type emitted | Add the RTCM validation step to the list of evidence ingest sources in `compliance-evidence-store.md §2`. Each validation (approved or rejected) must emit a normalized evidence record with `control_id=rtcm-compatibility-check`, `result=PASS/FAIL`, and `details_ref` pointing to the per-stack rejection detail log. Rejected records must capture the specific runtime name, declared version, and the approved version range it violated. |
+
+**Implementation Recommendations to Close App_as_Code_008 Gaps**
+
+1. **Define a versioned Runtime Technology Compatibility Matrix (RTCM)** — Create a governed `runtime-compatibility-matrix.json` file in a centrally maintained repository path (e.g., `architecture/runtime-compatibility-matrix.json`). Each entry specifies the technology name, approved version range or exact approved versions, support status (supported / security-baseline-only / end-of-life-blocked), and the baseline reference date. Mirror the current approved set to SSM Parameter Store under a controlled path (e.g., `/cicd/rtcm/approved`) so it is accessible to pipeline jobs at runtime without embedding it in application code. Apply version control and change approval to every RTCM update.
+
+2. **Add a "Validate Runtime Compatibility Matrix" stage to Stage 2** — Insert a dedicated pipeline job immediately after Git checkout (Step 2 of `architecture/sequence-diagram.mmd`) and before any compilation, image build, or installation step. The job: (a) reads declared technology versions from the dispatch payload and any manifest/lock files in the source; (b) fetches the current approved RTCM from SSM Parameter Store; (c) checks every declared runtime, middleware, and database version against the matrix; (d) produces a structured decision record listing each technology checked, its declared version, the approved version range, and the per-technology PASS/FAIL outcome; (e) fails the pipeline with a deterministic error message referencing the specific rejected versions if any technology fails the check.
+
+3. **Wire RTCM rejection into the existing gate pattern** — On RTCM validation failure, the pipeline gate (B4 in `architecture/aws-migration-cicd.mmd`) must fire the same fail-closed path as other gate failures: open a remediation task in ServiceNow (B5) with the RTCM rejection detail, and prevent any downstream image build, installation, or deployment step from executing. The error message must conform to the standardized policy-violation error schema (per App_as_Code_007 recommendation 3), referencing the specific unapproved version(s) and the relevant RTCM control identifier.
+
+4. **Emit a structured RTCM evidence record for every validation** — Register the RTCM validation step as a named evidence source (`rtcm-validator`) in `architecture/compliance-evidence-store.md §2`. After every validation run (approved or rejected), publish a normalized evidence event to the EventBridge Compliance Evidence Bus with: `control_id=rtcm-compatibility-check`, `result=PASS or FAIL`, `baseline_ref` pointing to the RTCM version/commit used, `run_id` identifying the pipeline run, and `details_ref` pointing to the per-technology decision log in S3. Rejected records must also include a structured rejection summary (technology name, declared version, approved version range, policy reference) in the details log so auditors can retrieve the full rejection rationale without manual investigation.
+
+5. **Update architecture diagrams to model the RTCM validation step** — Add a node for "Runtime Compatibility Matrix Check" to `architecture/aws-migration-cicd.mmd` Stage 2 (between B2 and B3) and to `architecture/sequence-diagram.mmd` (between Steps 1 and 2 of Phase 2). Add the `rtcm-validator` as a new evidence ingest source in `architecture/component-context-diagram.mmd` (parallel to SAST and IAC). Update `architecture/full-pipeline-tech-stack.md` with a new row describing the RTCM validation control, the SSM Parameter Store integration, and its role in pre-installation version gating.
+
+**Architect Verdict**
+- App_as_Code_008 is **partially met**. The architecture already provides the blocking infrastructure (pipeline gates, fail-closed flow, ServiceNow remediation routing), the evidence capture infrastructure (EventBridge bus, signed ingestor, immutable S3 store, CloudTrail), and the dependency-scanning foundation (SAST/dependency/Inspector) that together address the spirit of version-based compliance checking and audit-trail requirements. However, the architecture does not yet explicitly model a Runtime Technology Compatibility Matrix as a governed versioned artifact, a dedicated pre-installation RTCM validation pipeline step, or a structured RTCM evidence record type. The five implementation recommendations above — defining the RTCM, adding a validation job before installation, wiring the gate, emitting structured evidence per decision, and updating architecture diagrams — together close all remaining gaps and bring this requirement to fully met status.
