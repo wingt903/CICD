@@ -1,7 +1,6 @@
 %%{init: {'flowchart': {'nodeSpacing': 6, 'rankSpacing': 10, 'diagramPadding': 2, 'curve': 'linear'}}}%%
 graph TB
-    %% Edge labels: numbers 1-48 = sequential workflow steps; F1/F2/F3 = failure/remediation paths.
-    %% Full step descriptions are in architecture/full-pipeline-tech-stack.md.
+    %% Edge labels: 1-48 = workflow steps; F1/F2/F3 = failure paths.
     Team[Project / Migration Team]
 
     subgraph Governance["Governance & Request"]
@@ -46,7 +45,7 @@ graph TB
         EVIDENCES3[S3 Evidence Bucket\nObject Lock + SSE-KMS]
         EVIDX[DynamoDB\nEvidence Index]
         INTVERIFY[Integrity Verifier\nLambda]
-        CLOUDTRAIL[CloudTrail\nEvidence Audit Log]
+        CLOUDTRAIL[CloudTrail\nEvidence Audit]
         AUDITMAN[Audit Manager]
         ATHENA[Athena\nReport Queries]
         AUDITAPI[Auditor\nExport API]
@@ -59,69 +58,69 @@ graph TB
     end
 
     %% Governance → Pipeline
-    SN -.->|1| GHA
-    SN -->|2| IH
-    IH -->|3| GHA
-    SN -->|F3| Team
+    SN -.->|CMDB context| GHA
+    SN -->|trigger event| IH
+    IH -->|dispatch run| GHA
+    SN -->|F3: remediation| Team
 
     %% Pipeline bootstrap
-    GH -->|4| GHA
-    GHA -->|5| OIDC
-    OIDC -->|6| GHA
+    GH -->|pipeline trigger| GHA
+    GHA -->|request token| OIDC
+    OIDC -->|temp credentials| GHA
 
     %% RTCM + security scan gates
-    GH -->|7| RTCM
-    PARAM -->|8| RTCM
-    GHA -->|9| RTCMVAL
-    RTCM -->|10| RTCMVAL
-    GHA -->|11| SAST
-    GHA -->|12| IAC
-    RTCMVAL -->|13| SGATE
-    SAST -->|14| SGATE
-    IAC -->|15| SGATE
-    SGATE -->|16| IMG
-    SGATE -->|F1| SN
+    GH -->|RTCM artifact| RTCM
+    PARAM -->|mirror baseline| RTCM
+    GHA -->|read stack versions| RTCMVAL
+    RTCM -->|version policy| RTCMVAL
+    GHA -->|run code scans| SAST
+    GHA -->|run IaC scans| IAC
+    RTCMVAL -->|gate evidence| SGATE
+    SAST -->|gate evidence| SGATE
+    IAC -->|gate evidence| SGATE
+    SGATE -->|passed: build| IMG
+    SGATE -->|F1: remediation| SN
 
     %% Image build
-    IMG -->|17| EC2
-    GHA -->|18| SSMSESS
-    SSMSESS -->|19| EC2
-    GHA -->|20| ANS
-    ANS -->|21| EC2
-    PARAM -->|22| EC2
+    IMG -->|run playbook| EC2
+    GHA -->|start session| SSMSESS
+    SSMSESS -->|secure channel| EC2
+    GHA -->|launch config| ANS
+    ANS -->|configure host| EC2
+    PARAM -->|build params| EC2
 
     %% AMI scan + deploy
-    EC2 -->|23| AMI
-    AMI -->|24| AMISCAN
-    AMISCAN -->|25| IGATE
-    IGATE -->|26| APP
-    IGATE -->|F2| SN
-    EC2 -->|27| INV
-    INV -->|28| SN
-    APP -->|29| RUNTIMESEC
-    RUNTIMESEC -->|30| SN
+    EC2 -->|publish AMI| AMI
+    AMI -->|scan candidate| AMISCAN
+    AMISCAN -->|scan evidence| IGATE
+    IGATE -->|passed: deploy| APP
+    IGATE -->|F2: remediation| SN
+    EC2 -->|inventory state| INV
+    INV -->|sync to CMDB| SN
+    APP -->|posture telemetry| RUNTIMESEC
+    RUNTIMESEC -->|posture feedback| SN
 
     %% Evidence flows
-    GHA -->|31| EVTBUS
-    RTCMVAL -->|32| EVTBUS
-    SAST -->|33| EVTBUS
-    IAC -->|34| EVTBUS
-    AMISCAN -->|35| EVTBUS
-    RUNTIMESEC -->|36| EVTBUS
-    INV -->|37| EVTBUS
-    EVTBUS -->|38| INGESTOR
-    INGESTOR -->|39| EVIDENCES3
-    INGESTOR -->|40| EVIDX
-    EVIDENCES3 -->|41| INTVERIFY
-    EVIDENCES3 -->|42| CLOUDTRAIL
-    INTVERIFY -->|43| CLOUDTRAIL
+    GHA -->|pipeline evidence| EVTBUS
+    RTCMVAL -->|RTCM evidence| EVTBUS
+    SAST -->|scan evidence| EVTBUS
+    IAC -->|IaC evidence| EVTBUS
+    AMISCAN -->|image evidence| EVTBUS
+    RUNTIMESEC -->|posture evidence| EVTBUS
+    INV -->|inventory evidence| EVTBUS
+    EVTBUS -->|validate + sign| INGESTOR
+    INGESTOR -->|write record| EVIDENCES3
+    INGESTOR -->|index record| EVIDX
+    EVIDENCES3 -->|daily check| INTVERIFY
+    EVIDENCES3 -->|S3 events| CLOUDTRAIL
+    INTVERIFY -->|tamper alert| CLOUDTRAIL
 
     %% Audit reporting
-    EVIDENCES3 -->|44| AUDITMAN
-    EVIDENCES3 -->|45| ATHENA
-    EVIDX -->|46| ATHENA
-    AUDITMAN -->|47| AUDITAPI
-    ATHENA -->|48| AUDITAPI
+    EVIDENCES3 -->|aggregate| AUDITMAN
+    EVIDENCES3 -->|ad-hoc queries| ATHENA
+    EVIDX -->|index queries| ATHENA
+    AUDITMAN -->|report export| AUDITAPI
+    ATHENA -->|report export| AUDITAPI
 
     %% actor
     style Team fill:#E1F5FE,stroke:#01579B,stroke-width:2px,color:#000
