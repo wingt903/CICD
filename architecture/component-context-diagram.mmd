@@ -58,69 +58,69 @@ graph TB
     end
 
     %% Governance → Pipeline
-    SN -.->|CMDB context| GHA
-    SN -->|trigger event| IH
-    IH -->|dispatch run| GHA
+    SN -.->|1. CMDB context| GHA
+    SN -->|2. trigger event| IH
+    IH -->|3. dispatch run| GHA
     SN -->|F3: remediation| Team
 
     %% Pipeline bootstrap
-    GH -->|pipeline trigger| GHA
-    GHA -->|request token| OIDC
-    OIDC -->|temp credentials| GHA
+    GH -->|4. pipeline trigger| GHA
+    GHA -->|5. request token| OIDC
+    OIDC -->|6. temp credentials| GHA
 
     %% RTCM + security scan gates
-    GH -->|RTCM artifact| RTCM
-    PARAM -->|mirror baseline| RTCM
-    GHA -->|read stack versions| RTCMVAL
-    RTCM -->|version policy| RTCMVAL
-    GHA -->|run code scans| SAST
-    GHA -->|run IaC scans| IAC
-    RTCMVAL -->|gate evidence| SGATE
-    SAST -->|gate evidence| SGATE
-    IAC -->|gate evidence| SGATE
-    SGATE -->|passed: build| IMG
+    GH -->|7. RTCM artifact| RTCM
+    PARAM -->|8. mirror baseline| RTCM
+    GHA -->|9. read stack versions| RTCMVAL
+    RTCM -->|10. version policy| RTCMVAL
+    GHA -->|11. run code scans| SAST
+    GHA -->|12. run IaC scans| IAC
+    RTCMVAL -->|13. gate evidence| SGATE
+    SAST -->|14. gate evidence| SGATE
+    IAC -->|15. gate evidence| SGATE
+    SGATE -->|16. passed: build| IMG
     SGATE -->|F1: remediation| SN
 
     %% Image build
-    IMG -->|run playbook| EC2
-    GHA -->|start session| SSMSESS
-    SSMSESS -->|secure channel| EC2
-    GHA -->|launch config| ANS
-    ANS -->|configure host| EC2
-    PARAM -->|build params| EC2
+    IMG -->|17. run playbook| EC2
+    GHA -->|18. start session| SSMSESS
+    SSMSESS -->|19. secure channel| EC2
+    GHA -->|20. launch config| ANS
+    ANS -->|21. configure host| EC2
+    PARAM -->|22. build params| EC2
 
     %% AMI scan + deploy
-    EC2 -->|publish AMI| AMI
-    AMI -->|scan candidate| AMISCAN
-    AMISCAN -->|scan evidence| IGATE
-    IGATE -->|passed: deploy| APP
+    EC2 -->|23. publish AMI| AMI
+    AMI -->|24. scan candidate| AMISCAN
+    AMISCAN -->|25. scan evidence| IGATE
+    IGATE -->|26. passed: deploy| APP
     IGATE -->|F2: remediation| SN
-    EC2 -->|inventory state| INV
-    INV -->|sync to CMDB| SN
-    APP -->|posture telemetry| RUNTIMESEC
-    RUNTIMESEC -->|posture feedback| SN
+    EC2 -->|27. inventory state| INV
+    INV -->|28. sync to CMDB| SN
+    APP -->|29. posture telemetry| RUNTIMESEC
+    RUNTIMESEC -->|30. posture feedback| SN
 
     %% Evidence flows
-    GHA -->|pipeline evidence| EVTBUS
-    RTCMVAL -->|RTCM evidence| EVTBUS
-    SAST -->|scan evidence| EVTBUS
-    IAC -->|IaC evidence| EVTBUS
-    AMISCAN -->|image evidence| EVTBUS
-    RUNTIMESEC -->|posture evidence| EVTBUS
-    INV -->|inventory evidence| EVTBUS
-    EVTBUS -->|validate + sign| INGESTOR
-    INGESTOR -->|write record| EVIDENCES3
-    INGESTOR -->|index record| EVIDX
-    EVIDENCES3 -->|daily check| INTVERIFY
-    EVIDENCES3 -->|S3 events| CLOUDTRAIL
-    INTVERIFY -->|tamper alert| CLOUDTRAIL
+    GHA -->|31. pipeline evidence| EVTBUS
+    RTCMVAL -->|32. RTCM evidence| EVTBUS
+    SAST -->|33. scan evidence| EVTBUS
+    IAC -->|34. IaC evidence| EVTBUS
+    AMISCAN -->|35. image evidence| EVTBUS
+    RUNTIMESEC -->|36. posture evidence| EVTBUS
+    INV -->|37. inventory evidence| EVTBUS
+    EVTBUS -->|38. validate + sign| INGESTOR
+    INGESTOR -->|39. write record| EVIDENCES3
+    INGESTOR -->|40. index record| EVIDX
+    EVIDENCES3 -->|41. daily check| INTVERIFY
+    EVIDENCES3 -->|42. S3 events| CLOUDTRAIL
+    INTVERIFY -->|43. tamper alert| CLOUDTRAIL
 
     %% Audit reporting
-    EVIDENCES3 -->|aggregate| AUDITMAN
-    EVIDENCES3 -->|ad-hoc queries| ATHENA
-    EVIDX -->|index queries| ATHENA
-    AUDITMAN -->|report export| AUDITAPI
-    ATHENA -->|report export| AUDITAPI
+    EVIDENCES3 -->|44. aggregate| AUDITMAN
+    EVIDENCES3 -->|45. ad-hoc queries| ATHENA
+    EVIDX -->|46. index queries| ATHENA
+    AUDITMAN -->|47. report export| AUDITAPI
+    ATHENA -->|48. report export| AUDITAPI
 
     %% actor
     style Team fill:#E1F5FE,stroke:#01579B,stroke-width:2px,color:#000
