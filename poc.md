@@ -56,7 +56,7 @@ This POC fills those gaps in an automated, pipeline-first way.
 
 ## 4) Step-by-Step Implementation
 
-## Step 0 — Branch and working convention
+### Step 0 — Branch and working convention
 
 Create a branch for POC automation changes:
 
@@ -66,7 +66,7 @@ git checkout -b poc/ecs-tomcat-github-actions
 
 ---
 
-## Step 1 — One-time AWS OIDC bootstrap (Platform/Admin)
+### Step 1 — One-time AWS OIDC bootstrap (Platform/Admin)
 
 Create IAM role(s) for GitHub Actions with trust policy for your repo and branch/environment constraints.
 
@@ -88,7 +88,7 @@ Store role ARNs in GitHub environment/repo variables used by pipeline, e.g.:
 
 ---
 
-## Step 2 — Define Terraform for ECS Tomcat runtime
+### Step 2 — Define Terraform for ECS Tomcat runtime
 
 Under `infrastructure/terraform`, add ECS POC resources (or module):
 
@@ -106,12 +106,12 @@ Required Terraform outputs for pipeline handoff:
 - `ecr_repository_url`
 - `ecs_cluster_name`
 - `ecs_service_name`
-- `ecs_task_family`
+- `ecs_task_definition_family`
 - `alb_dns_name`
 
 ---
 
-## Step 3 — Add environment variable files for dev
+### Step 3 — Add environment variable files for dev
 
 Create environment-specific tfvars under `infrastructure/terraform/environments`, for example:
 
@@ -128,7 +128,7 @@ Keep sensitive values in GitHub Secrets, not plaintext files.
 
 ---
 
-## Step 4 — Update pipeline: build, push, deploy (fully automated)
+### Step 4 — Update pipeline: build, push, deploy (fully automated)
 
 Use `cicd/github-actions/aws-migration-pipeline.yml` as your source workflow and implement these concrete deploy actions (replace placeholders):
 
@@ -149,7 +149,7 @@ Also keep existing gates:
 
 ---
 
-## Step 5 — Configure GitHub Environments and approvals
+### Step 5 — Configure GitHub Environments and approvals
 
 In repository settings:
 
@@ -161,7 +161,7 @@ This enforces promotion control without console-based release activity.
 
 ---
 
-## Step 6 — Execute POC via GitHub Actions only
+### Step 6 — Execute POC via GitHub Actions only
 
 Run one of these:
 
@@ -180,7 +180,7 @@ No console action is required from developer.
 
 ---
 
-## Step 7 — Verification criteria (POC success)
+### Step 7 — Verification criteria (POC success)
 
 POC is successful when all are true:
 
