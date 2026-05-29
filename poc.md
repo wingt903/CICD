@@ -1,415 +1,221 @@
-# POC: Deploy Apache Tomcat "Hello World" to AWS ECS (Fargate)
+# POC: GitHub Actions–Only Deployment of Apache Tomcat "Hello World" to ECS
 
-This guide walks you through deploying the sample Tomcat application in this repository to AWS Elastic Container Service (ECS) using Fargate — step by step, with no prior CICD, Terraform, or Ansible experience required.
+This POC is rewritten to match your requirement:
 
----
-
-## What You Will Build
-
-A running Apache Tomcat 10.1 container in AWS, accessible via a public URL, serving a "Hello World" web page.
+- **No developer AWS Console login**
+- **No manual AWS CLI deployment from developer laptop**
+- **Everything executed through GitHub Actions with AWS OIDC roles**
 
 ---
 
-## Prerequisites
+## 1) Target Outcome
 
-Before starting, make sure you have the following installed and configured on your local machine:
+After completing this POC:
 
-### 1. AWS Account
-- Sign up at https://aws.amazon.com if you don't have one.
-- Note your **AWS Account ID** (12-digit number, visible top-right in AWS Console).
-- Choose a **region** — this guide uses `ap-southeast-1` (Singapore). You can use any region.
-
-### 2. AWS CLI
-- Install: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
-- After install, configure it with your credentials:
-  ```bash
-  aws configure
-  ```
-  Enter your AWS Access Key ID, Secret Access Key, region (`ap-southeast-1`), and output format (`json`).
-
-> **How to get credentials:** In AWS Console → top-right menu → Security Credentials → Access Keys → Create Access Key.
-
-### 3. Docker Desktop
-- Install: https://www.docker.com/products/docker-desktop
-- After install, make sure Docker is running (Docker whale icon in taskbar).
-
-### 4. Git
-- Install: https://git-scm.com/downloads
-- Clone this repository if you haven't already:
-  ```bash
-  git clone https://github.com/wingt903/CICD.git
-  cd CICD
-  ```
+1. A developer only pushes code (or triggers `workflow_dispatch`).
+2. GitHub Actions builds the Tomcat image from `sample-code/tomcat/`.
+3. GitHub Actions pushes the image to ECR.
+4. GitHub Actions applies Terraform for ECS/Fargate infrastructure.
+5. GitHub Actions updates ECS service to the new image.
+6. GitHub Actions runs smoke validation and publishes endpoint/output.
 
 ---
 
-## Step 1 — Understand the Sample Application
+## 2) Current Repository Baseline (Important)
 
-The Tomcat sample app is in `sample-code/tomcat/`:
+Already present:
 
-```
-sample-code/tomcat/
-├── Dockerfile          ← instructions to build the container image
-└── webapp/
-    └── index.jsp       ← the "Hello World" web page served by Tomcat
-```
+- App sample: `/tmp/workspace/wingt903/CICD/sample-code/tomcat`
+- Pipeline scaffold: `/tmp/workspace/wingt903/CICD/cicd/github-actions/aws-migration-pipeline.yml`
+- Terraform scaffold: `/tmp/workspace/wingt903/CICD/infrastructure/terraform`
 
-The `Dockerfile` uses the official `tomcat:10.1-jdk17` image and copies `index.jsp` into the Tomcat webapps folder. No changes are needed — it is ready to use as-is.
+Gap to close for this POC:
 
----
+- Current Terraform does **not** yet provision ECS/ECR/ALB/network for Tomcat runtime.
+- Current deploy jobs are placeholders.
 
-## Step 2 — Create an ECR Repository (Image Registry)
-
-Amazon ECR (Elastic Container Registry) is where you store your Docker image before deploying it to ECS.
-
-```bash
-# Replace ACCOUNT_ID with your 12-digit AWS Account ID
-# Replace REGION with your chosen region (e.g. ap-southeast-1)
-aws ecr create-repository \
-  --repository-name poc-tomcat \
-  --region ap-southeast-1
-```
-
-You will see output like:
-```json
-{
-  "repository": {
-    "repositoryUri": "123456789012.dkr.ecr.ap-southeast-1.amazonaws.com/poc-tomcat"
-  }
-}
-```
-
-Copy the `repositoryUri` — you will need it in the next steps.
+This POC fills those gaps in an automated, pipeline-first way.
 
 ---
 
-## Step 3 — Build and Push the Docker Image
+## 3) Operating Model and Responsibilities
 
-### 3a. Log Docker into ECR
+### Developer
+- Commit app/infrastructure changes
+- Open PR / merge to `main`
+- Trigger workflow (`workflow_dispatch`) if needed
 
-```bash
-aws ecr get-login-password --region ap-southeast-1 \
-  | docker login --username AWS --password-stdin \
-    123456789012.dkr.ecr.ap-southeast-1.amazonaws.com
-```
+### Platform/Admin (one-time bootstrap)
+- Configure GitHub OIDC trust with AWS IAM role
+- Configure GitHub repo/environment variables and secrets
+- Enable protected environments (`dev`, optionally `test`, `prod`)
 
-Replace `123456789012` with your Account ID.
-
-### 3b. Build the image
-
-From the root of this repository:
-
-```bash
-docker build -t poc-tomcat sample-code/tomcat/
-```
-
-This reads the `Dockerfile` in `sample-code/tomcat/` and builds the image locally.
-
-### 3c. Tag the image for ECR
-
-```bash
-docker tag poc-tomcat:latest \
-  123456789012.dkr.ecr.ap-southeast-1.amazonaws.com/poc-tomcat:latest
-```
-
-Replace `123456789012` with your Account ID.
-
-### 3d. Push the image to ECR
-
-```bash
-docker push \
-  123456789012.dkr.ecr.ap-southeast-1.amazonaws.com/poc-tomcat:latest
-```
-
-Once complete, your image is stored in AWS and ready for deployment.
+> After bootstrap, developers do not need AWS console access.
 
 ---
 
-## Step 4 — Create an ECS Cluster
+## 4) Step-by-Step Implementation
 
-An ECS cluster is the logical grouping that runs your container.
+## Step 0 — Branch and working convention
+
+Create a branch for POC automation changes:
 
 ```bash
-aws ecs create-cluster \
-  --cluster-name poc-tomcat-cluster \
-  --region ap-southeast-1
+git checkout -b poc/ecs-tomcat-github-actions
 ```
 
 ---
 
-## Step 5 — Create a Task Definition
+## Step 1 — One-time AWS OIDC bootstrap (Platform/Admin)
 
-A Task Definition tells ECS what container to run, how much CPU/memory to allocate, and which ports to open.
+Create IAM role(s) for GitHub Actions with trust policy for your repo and branch/environment constraints.
 
-Save the following as `/tmp/task-def.json` (copy and paste into a text file):
+Minimum role capabilities for this POC:
 
-```json
-{
-  "family": "poc-tomcat-task",
-  "networkMode": "awsvpc",
-  "requiresCompatibilities": ["FARGATE"],
-  "cpu": "512",
-  "memory": "1024",
-  "executionRoleArn": "arn:aws:iam::123456789012:role/ecsTaskExecutionRole",
-  "containerDefinitions": [
-    {
-      "name": "tomcat",
-      "image": "123456789012.dkr.ecr.ap-southeast-1.amazonaws.com/poc-tomcat:latest",
-      "portMappings": [
-        {
-          "containerPort": 8080,
-          "protocol": "tcp"
-        }
-      ],
-      "essential": true,
-      "logConfiguration": {
-        "logDriver": "awslogs",
-        "options": {
-          "awslogs-group": "/ecs/poc-tomcat",
-          "awslogs-region": "ap-southeast-1",
-          "awslogs-stream-prefix": "ecs"
-        }
-      }
-    }
-  ]
-}
-```
+- ECR push/pull
+- ECS service/task updates
+- CloudWatch Logs access
+- Terraform-managed resource create/update/delete for ECS stack
+- `iam:PassRole` for ECS task execution role
 
-> **Replace** all occurrences of `123456789012` with your actual Account ID.
+Store role ARNs in GitHub environment/repo variables used by pipeline, e.g.:
 
-### 5a. Create the ECS Task Execution Role (one-time setup)
+- `AWS_DEV_ROLE_ARN`
+- `AWS_TEST_ROLE_ARN`
+- `AWS_PROD_ROLE_ARN`
 
-ECS needs permission to pull the image from ECR. Run:
-
-```bash
-# Create the role
-aws iam create-role \
-  --role-name ecsTaskExecutionRole \
-  --assume-role-policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Effect": "Allow",
-      "Principal": {"Service": "ecs-tasks.amazonaws.com"},
-      "Action": "sts:AssumeRole"
-    }]
-  }'
-
-# Attach the managed policy
-aws iam attach-role-policy \
-  --role-name ecsTaskExecutionRole \
-  --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
-```
-
-### 5b. Create a CloudWatch log group
-
-```bash
-aws logs create-log-group \
-  --log-group-name /ecs/poc-tomcat \
-  --region ap-southeast-1
-```
-
-### 5c. Register the task definition
-
-```bash
-aws ecs register-task-definition \
-  --cli-input-json file:///tmp/task-def.json \
-  --region ap-southeast-1
-```
+(Your workflow already references these variable names.)
 
 ---
 
-## Step 6 — Find Your VPC, Subnets, and Security Group
+## Step 2 — Define Terraform for ECS Tomcat runtime
 
-ECS Fargate needs to know which VPC/subnets to run in.
+Under `/tmp/workspace/wingt903/CICD/infrastructure/terraform`, add ECS POC resources (or module):
 
-### 6a. Get your default VPC ID
+1. ECR repository for Tomcat image
+2. ECS cluster
+3. ECS task definition (Tomcat container on port 8080)
+4. ECS service (Fargate, desired count 1)
+5. ALB + target group + listener (HTTP for POC)
+6. Security groups (ALB ingress, ECS from ALB)
+7. CloudWatch log group
+8. Required IAM execution/task roles
 
-```bash
-aws ec2 describe-vpcs \
-  --filters Name=isDefault,Values=true \
-  --query "Vpcs[0].VpcId" \
-  --output text \
-  --region ap-southeast-1
-```
+Required Terraform outputs for pipeline handoff:
 
-This returns something like `vpc-0abc12345def67890`. Note it down.
-
-### 6b. Get subnet IDs in that VPC
-
-```bash
-aws ec2 describe-subnets \
-  --filters Name=vpc-id,Values=vpc-0abc12345def67890 \
-  --query "Subnets[*].SubnetId" \
-  --output text \
-  --region ap-southeast-1
-```
-
-You will get 2–3 subnet IDs. Note at least two of them.
-
-### 6c. Create a Security Group that allows web traffic
-
-```bash
-aws ec2 create-security-group \
-  --group-name poc-tomcat-sg \
-  --description "Allow HTTP access for Tomcat POC" \
-  --vpc-id vpc-0abc12345def67890 \
-  --region ap-southeast-1
-```
-
-Note the `GroupId` returned (e.g. `sg-0123456789abcdef0`).
-
-Then allow inbound traffic on port 8080:
-
-```bash
-aws ec2 authorize-security-group-ingress \
-  --group-id sg-0123456789abcdef0 \
-  --protocol tcp \
-  --port 8080 \
-  --cidr 0.0.0.0/0 \
-  --region ap-southeast-1
-```
+- `ecr_repository_url`
+- `ecs_cluster_name`
+- `ecs_service_name`
+- `ecs_task_family`
+- `alb_dns_name`
 
 ---
 
-## Step 7 — Run the ECS Service
+## Step 3 — Add environment variable files for dev
 
-This creates and starts the Tomcat container on ECS Fargate, with a public IP assigned automatically.
+Create environment-specific tfvars under `infrastructure/terraform/environments`, for example:
 
-```bash
-aws ecs create-service \
-  --cluster poc-tomcat-cluster \
-  --service-name poc-tomcat-service \
-  --task-definition poc-tomcat-task \
-  --desired-count 1 \
-  --launch-type FARGATE \
-  --network-configuration "awsvpcConfiguration={
-    subnets=[subnet-AAAAAAAAAA,subnet-BBBBBBBBBB],
-    securityGroups=[sg-0123456789abcdef0],
-    assignPublicIp=ENABLED
-  }" \
-  --region ap-southeast-1
-```
+- `dev.tfvars`
 
-Replace:
-- `subnet-AAAAAAAAAA,subnet-BBBBBBBBBB` with your actual subnet IDs from Step 6b.
-- `sg-0123456789abcdef0` with your security group ID from Step 6c.
+Include at least:
+
+- `environment`
+- `aws_region`
+- network IDs (VPC/subnet IDs)
+- alarm email (if used)
+
+Keep sensitive values in GitHub Secrets, not plaintext files.
 
 ---
 
-## Step 8 — Find the Public IP and Verify
+## Step 4 — Update pipeline: build, push, deploy (fully automated)
 
-### 8a. Wait for the task to start (about 1–2 minutes)
+Use `/tmp/workspace/wingt903/CICD/cicd/github-actions/aws-migration-pipeline.yml` as your source workflow and implement these concrete deploy actions (replace placeholders):
 
-```bash
-aws ecs list-tasks \
-  --cluster poc-tomcat-cluster \
-  --region ap-southeast-1
-```
+1. **Authenticate to AWS** with `aws-actions/configure-aws-credentials@v4` via OIDC role.
+2. **Build Tomcat image** from `sample-code/tomcat`.
+3. **Login to ECR** and push image with immutable tag (`${{ github.sha }}`).
+4. **Terraform apply (dev)** using `infrastructure/terraform` + `environments/dev.tfvars`.
+5. **Render/register ECS task definition** using new image tag.
+6. **Update ECS service** and wait for steady state.
+7. **Smoke test** `http://<alb_dns_name>/`.
+8. **Publish deployment summary** (image, service, URL, commit SHA).
 
-You will see a task ARN like `arn:aws:ecs:ap-southeast-1:123456789012:task/poc-tomcat-cluster/abc123...`
+Also keep existing gates:
 
-### 8b. Get the public IP
-
-```bash
-# Replace <task-id> with the ID portion at the end of your task ARN
-aws ecs describe-tasks \
-  --cluster poc-tomcat-cluster \
-  --tasks <task-id> \
-  --region ap-southeast-1 \
-  --query "tasks[0].attachments[0].details[?name=='networkInterfaceId'].value" \
-  --output text
-```
-
-Note the `networkInterfaceId` (e.g. `eni-0abc123`), then:
-
-```bash
-aws ec2 describe-network-interfaces \
-  --network-interface-ids eni-0abc123 \
-  --query "NetworkInterfaces[0].Association.PublicIp" \
-  --output text \
-  --region ap-southeast-1
-```
-
-### 8c. Open the app in your browser
-
-Navigate to:
-```
-http://<PUBLIC_IP>:8080
-```
-
-You should see the Tomcat Hello World page:
-
-> **Tomcat CI/CD Migration Sample**  
-> Deployed via pipeline to AWS runtime target.
+- `tfsec`
+- `Checkov`
+- application/security scans
 
 ---
 
-## Step 9 — Clean Up (to avoid AWS charges)
+## Step 5 — Configure GitHub Environments and approvals
 
-When you are done with the POC, delete all resources:
+In repository settings:
 
-```bash
-# Delete ECS service
-aws ecs update-service \
-  --cluster poc-tomcat-cluster \
-  --service poc-tomcat-service \
-  --desired-count 0 \
-  --region ap-southeast-1
+1. Create environment `dev` (and later `test`, `prod`)
+2. Add required reviewers for non-dev environments
+3. Add environment-scoped variables/secrets (role ARN, tfvars sensitive values)
 
-aws ecs delete-service \
-  --cluster poc-tomcat-cluster \
-  --service poc-tomcat-service \
-  --region ap-southeast-1
-
-# Delete ECS cluster
-aws ecs delete-cluster \
-  --cluster poc-tomcat-cluster \
-  --region ap-southeast-1
-
-# Delete ECR repository (and all images inside it)
-aws ecr delete-repository \
-  --repository-name poc-tomcat \
-  --force \
-  --region ap-southeast-1
-
-# Delete CloudWatch log group
-aws logs delete-log-group \
-  --log-group-name /ecs/poc-tomcat \
-  --region ap-southeast-1
-
-# Delete security group
-aws ec2 delete-security-group \
-  --group-id sg-0123456789abcdef0 \
-  --region ap-southeast-1
-```
+This enforces promotion control without console-based release activity.
 
 ---
 
-## Summary of What Was Done
+## Step 6 — Execute POC via GitHub Actions only
 
-| Step | What Happened |
-|------|--------------|
-| 1 | Reviewed the sample Tomcat app and Dockerfile |
-| 2 | Created an ECR repository to store the Docker image |
-| 3 | Built the Docker image locally and pushed it to ECR |
-| 4 | Created an ECS cluster |
-| 5 | Defined the container task (CPU, memory, ports, image) |
-| 6 | Identified VPC, subnets, and created a security group |
-| 7 | Launched the container as an ECS Fargate service |
-| 8 | Retrieved the public IP and confirmed the app is live |
-| 9 | Cleaned up all resources |
+Run one of these:
 
----
+- Merge PR to `main`, or
+- Trigger `workflow_dispatch`
 
-## Troubleshooting
+Expected run order:
 
-| Problem | Likely Cause | Fix |
-|---------|-------------|-----|
-| `docker push` fails | Not logged into ECR | Re-run Step 3a |
-| Task stays in `PENDING` | Role missing or image URI wrong | Check `executionRoleArn` and `image` in task definition |
-| Browser shows nothing | Security group not open | Confirm port 8080 is allowed in Step 6c |
-| `ecsTaskExecutionRole` already exists | Role was created previously | Skip Step 5a, the role is already there |
+1. Validate/build/scan
+2. IaC policy checks (`tfsec` + `Checkov`)
+3. Release manifest
+4. Deploy to `dev` (real deployment, no placeholder)
+5. Smoke validation and summary
+
+No console action is required from developer.
 
 ---
 
-*This POC uses ECS Fargate with a public IP for simplicity. A production setup would add an Application Load Balancer, private subnets, HTTPS, and IAM least-privilege controls — as modelled in the full architecture in the `architecture/` folder of this repository.*
+## Step 7 — Verification criteria (POC success)
+
+POC is successful when all are true:
+
+1. Developer did not use AWS console for deployment
+2. GitHub Actions run shows successful deploy stage
+3. ECS service is healthy and running desired tasks
+4. ALB URL returns Tomcat Hello World page
+5. Deployment metadata ties to commit SHA and workflow run
+
+---
+
+## 5) Minimal Deliverables Checklist
+
+- [ ] Terraform ECS runtime resources for Tomcat (dev)
+- [ ] Pipeline deploy-dev job changed from placeholder to real deployment
+- [ ] ECR push + ECS update done in workflow
+- [ ] Smoke test and deployment summary in workflow
+- [ ] `dev` environment configured with OIDC role variable
+- [ ] Evidence of successful run (Actions URL + endpoint output)
+
+---
+
+## 6) Recommended Next Hardening (after POC)
+
+1. Blue/green deployment strategy
+2. HTTPS listener and ACM certificate
+3. WAF and stricter SG rules
+4. Private subnets + NAT design
+5. Task role least privilege and secret injection via SSM/Secrets Manager
+6. Promotion from `dev` to `test`/`prod` with approvals and quality gates
+
+---
+
+## 7) Key Principle for This POC
+
+**Deployment is a GitHub event, not a human console activity.**
+
+That is the required operating model for this repository’s AWS CI/CD architecture.
