@@ -25,9 +25,9 @@ After completing this POC:
 
 Already present:
 
-- App sample: `/tmp/workspace/wingt903/CICD/sample-code/tomcat`
-- Pipeline scaffold: `/tmp/workspace/wingt903/CICD/cicd/github-actions/aws-migration-pipeline.yml`
-- Terraform scaffold: `/tmp/workspace/wingt903/CICD/infrastructure/terraform`
+- App sample: `sample-code/tomcat`
+- Pipeline scaffold: `cicd/github-actions/aws-migration-pipeline.yml`
+- Terraform scaffold: `infrastructure/terraform`
 
 Gap to close for this POC:
 
@@ -90,7 +90,7 @@ Store role ARNs in GitHub environment/repo variables used by pipeline, e.g.:
 
 ## Step 2 — Define Terraform for ECS Tomcat runtime
 
-Under `/tmp/workspace/wingt903/CICD/infrastructure/terraform`, add ECS POC resources (or module):
+Under `infrastructure/terraform`, add ECS POC resources (or module):
 
 1. ECR repository for Tomcat image
 2. ECS cluster
@@ -130,7 +130,7 @@ Keep sensitive values in GitHub Secrets, not plaintext files.
 
 ## Step 4 — Update pipeline: build, push, deploy (fully automated)
 
-Use `/tmp/workspace/wingt903/CICD/cicd/github-actions/aws-migration-pipeline.yml` as your source workflow and implement these concrete deploy actions (replace placeholders):
+Use `cicd/github-actions/aws-migration-pipeline.yml` as your source workflow and implement these concrete deploy actions (replace placeholders):
 
 1. **Authenticate to AWS** with `aws-actions/configure-aws-credentials@v4` via OIDC role.
 2. **Build Tomcat image** from `sample-code/tomcat`.
