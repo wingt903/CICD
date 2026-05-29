@@ -50,7 +50,7 @@ Source Systems
    ▼ (EventBridge event bus: compliance-evidence-bus)
 Evidence Ingestor Lambda
    │  - validates schema
-   │  - signs record with KMS key (aws/evidence-signing)
+   │  - signs record with KMS Customer Managed Key (alias/evidence-signing)
    │  - generates evidence_id, adds ingest timestamp
    ▼
 S3 Evidence Bucket (compliance-evidence-<account>)
@@ -61,7 +61,7 @@ S3 Evidence Bucket (compliance-evidence-<account>)
    │  - Object-level logging: CloudTrail data events (read + write)
    ▼
 Evidence Index (Amazon DynamoDB — GSIs on system_id, control_id, timestamp)
-   │  - TTL mirrored to evidence retention period
+   │  - TTL disabled (records retained permanently to match 7-year evidence retention)
    │  - Streams → integrity verifier
    ▼
 Integrity Verifier Lambda (scheduled daily via EventBridge)

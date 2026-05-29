@@ -47,8 +47,8 @@ sequenceDiagram
 
     GH->>SN: Send API Patch Request:<br>Update CMDB CI with New Active AMI ID + Ansible execution references
     Note over SN: CMDB and Change Record are updated with<br>AMI + Ansible execution evidence for audit tracking
-    GH->>EvidenceBus: Publish normalized evidence event<br>[system_id, env, baseline_ref, control_id, result, run_id, source=github-actions]
-    EvidenceBus->>EvidenceStore: Ingestor Lambda validates schema, signs record (KMS), writes to S3 (Object Lock) + indexes in DynamoDB
+    GH->>EvidenceBus: Publish normalized evidence event<br>[system_id, env, baseline_ref, control_id, result, run_id, source=github-actions]<br>(partial schema shown — full 12-field schema per compliance-evidence-store.md §1)
+    EvidenceBus->>EvidenceStore: Ingestor Lambda validates schema, signs record (KMS alias/evidence-signing), writes to S3 (Object Lock) + indexes in DynamoDB
     EvidenceStore->>AuditTrail: S3 PutObject event captured (actor, timestamp, key, requestId)
 
     %% Phase 6: Continuous Drift Detection and Closed-Loop Remediation
@@ -67,7 +67,7 @@ sequenceDiagram
     TerraformEnforcer->>DriftReconciler: Return post-remediation state
     DriftReconciler->>DriftReconciler: Verify convergence to desired baseline
     DriftReconciler->>SN: Update CMDB/compliance status with closure evidence
-    DriftReconciler->>EvidenceBus: Publish drift remediation evidence event<br>[system_id, baseline_ref, result=PASS/FAIL, remediation_state=COMPLETE, source=drift-reconciler]
+    DriftReconciler->>EvidenceBus: Publish drift remediation evidence event<br>[system_id, baseline_ref, result=PASS|FAIL, remediation_state=COMPLETE|FAILED, source=drift-reconciler]<br>(partial schema shown — full 12-field schema per compliance-evidence-store.md §1)
     EvidenceBus->>EvidenceStore: Ingestor Lambda signs and writes evidence record (S3 Object Lock + DynamoDB index)
     EvidenceStore->>AuditTrail: S3 PutObject event captured
 
@@ -83,7 +83,7 @@ sequenceDiagram
         end
         DatabaseDriftController->>DatabaseDriftController: Perform post-remediation validation
         DatabaseDriftController->>SN: Publish DB drift status and remediation evidence
-        DatabaseDriftController->>EvidenceBus: Publish DB remediation evidence event<br>[system_id, baseline_ref, control_id=db-schema, result, remediation_state, source=db-drift-controller]
+        DatabaseDriftController->>EvidenceBus: Publish DB remediation evidence event<br>[system_id, baseline_ref, control_id=db-schema, result=PASS|FAIL, remediation_state=COMPLETE|FAILED, source=db-drift-controller]<br>(partial schema shown — full 12-field schema per compliance-evidence-store.md §1)
         EvidenceBus->>EvidenceStore: Ingestor Lambda signs and writes evidence record (S3 Object Lock + DynamoDB index)
         EvidenceStore->>AuditTrail: S3 PutObject event captured
     else No DB drift
