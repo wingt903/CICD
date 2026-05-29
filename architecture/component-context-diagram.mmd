@@ -56,7 +56,7 @@ graph TB
     SAST -->|Gate evidence| SGATE
     IAC -->|Gate evidence| SGATE
     SGATE -->|Passed, proceed with image build| IMG
-    SGATE -->|Failed, remediation required (tracked in ServiceNow)| SN
+    SGATE -->|Failed, remediation required - tracked in ServiceNow| SN
 
     IMG -->|Run playbook execution| EC2
     SSMSESS -->|Open secure management session| EC2
@@ -70,7 +70,7 @@ graph TB
     AMI -->|Submit candidate image for scan| AMISCAN
     AMISCAN -->|Scan evidence| IGATE
     IGATE -->|Passed, deploy to workloads| APP
-    IGATE -->|Failed, remediation required (tracked in ServiceNow)| SN
+    IGATE -->|Failed, remediation required - tracked in ServiceNow| SN
     APP -->|Runtime findings and posture telemetry| RUNTIMESEC
     RUNTIMESEC -->|Security posture feedback| SN
 
