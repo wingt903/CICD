@@ -1,20 +1,23 @@
-graph LR
+graph TB
     Team[Project / Migration Team]
 
     subgraph Governance["Trust Boundary: Governance & Request Layer"]
-        SN[ServiceNow Catalog + CMDB]
+        direction LR
+        SN[ServiceNow\nCatalog + CMDB]
         IH[IntegrationHub]
     end
 
     subgraph Pipeline["Trust Boundary: CI/CD Orchestration Layer"]
-        GH[GitHub Repository]
+        direction TB
+        GH[GitHub\nRepository]
         GHA[GitHub Actions]
-        IMG[Ansible Image Build Playbooks]
+        IMG[Ansible Image Build\nPlaybooks]
         ANS[Ansible]
     end
 
     subgraph AWS["Trust Boundary: AWS Control Plane"]
-        OIDC[AWS IAM OIDC Provider]
+        direction LR
+        OIDC[AWS IAM OIDC\nProvider]
         SSMSESS[AWS SSM Session Manager]
         PARAM[AWS SSM Parameter Store]
         INV[AWS SSM Inventory]
@@ -22,6 +25,7 @@ graph LR
     end
 
     subgraph Runtime["Trust Boundary: AWS Runtime / Build Targets"]
+        direction LR
         EC2[Private Builder EC2]
         APP[Target Workloads\nWebLogic / Tomcat / Python]
     end
