@@ -8,7 +8,7 @@ This document explains each numbered integration in the component context diagra
 
 | # | From → To | Explanation |
 |---|-----------|-------------|
-| 1 | ServiceNow → GitHub Actions | GitHub Actions pulls CMDB context (server details, environment metadata) from ServiceNow to parameterise the pipeline run. |
+| 1 | ServiceNow → GitHub Actions | GitHub Actions pulls CMDB context (server details, environment metadata) from ServiceNow to parameterize the pipeline run. |
 | 2 | ServiceNow → IntegrationHub | ServiceNow raises a migration/change request and emits a trigger event to IntegrationHub to start the automation flow. |
 | 3 | IntegrationHub → GitHub Actions | IntegrationHub translates the ServiceNow event into a GitHub Actions workflow dispatch call, kicking off the pipeline. |
 | F3 | ServiceNow → Team | When a remediation action is required (e.g., change request rejected), ServiceNow notifies the Project / Migration Team directly. |
@@ -51,7 +51,7 @@ This document explains each numbered integration in the component context diagra
 | 18 | GitHub Actions → SSM Session Manager | GitHub Actions opens an SSM Session Manager session to the builder EC2, avoiding any direct SSH or console access. |
 | 19 | SSM Session Manager → Private Builder EC2 | SSM Session Manager establishes an encrypted channel to the builder EC2 through which build commands are executed. |
 | 20 | GitHub Actions → Ansible | GitHub Actions invokes Ansible with the launch configuration parameters needed for the build run. |
-| 21 | Ansible → Private Builder EC2 | Ansible runs its playbook to configure the EC2 host — installing runtimes, applying hardening, and building the target artefact. |
+| 21 | Ansible → Private Builder EC2 | Ansible runs its playbook to configure the EC2 host — installing runtimes, applying hardening, and building the target artifact. |
 | 22 | SSM Parameter Store → Private Builder EC2 | Build-time parameters (e.g., package versions, environment settings) are pulled from SSM Parameter Store by the EC2 build process. |
 
 ---
@@ -67,7 +67,7 @@ This document explains each numbered integration in the component context diagra
 | F2 | Image Scan Gate → ServiceNow | When the image scan fails, a remediation ticket is raised in ServiceNow to address the identified vulnerabilities. |
 | 27 | Private Builder EC2 → SSM Inventory | The builder EC2 reports its installed software and configuration state into SSM Inventory after the build completes. |
 | 28 | SSM Inventory → ServiceNow | SSM Inventory syncs the up-to-date host inventory data back to the ServiceNow CMDB to keep configuration records current. |
-| 29 | Target Workloads → Runtime Posture (SecHub + GuardDuty + IAM AA) | Deployed workloads emit runtime security telemetry to AWS Security Hub, GuardDuty, and IAM Access Analyser for continuous posture monitoring. |
+| 29 | Target Workloads → Runtime Posture (SecHub + GuardDuty + IAM AA) | Deployed workloads emit runtime security telemetry to AWS Security Hub, GuardDuty, and IAM Access Analyzer for continuous posture monitoring. |
 | 30 | Runtime Posture → ServiceNow | Posture findings and alerts from Security Hub/GuardDuty are fed back to ServiceNow to trigger remediation workflows. |
 
 ---
@@ -101,3 +101,31 @@ This document explains each numbered integration in the component context diagra
 | 46 | DynamoDB Evidence Index → Athena | The DynamoDB index metadata is made available to Athena queries, allowing joins between index fields and S3 evidence objects. |
 | 47 | Audit Manager → Auditor Export API | Audit Manager exports structured compliance reports through the Auditor Export API for consumption by auditors or external GRC tools. |
 | 48 | Athena → Auditor Export API | Athena query results are surfaced via the Auditor Export API, providing on-demand evidence exports for audit requests. |
+
+---
+
+## Glossary
+
+| Short Form | Long Name |
+|---|---|
+| AMI | Amazon Machine Image |
+| AMISCAN | AMI/Image Security Scan stage (ECR + Inspector) |
+| API | Application Programming Interface |
+| AWS | Amazon Web Services |
+| CI/CD | Continuous Integration / Continuous Delivery |
+| CMDB | Configuration Management Database |
+| DynamoDB | Amazon DynamoDB |
+| EC2 | Amazon Elastic Compute Cloud |
+| ECR | Amazon Elastic Container Registry |
+| GRC | Governance, Risk, and Compliance |
+| IaC | Infrastructure as Code |
+| IAM | Identity and Access Management |
+| OIDC | OpenID Connect |
+| RTCM | Runtime Compatibility Matrix |
+| S3 | Amazon Simple Storage Service |
+| SAST | Static Application Security Testing |
+| SecHub | AWS Security Hub |
+| SSE-KMS | Server-Side Encryption with AWS Key Management Service |
+| SSM | AWS Systems Manager |
+| STS | AWS Security Token Service |
+| tfsec | Terraform Security Scanner |
