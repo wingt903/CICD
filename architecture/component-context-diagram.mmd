@@ -1,3 +1,4 @@
+%%{init: {'flowchart': {'nodeSpacing': 28, 'rankSpacing': 36, 'diagramPadding': 8, 'curve': 'linear'}}}%%
 graph TB
     %% Top-to-bottom layout is used for full-screen readability in draw.io
     Team[Project / Migration Team]
@@ -55,67 +56,67 @@ graph TB
         EC2[Private Builder EC2]
         APP[Target Workloads\nWebLogic / Tomcat / Python]
     end
-    SN -->|Trigger workflow event| IH
-    IH -->|Dispatch pipeline run| GHA
-    SN -. CMDB metadata / change context .-> GHA
-    SN -->|Failed scan remediation request| Team
+    SN -->|2. Trigger workflow event| IH
+    IH -->|3. Dispatch pipeline run| GHA
+    SN -.->|1. CMDB metadata / change context| GHA
+    SN -->|31. Failed scan remediation request| Team
 
-    GH -->|Push/PR pipeline trigger| GHA
-    GHA -->|Request federated identity token| OIDC
-    OIDC -->|Return temporary AWS credentials| GHA
+    GH -->|4. Push/PR pipeline trigger| GHA
+    GHA -->|5. Request federated identity token| OIDC
+    OIDC -->|6. Return temporary AWS credentials| GHA
 
-    GH -->|Versioned RTCM artifact| RTCM
-    PARAM -->|Mirror approved RTCM baseline| RTCM
-    GHA -->|Read declared stack versions| RTCMVAL
-    RTCM -->|Approved version policy| RTCMVAL
-    GHA -->|Run application security scans| SAST
-    GHA -->|Run IaC policy validation| IAC
-    RTCMVAL -->|Compatibility gate evidence| SGATE
-    SAST -->|Gate evidence| SGATE
-    IAC -->|Gate evidence| SGATE
-    SGATE -->|Passed, proceed with image build| IMG
-    SGATE -->|Failed, remediation required - tracked in ServiceNow| SN
+    GH -->|7. Versioned RTCM artifact| RTCM
+    PARAM -->|8. Mirror approved RTCM baseline| RTCM
+    GHA -->|9. Read declared stack versions| RTCMVAL
+    RTCM -->|10. Approved version policy| RTCMVAL
+    GHA -->|11. Run application security scans| SAST
+    GHA -->|12. Run IaC policy validation| IAC
+    RTCMVAL -->|13. Compatibility gate evidence| SGATE
+    SAST -->|14. Gate evidence| SGATE
+    IAC -->|15. Gate evidence| SGATE
+    SGATE -->|16. Passed, proceed with image build| IMG
+    SGATE -->|32. Failed, remediation required - tracked in ServiceNow| SN
 
-    IMG -->|Run playbook execution| EC2
-    SSMSESS -->|Open secure management session| EC2
+    IMG -->|17. Run playbook execution| EC2
+    SSMSESS -->|19. Open secure management session| EC2
 
-    GHA -->|Start SSM automation/session| SSMSESS
-    GHA -->|Launch configuration tasks| ANS
-    ANS -->|Configure builder host| EC2
-    PARAM -->|Provide approved build parameters| EC2
+    GHA -->|18. Start SSM automation/session| SSMSESS
+    GHA -->|20. Launch configuration tasks| ANS
+    ANS -->|21. Configure builder host| EC2
+    PARAM -->|22. Provide approved build parameters| EC2
 
-    EC2 -->|Publish hardened image| AMI
-    AMI -->|Submit candidate image for scan| AMISCAN
-    AMISCAN -->|Scan evidence| IGATE
-    IGATE -->|Passed, deploy to workloads| APP
-    IGATE -->|Failed, remediation required - tracked in ServiceNow| SN
-    APP -->|Runtime findings and posture telemetry| RUNTIMESEC
-    RUNTIMESEC -->|Security posture feedback| SN
+    EC2 -->|23. Publish hardened image| AMI
+    AMI -->|24. Submit candidate image for scan| AMISCAN
+    AMISCAN -->|25. Scan evidence| IGATE
+    IGATE -->|26. Passed, deploy to workloads| APP
+    IGATE -->|33. Failed, remediation required - tracked in ServiceNow| SN
+    APP -->|27. Runtime findings and posture telemetry| RUNTIMESEC
+    RUNTIMESEC -->|28. Security posture feedback| SN
 
-    EC2 -->|Send inventory state| INV
-    INV -->|Sync inventory to CMDB| SN
+    EC2 -->|29. Send inventory state| INV
+    INV -->|30. Sync inventory to CMDB| SN
 
     %% Evidence publication flows into the central evidence bus
-    GHA -->|Publish pipeline stage evidence| EVTBUS
-    RTCMVAL -->|Publish approved or rejected RTCM evidence| EVTBUS
-    SAST -->|Publish scan evidence| EVTBUS
-    IAC -->|Publish IaC policy evidence| EVTBUS
-    AMISCAN -->|Publish image scan evidence| EVTBUS
-    RUNTIMESEC -->|Publish runtime posture evidence| EVTBUS
-    INV -->|Publish inventory evidence| EVTBUS
-    EVTBUS -->|Validate + sign evidence record| INGESTOR
-    INGESTOR -->|Write signed evidence| EVIDENCES3
-    INGESTOR -->|Index evidence record| EVIDX
-    EVIDENCES3 -->|Daily integrity check| INTVERIFY
-    EVIDENCES3 -->|All S3 events logged| CLOUDTRAIL
-    INTVERIFY -->|Alert on tamper anomaly| CLOUDTRAIL
+    GHA -->|34. Publish pipeline stage evidence| EVTBUS
+    RTCMVAL -->|35. Publish approved or rejected RTCM evidence| EVTBUS
+    SAST -->|36. Publish scan evidence| EVTBUS
+    IAC -->|37. Publish IaC policy evidence| EVTBUS
+    AMISCAN -->|38. Publish image scan evidence| EVTBUS
+    RUNTIMESEC -->|39. Publish runtime posture evidence| EVTBUS
+    INV -->|40. Publish inventory evidence| EVTBUS
+    EVTBUS -->|41. Validate + sign evidence record| INGESTOR
+    INGESTOR -->|42. Write signed evidence| EVIDENCES3
+    INGESTOR -->|43. Index evidence record| EVIDX
+    EVIDENCES3 -->|44. Daily integrity check| INTVERIFY
+    EVIDENCES3 -->|45. All S3 events logged| CLOUDTRAIL
+    INTVERIFY -->|46. Alert on tamper anomaly| CLOUDTRAIL
 
     %% Audit reporting
-    EVIDENCES3 -->|Evidence aggregation| AUDITMAN
-    EVIDENCES3 -->|Ad-hoc + scheduled queries| ATHENA
-    EVIDX -->|Index-driven report queries| ATHENA
-    AUDITMAN -->|Compliance report export| AUDITAPI
-    ATHENA -->|Report export| AUDITAPI
+    EVIDENCES3 -->|47. Evidence aggregation| AUDITMAN
+    EVIDENCES3 -->|48. Ad-hoc + scheduled queries| ATHENA
+    EVIDX -->|49. Index-driven report queries| ATHENA
+    AUDITMAN -->|50. Compliance report export| AUDITAPI
+    ATHENA -->|51. Report export| AUDITAPI
 
     %% actor
     style Team fill:#E1F5FE,stroke:#01579B,stroke-width:2px,color:#000
