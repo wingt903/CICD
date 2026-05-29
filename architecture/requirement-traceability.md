@@ -328,9 +328,18 @@ _Scenario 3 – Evidence and Audit Logging_
 |---|---|
 | Explicit exclusion of custom application code | Add a formal monitoring-scope policy for App_as_Code_006 that limits eligible `control_id` domains to `platform`, `middleware`, `runtime`, and `database`, and rejects/filters `application_code` controls at evidence ingest and reporting layers. |
 | Enforced evidence classification for scope auditing | Extend evidence governance with a mandatory layer-scope attribute and validation rule so auditors can prove all App_as_Code_006 records exclude custom code assessments. |
+| Visual scope-boundary representation in architecture diagrams | Update architecture diagrams to explicitly label the monitoring scope boundary so the exclusion of custom application code is auditable and unambiguous. |
+
+**Implementation Recommendations to Close App_as_Code_006 Gaps**
+
+1. **Define a monitoring-scope allowlist policy** — Introduce a formal policy document (or policy-as-code rule) that declares the eligible `control_id` domain prefixes for App_as_Code_006 as: `platform`, `middleware`, `runtime`, and `database`. Configure the evidence signing ingestor to reject or quarantine any evidence record carrying an `application_code`-scoped `control_id`, and surface rejections in the reporting layer so auditors have a traceable exclusion log.
+
+2. **Add a mandatory `layer_scope` attribute to the compliance evidence schema** — Extend the canonical evidence record (defined in `architecture/compliance-evidence-store.md`) with a required `layer_scope` field accepting values `platform | middleware | runtime | database | application_code`. Enforce at the signing ingestor that any evidence record tagged to the App_as_Code_006 control set must not carry `layer_scope: application_code`; records that violate this rule must be rejected with an ingest error and written to the audit log.
+
+3. **Surface the scope-exclusion boundary explicitly in architecture diagrams** — Update `architecture/target-component-context.mmd` or `architecture/sequence-diagram.mmd` to add a labeled scope boundary (e.g., a subgraph or annotation) that visually distinguishes the platform/middleware/runtime/database monitoring zone from the custom application code zone. This makes the exclusion boundary auditable from the diagrams alone, without requiring a reader to interpret the evidence schema rules.
 
 **Architect Verdict**
-- App_as_Code_006 is **largely implemented** for continuous platform/runtime/database health and compliance monitoring with strong evidence retention and auditability. To fully satisfy the requirement, the architecture must add an explicit and enforceable scope-boundary control that excludes custom application code from this requirement’s monitoring and validation evidence set.
+- App_as_Code_006 is **largely implemented** for continuous platform/runtime/database health and compliance monitoring with strong evidence retention and auditability. To fully satisfy the requirement, the architecture must add an explicit and enforceable scope-boundary control that excludes custom application code from this requirement's monitoring and validation evidence set. The three implementation recommendations above — a scope allowlist policy, a mandatory `layer_scope` evidence attribute, and a visual diagram boundary — together close the remaining gaps.
 
 ### 7) App_as_Code_007
 
@@ -379,8 +388,18 @@ _Scenario 2 – Detection of Non-Compliant Configuration_
 | Explicit policy-violation error messaging | Add a standardized policy engine/error contract so control overrides return deterministic failure messages (for example: “Configuration violates organizational security policy: port 443 is mandatory”). |
 | Non-bypass enforcement of mandatory controls | Add template guardrails that reject attempts to disable mandatory controls (secret scanning, signing, required transport/security settings) at PR/pipeline parse time. |
 
+**Implementation Recommendations to Close App_as_Code_007 Gaps**
+
+1. **Centralized governed template library** — Create a dedicated GitHub repository (or a `/.github/workflows/templates/` path in a centrally governed repository) containing versioned reusable workflows published via the `workflow_call` trigger. Require all application pipelines to reference a pinned, approved template version (e.g., `uses: org/pipeline-templates/.github/workflows/standard-pipeline.yml@v1.2.0`) rather than maintaining local copies. Add a PR-time validation workflow that inspects incoming pipeline YAML files and rejects any that do not consume the approved template reference, blocking merges that bypass the governed template model.
+
+2. **Mandatory image-signing gate** — Add a non-optional Cosign/Sigstore signing step immediately after the image build stage in the pipeline, making the signed digest a required output artifact. Add a corresponding signature verification step at the start of every promotion job (dev → test → prod) that fails the pipeline with a clear error if the image signature is absent, invalid, or does not match the expected key. Record each signing and verification event as normalized compliance evidence in the evidence store, including the image digest, signer identity, and outcome.
+
+3. **Standardized policy-violation error contract** — Define a standard error message schema for all pipeline gate failures, for example: `"Policy violation [CTRL-ID]: <human-readable description>. Override not permitted."`. Apply this schema uniformly at every gate failure exit point in `cicd/github-actions/aws-migration-pipeline.yml` (security gate, image gate, promotion checks). Emit each policy-violation event as a structured evidence record (including `control_id`, `policy_ref`, and `violation_detail`) so that every override attempt is traceable in the audit log without manual intervention.
+
+4. **Non-bypass guardrails at PR parse time** — Add a GitHub Actions workflow (triggered on `pull_request` targeting protected branches) that statically validates pipeline YAML files in the PR diff. The validator must reject any pipeline that has disabled or removed mandatory controls — specifically: secret scanning steps, image signing steps, required security/quality gate jobs, and mandatory transport/TLS configuration. Failed validation must block the PR merge and return the standardized policy-violation error message from item 3, ensuring mandatory controls cannot be silently bypassed through configuration changes.
+
 **Architect Verdict**
-- App_as_Code_007 is **partially met**. The architecture already demonstrates standardized automated pipelines and fail-closed security gates, but it does not yet explicitly define a centralized governed template-library consumption model nor fully specify mandatory image-signing and standardized policy-violation error responses for override attempts. Adding those controls will close the remaining gaps.
+- App_as_Code_007 is **partially met**. The architecture already demonstrates standardized automated pipelines and fail-closed security gates, but it does not yet explicitly define a centralized governed template-library consumption model nor fully specify mandatory image-signing and standardized policy-violation error responses for override attempts. The four implementation recommendations above — a versioned template library with PR enforcement, a mandatory Cosign/Sigstore signing and verification gate, a standardized policy-violation error contract, and a PR-time pipeline guardrail validator — together close all remaining gaps and will bring this requirement to fully met status.
 
 ### 8) Requirement 8 (ID to be confirmed)
 **Status**: Pending input
