@@ -14,11 +14,11 @@ Every compliance assessment event produces a single normalized evidence record w
 | `timestamp` | ISO 8601 UTC | Moment the assessment outcome was determined (not ingest time). |
 | `system_id` | String | CMDB CI identifier of the assessed asset (matches ServiceNow CI record). |
 | `environment` | Enum: `dev` / `test` / `prod` | Target environment of the assessed asset. |
-| `baseline_ref` | String | Canonical reference to the approved baseline: AMI ID, Terraform commit SHA, or SSM document version. |
-| `control_id` | String | Security control or patch identifier (e.g., CIS benchmark ID, CVE, patch KB, Ansible role tag). |
+| `baseline_ref` | String | Canonical reference to the approved baseline: AMI ID, Terraform commit SHA, SSM document version, or RTCM version/commit. |
+| `control_id` | String | Security control, runtime compatibility control, or patch identifier (e.g., CIS benchmark ID, `rtcm-compatibility-check`, CVE, patch KB, Ansible role tag). |
 | `result` | Enum: `PASS` / `FAIL` / `PARTIAL` | Outcome of the compliance assessment for this control on this asset. |
 | `remediation_state` | Enum: `NOT_REQUIRED` / `PENDING` / `IN_PROGRESS` / `COMPLETE` / `FAILED` | Current remediation lifecycle status. |
-| `source_system` | String | Originating system (e.g., `github-actions`, `aws-ssm`, `security-hub`, `drift-reconciler`, `db-drift-controller`). |
+| `source_system` | String | Originating system (e.g., `github-actions`, `rtcm-validator`, `aws-ssm`, `security-hub`, `drift-reconciler`, `db-drift-controller`). |
 | `run_id` | String | Pipeline run ID or SSM Automation Execution ID that produced this record. |
 | `details_ref` | S3 URI | Pointer to the full execution log or scan artifact archived in the evidence store. |
 | `signature` | String | KMS-signed SHA-256 hash of all other fields to enable integrity verification. |
@@ -31,6 +31,7 @@ All fields are required. Evidence records are immutable once written; correction
 
 | Source | Trigger | Evidence Type |
 |---|---|---|
+| RTCM Validator | Immediately after source checkout and manifest inspection | Approved/rejected runtime compatibility decision for application, middleware, and database versions, including rejection reason and approved version range |
 | GitHub Actions (build pipeline) | End of each successful / failed build stage | SAST, IaC policy scan, image scan, AMI registration, SSM inventory capture |
 | Ansible / SSM | Post-build SSM document completion | OS hardening result, middleware configuration validation, inventory snapshot |
 | Drift Reconciler | Post-convergence verification | Infrastructure drift detection, baseline enforcement, convergence confirmation |
@@ -144,7 +145,7 @@ A dedicated IAM role (`compliance-evidence-audit-reader`) with read-only permiss
 
 ### Generation and Export
 
-- **AWS Audit Manager** is configured with a custom framework that maps each App_as_Code control (001–004) to the evidence sources defined in Section 2. Audit Manager automatically aggregates evidence and generates assessment reports.
+- **AWS Audit Manager** is configured with a custom framework that maps each App_as_Code control (001–008) to the evidence sources defined in Section 2, including RTCM validation evidence for App_as_Code_008. Audit Manager automatically aggregates evidence and generates assessment reports.
 - **Amazon Athena** queries the partitioned evidence S3 prefix for ad-hoc and scheduled report generation. Results are written to `s3://compliance-evidence-<account>/reports/`.
 - **Export** is available as PDF (via Audit Manager) or CSV/JSON (via Athena query result) through an auditor-facing presigned URL API (API Gateway + Lambda, read-only, authenticated via IAM Identity Center).
 - Report generation events are logged to CloudTrail.

@@ -1,0 +1,76 @@
+{
+  "matrix_id": "rtcm-2026-05-29",
+  "baseline_ref": "architecture/runtime-compatibility-matrix.json@rtcm-2026-05-29",
+  "owner": "Platform Architecture",
+  "published_at": "2026-05-29T00:00:00Z",
+  "distribution": {
+    "repository_path": "architecture/runtime-compatibility-matrix.json",
+    "ssm_parameter": "/cicd/rtcm/approved/current",
+    "signature_reference": "kms://alias/evidence-signing"
+  },
+  "application_runtimes": [
+    {
+      "technology": "python",
+      "approved_versions": [
+        "3.11"
+      ],
+      "support_status": "supported",
+      "security_baseline": "2026-05"
+    },
+    {
+      "technology": "java",
+      "approved_versions": [
+        "17"
+      ],
+      "support_status": "supported",
+      "security_baseline": "2026-05"
+    }
+  ],
+  "middleware": [
+    {
+      "technology": "tomcat",
+      "approved_versions": [
+        "10.1"
+      ],
+      "support_status": "supported",
+      "security_baseline": "2026-05"
+    },
+    {
+      "technology": "weblogic",
+      "approved_versions": [
+        "14.1.1"
+      ],
+      "support_status": "supported",
+      "security_baseline": "2026-05"
+    }
+  ],
+  "databases": [
+    {
+      "technology": "postgresql",
+      "approved_versions": [
+        "15"
+      ],
+      "support_status": "supported",
+      "security_baseline": "2026-05"
+    },
+    {
+      "technology": "oracle",
+      "approved_versions": [
+        "19c"
+      ],
+      "support_status": "supported",
+      "security_baseline": "2026-05"
+    }
+  ],
+  "policy": {
+    "control_id": "rtcm-compatibility-check",
+    "enforcement": "fail-closed",
+    "required_before": [
+      "image-build",
+      "middleware-installation",
+      "database-migration",
+      "environment-promotion"
+    ],
+    "rejection_message_template": "Policy violation [RTCM-001]: Declared technology version is not approved in the Runtime Technology Compatibility Matrix. Override not permitted."
+  }
+}

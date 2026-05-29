@@ -3,6 +3,7 @@ sequenceDiagram
     actor Team as Project Migration Team
     participant SN as ServiceNow (CMDB)
     participant GH as GitHub Actions Runner
+    participant RTCM as Runtime Technology Compatibility Matrix
     participant Scheduler as EventBridge Scheduler Service
     participant DriftReconciler as Drift Reconciler
     participant PolicyGate as Policy/Approval Gate
@@ -23,6 +24,20 @@ sequenceDiagram
     activate GH
     GH->>GH: Execute Git Checkout (App Code + Ansible Roles)
     Note over GH: If Java (Tomcat/WebLogic):<br>Compile Source to .WAR / .EAR via Maven
+    GH->>RTCM: Load approved RTCM baseline<br/>[versioned repo artifact + /cicd/rtcm/approved/current]
+    GH->>GH: Validate declared app middleware and DB versions<br/>against approved RTCM before any installation
+    alt RTCM validation rejected
+        GH->>SN: Open remediation task with rejection detail<br/>[technology, declared version, approved version range]
+        GH->>EvidenceBus: Publish RTCM rejection evidence event<br/>[control_id=rtcm-compatibility-check, result=FAIL, baseline_ref=rtcm version, run_id, details_ref]
+        EvidenceBus->>EvidenceStore: Ingestor Lambda validates schema, signs rejection record, writes to S3 (Object Lock) + indexes in DynamoDB
+        EvidenceStore->>AuditTrail: S3 PutObject event captured (actor, timestamp, key, requestId)
+        Note over GH: Pipeline terminates before image build,<br/>middleware install, or DB migration
+    else RTCM validation approved
+        GH->>EvidenceBus: Publish RTCM approval evidence event<br/>[control_id=rtcm-compatibility-check, result=PASS, baseline_ref=rtcm version, run_id, details_ref]
+        EvidenceBus->>EvidenceStore: Ingestor Lambda validates schema, signs approval record, writes to S3 (Object Lock) + indexes in DynamoDB
+        EvidenceStore->>AuditTrail: S3 PutObject event captured (actor, timestamp, key, requestId)
+    end
+    Note over GH,AWS_SSM: Remaining build and installation phases execute only after RTCM PASS
     GH->>AWS_SSM: Assume IAM Role via OIDC (Fetch Temp Security Token)
     GH->>GH: Initialize Ansible Controller Runtime & Install AWS SSM Session Manager Plugin
 
