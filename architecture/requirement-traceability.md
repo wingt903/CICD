@@ -275,11 +275,131 @@ _Scenario 5 – Engineering Productivity Improvement_
 **Architect Verdict**
 - App_as_Code_005 is **fully met**. The architecture eliminates manual verification steps by automating all post-ServiceNow-approval pipeline stages (Stages 2–5 in `aws-migration-cicd.mmd`) including automated security gates (SAST, IaC scans, image scans) and system-driven deployment promotion. Post-deployment fixes are prevented by Ansible configuration-as-code baked into immutable golden AMIs before deployment, and a scheduled drift detection and auto-remediation loop (EventBridge → Drift Reconciler → Policy Gate → Enforce Baseline → Convergence Verification) that corrects any post-deployment drift without manual engineering action. Security risk is reduced through consistent, repeatable automated controls applied identically on every pipeline run (tfsec/Checkov, Inspector, GuardDuty, OIDC short-lived credentials, SSM zero-trust tunnel). Every automated control execution publishes a normalised, KMS-signed, tamper-evident evidence record to the compliance evidence store, providing complete auditability. Engineering productivity is improved because all build, configuration, scan, deployment, and reconciliation activities are orchestrated automatically, removing manual setup, verification, and rework from the engineering workflow.
 
-### 6) Requirement 6 (ID to be confirmed)
-**Status**: Pending input
+### 6) App_as_Code_006
 
-### 7) Requirement 7 (ID to be confirmed)
-**Status**: Pending input
+**Requirement Summary**
+- Continuously monitor and validate baseline health and baseline configuration compliance for platform, middleware, runtime, and database layers.
+- Detect issues across availability, performance, resource utilization, and error conditions while systems are in operation.
+- Exclude custom application code from this requirement’s monitoring/validation scope.
+- Retain timestamped, system-linked health/compliance evidence for audit and forensics.
+
+**Status**: **Partially Met** (core monitoring and evidence controls are present; explicit scope-exclusion control for custom application code must be formalized)
+
+**Scenario Compliance Summary**
+
+| Scenario | Requirement Expectation | Verdict | Key References |
+|---|---|---|---|
+| Continuous Platform Health Monitoring | Baseline health and baseline compliance for platform/middleware/runtime/database are continuously monitored in operation. | **Met** | `architecture/target-component-context.mmd:42-56,58-63,101-122`, `architecture/component-context-diagram.mmd:26,34,85-89,96-97`, `architecture/sequence-diagram.mmd:54-93`, `architecture/full-pipeline-tech-stack.md:19,22-24` |
+| Exclusion of Custom Application Code | Monitoring and validation for this control are restricted to platform, middleware, runtime, and database layers, excluding custom code. | **Partially Met** | `architecture/target-component-context.mmd:49-63`, `architecture/sequence-diagram.mmd:54-93`, `architecture/compliance-evidence-store.md:11-24,32-39` |
+| Evidence and Audit Logging | Monitoring/validation outputs are retained with timestamps, system identifiers, and health/compliance status for audit/forensics. | **Met** | `architecture/compliance-evidence-store.md:11-27,56-71,117-127`, `architecture/component-context-diagram.mmd:40-48,98-103`, `architecture/target-component-context.mmd:65-72,123-134`, `architecture/sequence-diagram.mmd:50-53,70-73,86-93` |
+
+**Traceability Evidence**
+
+_Scenario 1 – Continuous Platform Health Monitoring_
+
+| Evidence | Traceability |
+|---|---|
+| `architecture/target-component-context.mmd:42-56` | CloudWatch + OpenTelemetry + X-Ray telemetry, CloudWatch alarms/SNS, scheduled reconciliation, drift findings, baseline enforcement, and convergence verification establish continuous operational monitoring for runtime/platform layers. |
+| `architecture/target-component-context.mmd:58-63,118-122` | Dedicated database drift detector, migration orchestration, rollback path, and post-remediation validation provide continuous DB-layer health/compliance validation. |
+| `architecture/component-context-diagram.mmd:26,85-89` | Runtime security posture plus SSM inventory feedback continuously surfaces runtime and platform state into governance systems. |
+| `architecture/sequence-diagram.mmd:54-93` | EventBridge-driven recurring drift and DB control loops validate baseline compliance and publish outcomes continuously during operation. |
+| `architecture/full-pipeline-tech-stack.md:19,22-24` | Continuous threat/posture monitoring, asset state reconciliation, telemetry/tracing, and alarm routing provide sustained availability/performance/resource/error visibility. |
+
+_Scenario 2 – Exclusion of Custom Application Code_
+
+| Evidence | Traceability |
+|---|---|
+| `architecture/target-component-context.mmd:49-63` | Drift and DB control lanes are modeled around infrastructure baseline, middleware/runtime configuration, and database schema/parameter controls (not custom code logic validation). |
+| `architecture/sequence-diagram.mmd:54-93` | Continuous validation sequence is scoped to Terraform/config baseline convergence and DB schema/config drift control workflows. |
+| `architecture/compliance-evidence-store.md:11-24,32-39` | Evidence model and sources support control-scoped records (`control_id`, `source_system`) that can enforce non-code monitoring scope, but explicit exclusion policy is not yet defined. |
+
+_Scenario 3 – Evidence and Audit Logging_
+
+| Evidence | Traceability |
+|---|---|
+| `architecture/compliance-evidence-store.md:11-24` | Canonical evidence schema includes required timestamp (`timestamp`), system identifier (`system_id`), baseline reference (`baseline_ref`), and compliance/health outcome (`result`, `remediation_state`). |
+| `architecture/component-context-diagram.mmd:40-48,98-103` | EventBridge evidence bus, signing ingestor, immutable S3 evidence store, integrity verifier, and CloudTrail audit log provide retained, tamper-evident evidence. |
+| `architecture/target-component-context.mmd:65-72,123-134` | Central evidence ingest/index, daily integrity verification, and access/change audit logging are modeled as first-class architecture components. |
+| `architecture/sequence-diagram.mmd:50-53,70-73,86-93` | Pipeline, drift, and DB monitoring flows all emit normalized evidence and generate CloudTrail-captured write events for forensic traceability. |
+
+**Architectural Additions Required to Fully Meet App_as_Code_006**
+
+| Gap Area (Open) | Required Addition to Fulfill Requirement |
+|---|---|
+| Explicit exclusion of custom application code | Add a formal monitoring-scope policy for App_as_Code_006 that limits eligible `control_id` domains to `platform`, `middleware`, `runtime`, and `database`, and rejects/filters `application_code` controls at evidence ingest and reporting layers. |
+| Enforced evidence classification for scope auditing | Extend evidence governance with a mandatory layer-scope attribute and validation rule so auditors can prove all App_as_Code_006 records exclude custom code assessments. |
+| Visual scope-boundary representation in architecture diagrams | Update architecture diagrams to explicitly label the monitoring scope boundary so the exclusion of custom application code is auditable and unambiguous. |
+
+**Implementation Recommendations to Close App_as_Code_006 Gaps**
+
+1. **Define a monitoring-scope allowlist policy** — Introduce a formal policy document (or policy-as-code rule) that declares the eligible `control_id` domain prefixes for App_as_Code_006 as: `platform`, `middleware`, `runtime`, and `database`. Configure the evidence signing ingestor to reject or quarantine any evidence record carrying an `application_code`-scoped `control_id`, and surface rejections in the reporting layer so auditors have a traceable exclusion log.
+
+2. **Add a mandatory `layer_scope` attribute to the compliance evidence schema** — Extend the canonical evidence record (defined in `architecture/compliance-evidence-store.md`) with a required `layer_scope` field accepting values `platform | middleware | runtime | database | application_code`. Enforce at the signing ingestor that any evidence record tagged to the App_as_Code_006 control set must not carry `layer_scope: application_code`; records that violate this rule must be rejected with an ingest error and written to the audit log.
+
+3. **Surface the scope-exclusion boundary explicitly in architecture diagrams** — Update `architecture/target-component-context.mmd` or `architecture/sequence-diagram.mmd` to add a labeled scope boundary (e.g., a subgraph or annotation) that visually distinguishes the platform/middleware/runtime/database monitoring zone from the custom application code zone. This makes the exclusion boundary auditable from the diagrams alone, without requiring a reader to interpret the evidence schema rules.
+
+**Architect Verdict**
+- App_as_Code_006 is **largely implemented** for continuous platform/runtime/database health and compliance monitoring with strong evidence retention and auditability. To fully satisfy the requirement, the architecture must add an explicit and enforceable scope-boundary control that excludes custom application code from this requirement's monitoring and validation evidence set. The three implementation recommendations above — a scope allowlist policy, a mandatory `layer_scope` evidence attribute, and a visual diagram boundary — together close the remaining gaps.
+
+### 7) App_as_Code_007
+
+**Requirement Summary**
+- Provide a centralized, governed CI/CD template library for application onboarding.
+- Ensure apps deployed through governed templates inherit standard organizational security configuration.
+- Automatically execute mandatory cyber controls (for example: secret scanning and image signing).
+- Detect and block attempts to override mandatory security controls, and return clear policy-violation errors.
+
+**Status**: **Partially Met** (standardized pipeline and gate controls are present, but centralized template-library/reuse and explicit image-signing + policy-violation messaging controls are not yet fully defined)
+
+**Scenario Compliance Summary**
+
+| Scenario | Requirement Expectation | Verdict | Key References |
+|---|---|---|---|
+| Standardised Deployment using a Governed Template | New applications use approved governed templates that enforce standard security configuration and mandatory controls automatically. | **Partially Met** | `architecture/aws-migration-cicd.mmd:57-66,76-86`, `architecture/component-context-diagram.mmd:65-70,81-84`, `architecture/full-pipeline-tech-stack.md:7-9,15-17`, `cicd/github-actions/aws-migration-pipeline.yml:20-67,69-103,145-203` |
+| Detection of Non-Compliant Configuration | Attempts to override mandatory security controls fail the pipeline and return policy-violation feedback. | **Partially Met** | `architecture/aws-migration-cicd.mmd:61-66`, `architecture/component-context-diagram.mmd:67-71,82-84`, `architecture/target-component-context.mmd:53-55`, `cicd/github-actions/aws-migration-pipeline.yml:99-103,194-195` |
+
+**Traceability Evidence**
+
+_Scenario 1 – Standardised Deployment using a Governed Template_
+
+| Evidence | Traceability |
+|---|---|
+| `architecture/aws-migration-cicd.mmd:57-66,76-86` | The architecture defines a common CI/CD orchestration flow with quality/security gates and middleware baseline application paths, supporting standardized deployment behavior for onboarded applications. |
+| `architecture/component-context-diagram.mmd:65-70,81-84` | Mandatory gate pattern is modeled (security/quality gate and image gate) with fail-closed behavior that prevents progression on control failure. |
+| `architecture/full-pipeline-tech-stack.md:7-9,15-17` | CI/CD orchestration, environment governance, and automated IaC/application/image security controls are defined as platform standards. |
+| `cicd/github-actions/aws-migration-pipeline.yml:20-67,69-103,145-203` | Repository includes a common pipeline workflow executing build/scan checks and promotion stages (`dev -> test -> prod`) for onboarded stacks. |
+| `architecture/component-context-diagram.mmd:22-24` | Security controls include SAST/dependency/secret scanning and IaC policy checks as core pipeline gates. |
+
+_Scenario 2 – Detection of Non-Compliant Configuration_
+
+| Evidence | Traceability |
+|---|---|
+| `architecture/aws-migration-cicd.mmd:61-66` | Explicit gate decision (`Pipeline gates passed?`) routes failures to remediation task flow, preventing non-compliant deployments. |
+| `architecture/component-context-diagram.mmd:67-71,82-84` | Gate outcomes are enforced automatically: failed checks do not proceed and are sent to remediation tracking. |
+| `architecture/target-component-context.mmd:53-55` | Policy decision gate authorizes or blocks baseline enforcement path, evidencing policy-driven control over runtime changes. |
+| `cicd/github-actions/aws-migration-pipeline.yml:99-103,194-195` | Promotion depends on successful upstream checks; unresolved high/critical findings are intended to block promotion. |
+
+**Architectural Additions Required to Fully Meet App_as_Code_007**
+
+| Gap Area (Open) | Required Addition to Fulfill Requirement |
+|---|---|
+| Centralized governed template library pattern | Add an explicit shared template model (for example reusable GitHub workflow templates via `workflow_call` in a centrally governed repo/path) and require application pipelines to consume only approved template versions. |
+| Mandatory image-signing control not explicit | Add a mandatory image-signing control (e.g., Sigstore/Cosign or equivalent) as a non-optional gate, with signed-artifact verification before promotion. |
+| Explicit policy-violation error messaging | Add a standardized policy engine/error contract so control overrides return deterministic failure messages (for example: “Configuration violates organizational security policy: port 443 is mandatory”). |
+| Non-bypass enforcement of mandatory controls | Add template guardrails that reject attempts to disable mandatory controls (secret scanning, signing, required transport/security settings) at PR/pipeline parse time. |
+
+**Implementation Recommendations to Close App_as_Code_007 Gaps**
+
+1. **Centralized governed template library** — Create a dedicated GitHub repository (or a `/.github/workflows/templates/` path in a centrally governed repository) containing versioned reusable workflows published via the `workflow_call` trigger. Require all application pipelines to reference a pinned, approved template version (e.g., `uses: org/pipeline-templates/.github/workflows/standard-pipeline.yml@v1.2.0`) rather than maintaining local copies. Add a PR-time validation workflow that inspects incoming pipeline YAML files and rejects any that do not consume the approved template reference, blocking merges that bypass the governed template model.
+
+2. **Mandatory image-signing gate** — Add a non-optional Cosign/Sigstore signing step immediately after the image build stage in the pipeline, making the signed digest a required output artifact. Add a corresponding signature verification step at the start of every promotion job (dev → test → prod) that fails the pipeline with a clear error if the image signature is absent, invalid, or does not match the expected key. Record each signing and verification event as normalized compliance evidence in the evidence store, including the image digest, signer identity, and outcome.
+
+3. **Standardized policy-violation error contract** — Define a standard error message schema for all pipeline gate failures, for example: `"Policy violation [CTRL-ID]: <human-readable description>. Override not permitted."`. Apply this schema uniformly at every gate failure exit point in `cicd/github-actions/aws-migration-pipeline.yml` (security gate, image gate, promotion checks). Emit each policy-violation event as a structured evidence record (including `control_id`, `policy_ref`, and `violation_detail`) so that every override attempt is traceable in the audit log without manual intervention.
+
+4. **Non-bypass guardrails at PR parse time** — Add a GitHub Actions workflow (triggered on `pull_request` targeting protected branches) that statically validates pipeline YAML files in the PR diff. The validator must reject any pipeline that has disabled or removed mandatory controls — specifically: secret scanning steps, image signing steps, required security/quality gate jobs, and mandatory transport/TLS configuration. Failed validation must block the PR merge and return the standardized policy-violation error message from item 3, ensuring mandatory controls cannot be silently bypassed through configuration changes.
+
+**Architect Verdict**
+- App_as_Code_007 is **partially met**. The architecture already demonstrates standardized automated pipelines and fail-closed security gates, but it does not yet explicitly define a centralized governed template-library consumption model nor fully specify mandatory image-signing and standardized policy-violation error responses for override attempts. The four implementation recommendations above — a versioned template library with PR enforcement, a mandatory Cosign/Sigstore signing and verification gate, a standardized policy-violation error contract, and a PR-time pipeline guardrail validator — together close all remaining gaps and will bring this requirement to fully met status.
 
 ### 8) Requirement 8 (ID to be confirmed)
 **Status**: Pending input
