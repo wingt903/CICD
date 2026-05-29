@@ -66,6 +66,13 @@ This document traces business requirements to the architecture artifacts under `
 
 **Status**: **Met**
 
+**Scenario Compliance Summary**
+
+| Scenario | Requirement Expectation | Verdict | Key References |
+|---|---|---|---|
+| Automatically apply approved security hardening and patches | Approved hardening controls and patches are applied automatically when components are deployed, updated, or need remediation. | **Met** | `architecture/sequence-diagram.mmd:34-36`, `architecture/aws-migration-cicd.mmd:79-85`, `process-flow-diagram.md:34`, `process-flow-diagram.md:59`, `architecture/target-component-context.mmd:G4-G5`, `architecture/component-context-diagram.mmd:SGATE, IGATE` |
+| Security hardening and patches are validated after application | System confirms required controls/patches are correctly applied and records any failure, partial application, or non-compliance. | **Met** | `architecture/component-context-diagram.mmd:AMISCAN, IGATE`, `architecture/sequence-diagram.mmd:36`, `process-flow-diagram.md:49-51`, `architecture/sequence-diagram.mmd:45-46`, `process-flow-diagram.md:59-62`, `architecture/target-component-context.mmd:G6`, `architecture/target-component-context.mmd:H4` |
+
 **Traceability Evidence**
 
 _Scenario 1 – Automatically apply approved security hardening and patches_
