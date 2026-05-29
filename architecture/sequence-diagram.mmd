@@ -3,6 +3,11 @@ sequenceDiagram
     actor Team as Project Migration Team
     participant SN as ServiceNow (CMDB)
     participant GH as GitHub Actions Runner
+    participant EV as EventBridge Scheduler
+    participant DR as Drift Reconciler
+    participant PG as Policy/Approval Gate
+    participant TF as Terraform/Config Enforcer
+    participant DB as Database Drift Controller
     participant AWS_SSM as AWS Systems Manager
     participant EC2 as Temporary Builder EC2
 
@@ -39,4 +44,38 @@ sequenceDiagram
 
     GH->>SN: Send API Patch Request:<br>Update CMDB CI with New Active AMI ID + Ansible execution references
     Note over SN: CMDB and Change Record are updated with<br>AMI + Ansible execution evidence for audit tracking
+
+    %% Phase 6: Continuous Drift Detection and Closed-Loop Remediation
+    EV->>DR: Scheduled reconciliation trigger
+    DR->>DR: Compare live AWS configuration<br/>vs Git/Terraform desired state
+    DR->>SN: Publish drift findings and evidence
+    DR->>PG: Raise remediation decision request
+    alt Policy allows auto-remediation
+        PG->>TF: Authorize enforce baseline execution
+        TF->>TF: Run Terraform apply/config re-run<br/>to match repository baseline
+    else Manual approval required
+        PG->>Team: Request approval for controlled remediation
+        Team->>PG: Approve remediation
+        PG->>TF: Authorize enforce baseline execution
+        TF->>TF: Run Terraform apply/config re-run<br/>to match repository baseline
+    end
+    TF->>DR: Return post-remediation state
+    DR->>DR: Verify convergence to desired baseline
+    DR->>SN: Update CMDB/compliance status with closure evidence
+
+    %% Phase 7: Dedicated Database Drift Detection and Remediation
+    EV->>DB: Scheduled database drift control trigger
+    DB->>DB: Detect schema/config drift against versioned migration baseline
+    alt DB drift detected
+        DB->>PG: Request migration remediation decision
+        PG->>DB: Approve migration execution policy
+        DB->>DB: Execute migration orchestration
+        alt Migration validation fails
+            DB->>DB: Execute rollback (snapshot restore/previous migration)
+        end
+        DB->>DB: Perform post-remediation validation
+        DB->>SN: Publish DB drift status and remediation evidence
+    else No DB drift
+        DB->>SN: Record compliant DB baseline state
+    end
     deactivate GH

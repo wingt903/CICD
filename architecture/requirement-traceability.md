@@ -36,7 +36,7 @@ This document traces business requirements to the architecture artifacts under `
 - Continuously detect unauthorized/unsupported configuration drift in in-scope workloads.
 - Automatically remediate drift so live state returns to repository-approved baseline.
 
-**Status**: **Partially Met**
+**Status**: **Met**
 
 **Traceability Evidence**
 - `architecture/component-context-diagram.mmd:74-78`  
@@ -45,16 +45,17 @@ This document traces business requirements to the architecture artifacts under `
   The solution defines remediation runbooks as code, continuous runtime security posture monitoring, and inventory reconciliation.
 - `process-flow-diagram.md:59-63`  
   Post-build SSM document includes inventory capture and remediation baseline, with evidence looped to ServiceNow.
-- `architecture/target-component-context.mmd:24,66-68`  
-  Runtime security posture checks are modeled across dev/test/prod environments.
-
-**Coverage Gaps Against Acceptance Criteria**
-- The diagrams do not explicitly show a scheduled/continuous control that compares live configuration directly against repository state.
-- Automatic remediation is described at capability level, but the architecture does not explicitly show a closed-loop “detect drift -> enforce repo baseline” execution path.
-- Database drift detection/remediation is not explicitly modeled as a dedicated control path.
+- `architecture/target-component-context.mmd:49-102`  
+  Adds explicit scheduled reconciliation control, live-vs-repo drift comparison, policy gate, baseline enforcement, and convergence verification loop with compliance evidence feedback.
+- `architecture/target-component-context.mmd:92-102`  
+  Adds dedicated database drift detection/remediation lane, including migration orchestration, rollback path, and post-remediation validation.
+- `architecture/sequence-diagram.mmd:45-78`  
+  Models closed-loop control flow end to end: detect drift -> policy/approval decision -> enforce repository baseline -> verify convergence -> publish closure evidence.
+- `architecture/sequence-diagram.mmd:79-91`  
+  Models dedicated database drift trigger, remediation decision, migration execution, rollback, and validation reporting.
 
 **Architect Verdict**
-- The architecture establishes strong monitoring, inventory, and remediation building blocks, but only partially evidences App_as_Code_002 as currently documented.
+- App_as_Code_002 is now explicitly evidenced with continuous reconciliation controls, a closed-loop remediation path to repo baseline, and a dedicated database drift control lane.
 
 ### 3) Requirement 3 (ID to be confirmed)
 **Status**: Pending input
