@@ -1,4 +1,4 @@
-%%{init: {'flowchart': {'nodeSpacing': 28, 'rankSpacing': 36, 'diagramPadding': 8, 'curve': 'linear'}}}%%
+%%{init: {'flowchart': {'nodeSpacing': 18, 'rankSpacing': 24, 'diagramPadding': 6, 'curve': 'linear'}}}%%
 graph TB
     %% Top-to-bottom layout is used for full-screen readability in draw.io
     Team[Project / Migration Team]
@@ -20,7 +20,7 @@ graph TB
     end
 
     subgraph Security["Trust Boundary: Security & Quality Gates"]
-        direction LR
+        direction TB
         SAST[Code Security Scans\nSAST + Dependency + Secret]
         IAC[IaC Policy Scans\ntfsec + Checkov]
         RTCM[Runtime Technology Compatibility Matrix\nApproved App + Middleware + DB Versions]
@@ -30,7 +30,7 @@ graph TB
     end
 
     subgraph AWS["Trust Boundary: AWS Control Plane"]
-        direction LR
+        direction TB
         OIDC[AWS IAM OIDC\nProvider]
         SSMSESS[AWS SSM Session Manager]
         PARAM[AWS SSM Parameter Store]
@@ -39,7 +39,7 @@ graph TB
     end
 
     subgraph Compliance["Trust Boundary: Compliance Evidence & Audit"]
-        direction LR
+        direction TB
         EVTBUS[EventBridge<br/>Compliance Evidence Bus]
         INGESTOR[Evidence Ingestor Lambda<br/>Schema Validation + KMS Signing]
         EVIDENCES3[S3 Evidence Bucket<br/>Object Lock WORM + SSE-KMS]
@@ -52,7 +52,7 @@ graph TB
     end
 
     subgraph Runtime["Trust Boundary: AWS Runtime / Build Targets"]
-        direction LR
+        direction TB
         EC2[Private Builder EC2]
         APP[Target Workloads\nWebLogic / Tomcat / Python]
     end
