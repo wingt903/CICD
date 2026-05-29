@@ -1,10 +1,10 @@
-%%{init: {'flowchart': {'nodeSpacing': 12, 'rankSpacing': 16, 'diagramPadding': 4, 'curve': 'linear'}}}%%
-graph TB
-    %% Top-to-bottom layout is used for full-screen readability in draw.io
+%%{init: {'flowchart': {'nodeSpacing': 10, 'rankSpacing': 12, 'diagramPadding': 2, 'curve': 'linear'}}}%%
+graph LR
+    %% Left-to-right layout keeps the GitHub preview denser with less unused whitespace
     Team[Project / Migration Team]
 
     subgraph Governance["Trust Boundary: Governance & Request Layer"]
-        direction LR
+        direction TB
         SN[ServiceNow\nCatalog + CMDB]
         IH[IntegrationHub]
     end
