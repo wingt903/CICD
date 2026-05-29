@@ -1,27 +1,34 @@
-graph LR
-    %% Styling
-    classDef actor fill:#E1F5FE,stroke:#01579B,stroke-width:2px;
-    classDef governance fill:#E8EAF6,stroke:#283593,stroke-width:2px;
-    classDef pipeline fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px;
-    classDef aws fill:#FFF3E0,stroke:#E65100,stroke-width:2px;
-    classDef runtime fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px;
-
+graph TB
+    %% Top-to-bottom layout is used for full-screen readability in draw.io
     Team[Project / Migration Team]
 
     subgraph Governance["Trust Boundary: Governance & Request Layer"]
-        SN[ServiceNow Catalog + CMDB]
+        direction LR
+        SN[ServiceNow\nCatalog + CMDB]
         IH[IntegrationHub]
     end
 
     subgraph Pipeline["Trust Boundary: CI/CD Orchestration Layer"]
-        GH[GitHub Repository]
+        direction TB
+        GH[GitHub\nRepository]
         GHA[GitHub Actions]
-        IMG[Ansible Image Build Playbooks]
+        IMG[Ansible Image Build\nPlaybooks]
         ANS[Ansible]
+        SGATE{Security and Quality Gates Passed?}
+    end
+
+    subgraph Security["Trust Boundary: Security & Quality Gates"]
+        direction LR
+        SAST[Code Security Scans\nSAST + Dependency + Secret]
+        IAC[IaC Policy Scans\ntfsec + Checkov]
+        AMISCAN[Artifact Security Scans\nECR + Inspector]
+        IGATE{Image Scan Passed?}
+        RUNTIMESEC[Runtime Security Posture\nSecurity Hub + GuardDuty + IAM Access Analyzer]
     end
 
     subgraph AWS["Trust Boundary: AWS Control Plane"]
-        OIDC[AWS IAM OIDC Provider]
+        direction LR
+        OIDC[AWS IAM OIDC\nProvider]
         SSMSESS[AWS SSM Session Manager]
         PARAM[AWS SSM Parameter Store]
         INV[AWS SSM Inventory]
@@ -29,6 +36,7 @@ graph LR
     end
 
     subgraph Runtime["Trust Boundary: AWS Runtime / Build Targets"]
+        direction LR
         EC2[Private Builder EC2]
         APP[Target Workloads\nWebLogic / Tomcat / Python]
     end
@@ -37,12 +45,19 @@ graph LR
     SN -->|Trigger workflow event| IH
     IH -->|Dispatch pipeline run| GHA
     SN -. CMDB metadata / change context .-> GHA
+    SN -->|Failed scan remediation request| Team
 
     GH -->|Push/PR pipeline trigger| GHA
     GHA -->|Request federated identity token| OIDC
     OIDC -->|Return temporary AWS credentials| GHA
 
-    GHA -->|Invoke image build playbooks| IMG
+    GHA -->|Run application security scans| SAST
+    GHA -->|Run IaC policy validation| IAC
+    SAST -->|Gate evidence| SGATE
+    IAC -->|Gate evidence| SGATE
+    SGATE -->|Passed, proceed with image build| IMG
+    SGATE -->|Failed, remediation required - tracked in ServiceNow| SN
+
     IMG -->|Run playbook execution| EC2
     SSMSESS -->|Open secure management session| EC2
 
@@ -52,12 +67,39 @@ graph LR
     PARAM -->|Provide approved build parameters| EC2
 
     EC2 -->|Publish hardened image| AMI
-    AMI -->|Deploy image to workloads| APP
+    AMI -->|Submit candidate image for scan| AMISCAN
+    AMISCAN -->|Scan evidence| IGATE
+    IGATE -->|Passed, deploy to workloads| APP
+    IGATE -->|Failed, remediation required - tracked in ServiceNow| SN
+    APP -->|Runtime findings and posture telemetry| RUNTIMESEC
+    RUNTIMESEC -->|Security posture feedback| SN
+
     EC2 -->|Send inventory state| INV
     INV -->|Sync inventory to CMDB| SN
 
-    class Team actor;
-    class SN,IH governance;
-    class GH,GHA,IMG,ANS pipeline;
-    class OIDC,SSMSESS,PARAM,INV,AMI aws;
-    class EC2,APP runtime;
+    %% actor
+    style Team fill:#E1F5FE,stroke:#01579B,stroke-width:2px,color:#000
+    %% governance
+    style SN fill:#E8EAF6,stroke:#283593,stroke-width:2px,color:#000
+    style IH fill:#E8EAF6,stroke:#283593,stroke-width:2px,color:#000
+    %% pipeline
+    style GH fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
+    style GHA fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
+    style IMG fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
+    style ANS fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
+    style SGATE fill:#ffffff,stroke:#444444,stroke-width:1.5px,color:#000
+    %% security
+    style SAST fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#000
+    style IAC fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#000
+    style AMISCAN fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#000
+    style IGATE fill:#ffffff,stroke:#444444,stroke-width:1.5px,color:#000
+    style RUNTIMESEC fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#000
+    %% aws
+    style OIDC fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
+    style SSMSESS fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
+    style PARAM fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
+    style INV fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
+    style AMI fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
+    %% runtime
+    style EC2 fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style APP fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000

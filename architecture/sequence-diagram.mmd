@@ -3,6 +3,11 @@ sequenceDiagram
     actor Team as Project Migration Team
     participant SN as ServiceNow (CMDB)
     participant GH as GitHub Actions Runner
+    participant Scheduler as EventBridge Scheduler Service
+    participant DriftReconciler as Drift Reconciler
+    participant PolicyGate as Policy/Approval Gate
+    participant TerraformEnforcer as Terraform/Config Enforcer
+    participant DatabaseDriftController as Database Drift Controller
     participant AWS_SSM as AWS Systems Manager
     participant EC2 as Temporary Builder EC2
 
@@ -39,4 +44,37 @@ sequenceDiagram
 
     GH->>SN: Send API Patch Request:<br>Update CMDB CI with New Active AMI ID + Ansible execution references
     Note over SN: CMDB and Change Record are updated with<br>AMI + Ansible execution evidence for audit tracking
+
+    %% Phase 6: Continuous Drift Detection and Closed-Loop Remediation
+    Scheduler->>DriftReconciler: Scheduled reconciliation trigger
+    Note over DriftReconciler: Compare live AWS configuration<br/>vs Git repository Terraform baseline (source of truth)
+    DriftReconciler->>SN: Publish drift findings and evidence
+    DriftReconciler->>PolicyGate: Raise remediation decision request
+    alt Policy allows auto-remediation
+        PolicyGate->>TerraformEnforcer: Authorize enforce baseline execution
+    else Manual approval required
+        PolicyGate->>Team: Request approval for controlled remediation
+        Team->>PolicyGate: Approve remediation
+        PolicyGate->>TerraformEnforcer: Authorize enforce baseline execution
+    end
+    TerraformEnforcer->>TerraformEnforcer: Run Terraform apply/config re-run<br/>to match repository baseline
+    TerraformEnforcer->>DriftReconciler: Return post-remediation state
+    DriftReconciler->>DriftReconciler: Verify convergence to desired baseline
+    DriftReconciler->>SN: Update CMDB/compliance status with closure evidence
+
+    %% Phase 7: Dedicated Database Drift Detection and Remediation
+    Scheduler->>DatabaseDriftController: Scheduled database drift control trigger
+    DatabaseDriftController->>DatabaseDriftController: Detect schema/config drift against versioned migration baseline
+    alt DB drift detected
+        DatabaseDriftController->>PolicyGate: Request migration remediation decision
+        PolicyGate->>DatabaseDriftController: Approve migration execution policy
+        DatabaseDriftController->>DatabaseDriftController: Execute migration orchestration
+        alt Migration validation fails
+            DatabaseDriftController->>DatabaseDriftController: Execute rollback (snapshot restore/previous migration)
+        end
+        DatabaseDriftController->>DatabaseDriftController: Perform post-remediation validation
+        DatabaseDriftController->>SN: Publish DB drift status and remediation evidence
+    else No DB drift
+        DatabaseDriftController->>SN: Record compliant DB baseline state
+    end
     deactivate GH
