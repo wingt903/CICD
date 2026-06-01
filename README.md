@@ -31,6 +31,9 @@ It now includes an AWS-only target design for full automated CI/CD with dev/test
    - `test` (automated + quality/security gate)
    - `prod` (manual approval using GitHub Environment protections)
 5. Post-deploy verification and rollback paths are executed on failure conditions.
+6. Release governance is fail-closed:
+   - immutable `releaseId` (`GITHUB_SHA`) and SHA-pinned image references are required
+   - previously failed/blocked release IDs are denied from re-deploy using SSM decision records
 
 ## GitHub/AWS Configuration Required
 
@@ -40,10 +43,15 @@ It now includes an AWS-only target design for full automated CI/CD with dev/test
   - `AWS_TEST_ROLE_ARN`
   - `AWS_PROD_ROLE_ARN`
 - Configure GitHub Environments named `dev`, `test`, and `prod` with required reviewers for prod.
+- Optional governed break-glass variables for prod override (`workflow_dispatch` only):
+  - `BREAK_GLASS_APPROVED` (`true`/`false`)
+  - `BREAK_GLASS_APPROVED_UNTIL` (UTC timestamp)
 - Configure Terraform backend resources per environment as defined in:
   - `infrastructure/terraform/backend/dev.hcl`
   - `infrastructure/terraform/backend/test.hcl`
   - `infrastructure/terraform/backend/prod.hcl`
+- Ensure IAM role permissions allow SSM Parameter Store read/write on
+  `/cicd/deployment-decisions/*` for deployment decision enforcement.
 
 ## Notes
 
