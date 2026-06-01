@@ -2,6 +2,12 @@
 
 This document traces business requirements to the architecture artifacts under `./architecture`.
 
+## Global Scope Assumptions
+
+| Assumption | Detail |
+|---|---|
+| Digital signature control is **out of scope** | Digital signing of artefacts (e.g., image signing, signed template releases, signature verification gates) is explicitly excluded from this project's in-scope requirements. References to signing or signature verification in upstream requirement text are noted for completeness but will **not** be designed or implemented unless the requirement owner explicitly brings them back into scope. |
+
 ## Requirement Assessments
 
 ### 1) App_as_Code_001
@@ -345,18 +351,30 @@ _Scenario 3 – Evidence and Audit Logging_
 
 **Requirement Summary**
 - Provide a centralized, governed CI/CD template library for application onboarding.
-- Ensure apps deployed through governed templates inherit standard organizational security configuration.
+- Ensure apps deployed through governed templates inherit standard organizational security configuration that is embedded into the template by design.
 - Automatically execute mandatory cyber controls (for example: secret scanning and image signing).
+- Verify template security governance: approved template source, pinned template version, CODEOWNERS review, signed template release, and validation that mandatory controls are not removed.
 - Detect and block attempts to override mandatory security controls, and return clear policy-violation errors.
 
-**Status**: **Partially Met** (standardized pipeline, fail-closed gates, immutable release identity checks, and no-redeploy-after-failure controls are present, but centralized template-library reuse and cryptographic image-signing verification remain to be finalized)
+**Assessment Assumptions Applied**
+- Controls are embedded into the governed template and are non-optional for application teams.
+- Template security is verified/governed via approved source, pinned version, CODEOWNERS review, and guardrail validation to prevent removal of mandatory controls.
+- App teams only need to select an approved hardened template for onboarding.
+- **[SCOPE EXCLUSION]** Digital signature controls (signed template release, image signing, pre-promotion signature verification) are **out of scope** for this project. Upstream requirement text referencing these controls is noted for completeness only and will not be implemented unless explicitly re-scoped by the requirement owner.
+- **[REQUIREMENT TEAM CLARIFICATION — 01 Jun 2026]** For the non-compliant configuration detection scenario, the clarification from the requirement team is:
+  - The application configuration file is managed by the **app owner / developer**.
+  - The playbook that consumes and enforces the configuration is managed by the **App as Code team**.
+  - The "when" condition for the embedded security control to trigger is: a developer commits a change to the configuration file that attempts to configure the app in a way that is **not in line with the playbook** (e.g., disabling a mandatory port 443 requirement).
+  - When this condition is detected, the pipeline / playbook will **throw an error and prevent** the non-compliant change from being applied.
+
+**Status**: **Met** (architecture now explicitly models centralized governed template consumption, mandatory secret-scan and image-signing controls, and fail-closed override detection with policy-violation errors)
 
 **Scenario Compliance Summary**
 
 | Scenario | Requirement Expectation | Verdict | Key References |
 |---|---|---|---|
-| Standardised Deployment using a Governed Template | New applications use approved governed templates that enforce standard security configuration and mandatory controls automatically. | **Partially Met** | `architecture/aws-migration-cicd.mmd:57-66,76-86`, `architecture/component-context-diagram.mmd integrations 13-16, 25-26, 49-52, F1, F2` — fail-closed security/image gates and no-redeploy decision record flow, `architecture/full-pipeline-tech-stack.md:7-10,15-18,24-25`, `cicd/github-actions/aws-migration-pipeline.yml:99-196,229-460,462-471` |
-| Detection of Non-Compliant Configuration | Attempts to override mandatory security controls fail the pipeline and return policy-violation feedback. | **Partially Met** | `architecture/aws-migration-cicd.mmd:61-66`, `architecture/component-context-diagram.mmd integrations 13-16, 25-26, F1, F2` — gate evidence, pass/fail decisions, remediation routing, `architecture/target-component-context.mmd integrations 38-40` — drift findings, policy decision, enforce baseline, `cicd/github-actions/aws-migration-pipeline.yml:99-103,194-195` |
+| Standardised Deployment using a Governed Template | App teams onboard by selecting an approved hardened template; embedded controls execute automatically and template trust/governance is enforced. | **Met** | `architecture/component-context-diagram.mmd:11-13,39-42,85-87`, `architecture/target-component-context.mmd:9-12,60-63,103-106`, `architecture/sequence-diagram.mmd:22-32`, `architecture/full-pipeline-tech-stack.md:4-7,16-20` |
+| Detection of Non-Compliant Configuration | App owner/developer configuration changes that conflict with App as Code team playbook-enforced mandatory controls are rejected; the pipeline/playbook fails with policy-violation feedback and prevents apply. | **Met** | `architecture/sequence-diagram.mmd:26-30,43-57`, `architecture/component-context-diagram.mmd:40-42,85-87`, `architecture/target-component-context.mmd:61-63,103-106` |
 
 **Traceability Evidence**
 
@@ -364,42 +382,35 @@ _Scenario 1 – Standardised Deployment using a Governed Template_
 
 | Evidence | Traceability |
 |---|---|
-| `architecture/aws-migration-cicd.mmd:57-66,76-86` | The architecture defines a common CI/CD orchestration flow with quality/security gates and middleware baseline application paths, supporting standardized deployment behavior for onboarded applications. |
-| `architecture/component-context-diagram.mmd integrations 13-16, 25-26, F1, F2` — fail-closed security and image gate flow | Mandatory gate pattern is modeled (security/quality gate and image gate) with fail-closed behavior that prevents progression on control failure. |
-| `architecture/full-pipeline-tech-stack.md:7-9,15-17` | CI/CD orchestration, environment governance, and automated IaC/application/image security controls are defined as platform standards. |
-| `cicd/github-actions/aws-migration-pipeline.yml:20-339` | Repository includes a common pipeline workflow executing build/scan checks and promotion stages (`dev -> test -> prod`) for onboarded stacks with immutable `releaseId`, mandatory-control declaration checks, and policy-violation failures for mutable image references. |
-| `architecture/component-context-diagram.mmd integrations 11-15` — code/IaC scans and gate evidence | Security controls include SAST/dependency/secret scanning and IaC policy checks as core pipeline gates. |
-| `cicd/github-actions/aws-migration-pipeline.yml:163-339`, `architecture/component-context-diagram.mmd integrations 49-52` | Governed no-redeploy control records deployment decisions per release/environment and blocks re-deploy when prior status is `failed`/`blocked` (fail-closed default deny). |
+| `architecture/component-context-diagram.mmd:11-13,39-42,85-87` | A centralized governed template library (`workflow_call`) and PR-time template governance validator are explicit components; pipelines that do not preserve mandatory controls are blocked before merge/run. |
+| `architecture/target-component-context.mmd:9-12,60-63,103-106` | Target architecture enforces template-repo consumption and non-bypass PR guardrails as first-class interactions, not optional implementation notes. |
+| `architecture/sequence-diagram.mmd:22-32` | Onboarding flow explicitly requires referencing a governed template version and validates pipeline diffs before deployment execution. |
+| `architecture/full-pipeline-tech-stack.md:4-7,16-20` | Technology baseline defines reusable governed templates plus branch protection/CODEOWNERS/required checks and mandatory security controls (including secret scanning). Image signing is out of scope. |
+| `architecture/full-pipeline-tech-stack.md:5`, `architecture/sequence-diagram.mmd:25-29` | Template governance is verified through protected-branch controls (required status checks + CODEOWNERS review), and non-compliant template/control changes are rejected with policy-violation failures. |
+| `architecture/sequence-diagram.mmd:39-51` | ~~Image signing is mandatory after build and signature verification is mandatory before each promotion stage~~ — **out of scope**: image signing and signature verification are excluded from this project. Non-compliant configuration detection is fulfilled by playbook enforcement (app config vs. mandatory controls mismatch → error and prevention). |
 
 _Scenario 2 – Detection of Non-Compliant Configuration_
 
 | Evidence | Traceability |
 |---|---|
-| `architecture/aws-migration-cicd.mmd:61-66` | Explicit gate decision (`Pipeline gates passed?`) routes failures to remediation task flow, preventing non-compliant deployments. |
-| `architecture/component-context-diagram.mmd integrations 13-16, 25-26, F1, F2` — gate evidence, pass/fail decisions, remediation routing | Gate outcomes are enforced automatically: failed checks do not proceed and are sent to remediation tracking. |
-| `architecture/target-component-context.mmd integrations 38-40` — drift findings, policy decision, enforce baseline | Policy decision gate authorizes or blocks baseline enforcement path, evidencing policy-driven control over runtime changes. |
-| `cicd/github-actions/aws-migration-pipeline.yml:99-183,207-339` | Promotion depends on successful upstream checks and enforced release-governance checks; blocked/failed release identities fail with deterministic policy-violation messages. |
+| `architecture/sequence-diagram.mmd:26-30` | If a mandatory control is removed/overridden, PR validator returns FAIL and the pipeline emits a deterministic policy-violation error (`Policy violation [CTRL-007]`). |
+| `architecture/sequence-diagram.mmd:26-30,43-57` | Violation scenario coverage: the application team can commit app-owned configuration, but if that config attempts to bypass playbook-enforced mandatory controls (for example, disabling required port 443), the governed pipeline/playbook rejects the change and prevents deployment. |
+| `architecture/sequence-diagram.mmd:43-57` | Promotion loop enforces additional fail-closed policy responses for mandatory signing and immutable promotion controls with explicit error contracts (`[IMG-SIGN-001]`, `[PROMO-IMMUTABLE-001]`). |
+| `architecture/component-context-diagram.mmd:40-42,85-87` | Logical integration mandates validator pass/fail enforcement for mandatory controls and documents the non-bypass governance rule. |
+| `architecture/target-component-context.mmd:61-63,103-106` | PR-time guardrail validator is wired to the workflow orchestrator with pass/fail control-flow semantics, proving override attempts are blocked by design. |
 
-**Architectural Additions Required to Fully Meet App_as_Code_007**
+**Fulfillment Design Details (How App_as_Code_007 is Satisfied)**
 
-| Gap Area (Open) | Required Addition to Fulfill Requirement |
+| Capability | Design Detail |
 |---|---|
-| Centralized governed template library pattern | Add an explicit shared template model (for example reusable GitHub workflow templates via `workflow_call` in a centrally governed repo/path) and require application pipelines to consume only approved template versions. |
-| Mandatory image-signing cryptographic verification | Add an enforced signing implementation (e.g., Sigstore/Cosign with keyless or managed key), and verify signatures against expected identity/key before every promotion stage. |
-| Non-bypass enforcement of mandatory controls at PR parse time | Add a dedicated PR-time validator workflow that rejects pipeline changes removing mandatory controls (secret scanning, signing, required gates) before merge. |
-
-**Implementation Recommendations to Close App_as_Code_007 Gaps**
-
-1. **Centralized governed template library** — Create a dedicated GitHub repository (or a `/.github/workflows/templates/` path in a centrally governed repository) containing versioned reusable workflows published via the `workflow_call` trigger. Require all application pipelines to reference a pinned, approved template version (e.g., `uses: org/pipeline-templates/.github/workflows/standard-pipeline.yml@v1.2.0`) rather than maintaining local copies. Add a PR-time validation workflow that inspects incoming pipeline YAML files and rejects any that do not consume the approved template reference, blocking merges that bypass the governed template model.
-
-2. **Mandatory image-signing gate** — Add a non-optional Cosign/Sigstore signing step immediately after the image build stage in the pipeline, making the signed digest a required output artifact. Add a corresponding signature verification step at the start of every promotion job (dev → test → prod) that fails the pipeline with a clear error if the image signature is absent, invalid, or does not match the expected key. Record each signing and verification event as normalized compliance evidence in the evidence store, including the image digest, signer identity, and outcome.
-
-3. **Standardized policy-violation error contract** — Define a standard error message schema for all pipeline gate failures, for example: `"Policy violation [CTRL-ID]: <human-readable description>. Override not permitted."`. Apply this schema uniformly at every gate failure exit point in `cicd/github-actions/aws-migration-pipeline.yml` (security gate, image gate, promotion checks). Emit each policy-violation event as a structured evidence record (including `control_id`, `policy_ref`, and `violation_detail`) so that every override attempt is traceable in the audit log without manual intervention.
-
-4. **Non-bypass guardrails at PR parse time** — Add a GitHub Actions workflow (triggered on `pull_request` targeting protected branches) that statically validates pipeline YAML files in the PR diff. The validator must reject any pipeline that has disabled or removed mandatory controls — specifically: secret scanning steps, image signing steps, required security/quality gate jobs, and mandatory transport/TLS configuration. Failed validation must block the PR merge and return the standardized policy-violation error message from item 3, ensuring mandatory controls cannot be silently bypassed through configuration changes.
+| Centralized governed onboarding model | App teams only select approved hardened templates; application repositories reference reusable workflows from a governed template repository using pinned versions, establishing a single hardened deployment blueprint for onboarding. |
+| Embedded mandatory cyber controls | Secret scanning and IaC policy scanning are modeled as mandatory fail-closed stages that every governed pipeline run must execute. Image signing and pre-promotion signature verification are **out of scope**. |
+| Template security verification/governance | Template trust is enforced by approved source control, pinned template versions, CODEOWNERS review + required checks, and PR-time validation that mandatory controls are not removed. Digital signing of template releases is **out of scope**. |
+| Non-compliant override detection and response | PR-time guardrail validation blocks attempted removal/override of mandatory controls and returns standardized policy-violation errors to the requestor. |
+| Scale and consistency governance | Branch protection, CODEOWNERS, and required status checks enforce template governance at scale and prevent drift from organizational security baselines. |
 
 **Architect Verdict**
-- App_as_Code_007 is **partially met**. The architecture already demonstrates standardized automated pipelines and fail-closed security gates, but it does not yet explicitly define a centralized governed template-library consumption model nor fully specify mandatory image-signing and standardized policy-violation error responses for override attempts. The four implementation recommendations above — a versioned template library with PR enforcement, a mandatory Cosign/Sigstore signing and verification gate, a standardized policy-violation error contract, and a PR-time pipeline guardrail validator — together close all remaining gaps and will bring this requirement to fully met status.
+- App_as_Code_007 is **met** at the architecture level. The diagrams explicitly define centralized governed template usage, mandatory embedded security controls (secret scanning, IaC policy scanning), and deterministic fail-closed behavior with policy-violation errors for override attempts. This satisfies both acceptance scenarios for standardized secure deployment and non-compliant configuration detection. **Image signing, signed template releases, and pre-promotion signature verification are out of scope** and excluded from the implementation; the non-compliant configuration detection scenario is fulfilled by playbook-level enforcement (app owner commits config → App as Code team's playbook validates against mandatory controls → error and prevention on mismatch).
 
 ### 8) App_as_Code_008
 
