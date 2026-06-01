@@ -32,7 +32,7 @@ flowchart TB
             A7{Approval granted?}
         end
 
-        subgraph A_SN["ServiceNow (Phase 2 target state / Phase 1 manual handoff)"]
+        subgraph A_SN["ServiceNow (Phase 2 target state; Phase 1 uses manual handoff)"]
             direction TB
             A10[Project team creates ServiceNow service request]
             A11{ServiceNow request approved?}
@@ -56,7 +56,7 @@ flowchart TB
 
     subgraph S2[Stage 2 - CI/CD Orchestration and Quality Gates]
         direction TB
-        B1[Generate GitHub dispatch payload / governed manual trigger]
+        B1["Generate GitHub dispatch payload (or governed manual trigger)"]
         B1A{Application repository model?}
         B2A[Checkout app source from environment-specific repo plus shared CICD repo]
         B2B[Checkout app source from single multi-environment repo plus shared CICD repo]
