@@ -34,6 +34,14 @@ This document traces business requirements to the architecture artifacts under `
 **Architect Verdict**
 - The architecture fulfills App_as_Code_001 when interpreted as: manual governance up to ServiceNow approval is allowed, and all post-approval deployment/configuration execution is automated and repeatable.
 
+**Test Scenarios**
+
+| Test Case | Given | When | Then | Pass Criteria |
+|---|---|---|---|---|
+| TC-001-01: ServiceNow Approval Triggers Automated Pipeline | A valid ServiceNow change request has received HLD approval | The ServiceNow webhook dispatches a `workflow_dispatch` event to GitHub Actions | The pipeline automatically starts without any manual engineering action | Pipeline run begins within the defined SLA; all post-approval stages execute without human intervention |
+| TC-001-02: Repeatable Deployment Across Environments | A release has been successfully deployed to Dev using the governed pipeline | The same pipeline configuration is promoted to Test and subsequently to Prod | All environments receive identical Ansible baselines, runtime configuration, and AMI outputs | Test and Prod deployments produce infrastructure state identical to Dev; no environment-specific manual edits are required |
+| TC-001-03: CMDB Updated Automatically After Deployment | A pipeline deployment completes all build and configuration stages | The CMDB callback step executes | The AMI ID and Ansible execution evidence are patched back to the ServiceNow change record automatically | ServiceNow change record contains the new AMI ID and Ansible evidence; no manual CMDB update is performed |
+
 ---
 
 ### 2) App_as_Code_002
@@ -62,6 +70,14 @@ This document traces business requirements to the architecture artifacts under `
 
 **Architect Verdict**
 - App_as_Code_002 is now explicitly evidenced with continuous reconciliation controls, a closed-loop remediation path to repo baseline, and a dedicated database drift control lane.
+
+**Test Scenarios**
+
+| Test Case | Given | When | Then | Pass Criteria |
+|---|---|---|---|---|
+| TC-002-01: Unauthorized Configuration Change Detected | A workload is running in a compliant state with its approved baseline in Git | An unauthorized configuration change is made directly to a running resource outside the pipeline | The Drift Reconciler detects the deviation and publishes drift findings within the scheduled reconciliation window | Drift finding is published to EventBridge; ServiceNow is notified; no manual detection step is required |
+| TC-002-02: Automatic Remediation to Approved Baseline | A drift finding has been published for a non-compliant running workload | The policy gate authorises automatic remediation | Terraform/Ansible enforces the approved repository baseline and convergence is verified | Resource state matches the approved Git baseline after enforcement; convergence verification publishes a PASS evidence record to the compliance store |
+| TC-002-03: Database Drift Detection and Remediation | A running database instance has drifted from its approved schema/parameter baseline | The DB Drift Detector triggers during the scheduled reconciliation cycle | Migration is orchestrated, the DB is validated post-remediation, and evidence is published | Database reaches compliant state; rollback path is exercised if migration fails; post-remediation validation evidence is stored in the evidence store |
 
 ### 3) App_as_Code_003
 
@@ -109,6 +125,14 @@ _Scenario 2 – Validate security hardening and patches after application_
 
 **Architect Verdict**
 - App_as_Code_003 is fulfilled through a layered, automated security hardening and validation pipeline. Hardening is applied automatically at image build time via Ansible (OS baseline + middleware profile), validated immediately by Inspector/ECR scans and in-pipeline configuration verification, and recorded in ServiceNow/CMDB with Ansible execution evidence. For running workloads, the drift reconciliation loop (EventBridge → Drift Reconciler → Policy Gate → Enforce Baseline → Convergence Verification → CMDB) detects and applies security remediation automatically and records every outcome. Database components have a dedicated remediation and post-validation path. Runtime non-compliance is surfaced continuously through Security Hub and GuardDuty with automated EventBridge-triggered responses, ensuring no manual intervention is required for the detection and recording of failures or partial application.
+
+**Test Scenarios**
+
+| Test Case | Given | When | Then | Pass Criteria |
+|---|---|---|---|---|
+| TC-003-01: Automatic Hardening Applied on Deployment | A new EC2 builder is launched for an application deployment | The pipeline executes Ansible OS hardening and the applicable middleware baseline (WebLogic / Tomcat / Python) | All required hardening controls and patches are applied before the AMI is serialized | Ansible execution log confirms all tasks pass; the resulting AMI contains the hardened configuration; no manual hardening step is required |
+| TC-003-02: Hardening Validated After Application | Ansible hardening has completed on the builder EC2 | The pipeline triggers an Inspector/ECR scan and SSM inventory capture | The scan confirms all required controls are in place and the result is recorded in ServiceNow/CMDB | Inspector/ECR scan returns PASS or only findings within the acceptable severity threshold; execution evidence is published to ServiceNow and CMDB |
+| TC-003-03: Hardening Failure Detected and Recorded | A hardening step fails to apply a required patch or control during the build stage | The pipeline gate evaluates the hardening outcome | The gate detects the failure, records a FAIL evidence record, and routes a remediation task to ServiceNow automatically | FAIL gate outcome is recorded in the evidence store with the failing control identified; ServiceNow remediation task is opened; pipeline does not proceed to image promotion |
 
 ### 4) App_as_Code_004
 
@@ -191,6 +215,16 @@ _Scenario 5 – Security hardening and patches are validated after application_
 
 **Architect Verdict**
 - App_as_Code_004 is now **fully met**. The architecture explicitly models a dedicated compliance evidence store with a normalized schema, tamper-evident S3 Object Lock storage, KMS cryptographic signing, a complete CloudTrail-based access/change audit trail, a daily integrity verification loop, and an exportable audit reporting layer via AWS Audit Manager and Athena. All five scenarios are satisfied. See `architecture/compliance-evidence-store.md` for the full design specification.
+
+**Test Scenarios**
+
+| Test Case | Given | When | Then | Pass Criteria |
+|---|---|---|---|---|
+| TC-004-01: Evidence Record Schema Completeness | Any pipeline or runtime assessment produces a compliance outcome | The Evidence Ingestor Lambda receives the event | A record containing `evidence_id`, `timestamp`, `system_id`, `environment`, `baseline_ref`, `control_id`, `result`, `remediation_state`, `source_system`, `run_id`, and `details_ref` is written to S3 Object Lock | All required schema fields are present in the stored record; the record is written as an immutable Object Lock object and indexed in DynamoDB |
+| TC-004-02: Daily Integrity Verification | Evidence records have been written to the S3 evidence store | The daily Integrity Verifier Lambda runs | Each record's KMS-signed SHA-256 hash is re-verified and the outcome is published to CloudWatch | All records pass hash verification; a CloudWatch metric is emitted; any failure triggers a CloudWatch alarm and alert |
+| TC-004-03: Audit Report Export | An auditor requests a historical compliance report for a specific time range, control set, or system | The auditor queries the Audit Export API (API Gateway + IAM Identity Center) | A report covering the requested scope is returned in PDF or CSV/JSON format | Report is generated without manual data extraction; all requested fields (system_id, control_id, result, timestamp) are present; export is accessible only to authenticated auditors |
+| TC-004-04: Evidence Immutability Under Deletion Attempt | A record has been written to S3 Object Lock in Governance mode within the 7-year retention window | An attempt is made to delete or overwrite the record | The deletion or overwrite is rejected by S3 Object Lock | AWS S3 returns an access-denied error for the delete/overwrite request; CloudTrail records the attempt with actor identity and timestamp |
+| TC-004-05: Access Audit Trail | An auditor reads an evidence record from the compliance evidence store | The read request completes | A CloudTrail S3 data event (GetObject) is captured with the actor identity, timestamp, and resource ARN | CloudTrail log entry is present in the write-once audit log bucket; event contains the expected actor, timestamp, and object identifier |
 
 ### 5) App_as_Code_005
 
@@ -281,6 +315,15 @@ _Scenario 5 – Engineering Productivity Improvement_
 **Architect Verdict**
 - App_as_Code_005 is **fully met**. The architecture eliminates manual verification steps by automating all post-ServiceNow-approval pipeline stages (Stages 2–5 in `aws-migration-cicd.mmd`) including automated security gates (SAST, IaC scans, image scans) and system-driven deployment promotion. Post-deployment fixes are prevented by Ansible configuration-as-code baked into immutable golden AMIs before deployment, and a scheduled drift detection and auto-remediation loop (EventBridge → Drift Reconciler → Policy Gate → Enforce Baseline → Convergence Verification) that corrects any post-deployment drift without manual engineering action. Security risk is reduced through consistent, repeatable automated controls applied identically on every pipeline run (tfsec/Checkov, Inspector, GuardDuty, OIDC short-lived credentials, SSM zero-trust tunnel). Every automated control execution publishes a normalised, KMS-signed, tamper-evident evidence record to the compliance evidence store, providing complete auditability. Engineering productivity is improved because all build, configuration, scan, deployment, and reconciliation activities are orchestrated automatically, removing manual setup, verification, and rework from the engineering workflow.
 
+**Test Scenarios**
+
+| Test Case | Given | When | Then | Pass Criteria |
+|---|---|---|---|---|
+| TC-005-01: No Manual Steps Between Approval and Deployment | A ServiceNow change request has received HLD approval | The webhook dispatches to GitHub Actions | All build, scan, configuration, and deployment steps execute automatically without any human action between approval and CMDB update | Pipeline completes all stages end-to-end without a manual step; CMDB is updated automatically at completion |
+| TC-005-02: Post-Deployment State Matches Approved Baseline | A hardened AMI has been deployed into an environment | The workload enters operation and SSM Inventory reconciliation runs | SSM Inventory and CMDB confirm the live runtime state matches the approved Git/Ansible baseline | Convergence check returns PASS; no post-deployment manual configuration fix is required |
+| TC-005-03: Consistent Control Execution Across Multiple Runs | The same pipeline configuration and codebase are used for repeated pipeline runs | Each run progresses through all security gate stages | SAST, IaC scan, and image scan produce the same control outcome for an unchanged codebase | All runs produce identical gate outcomes for an unchanged codebase; no run-to-run variation in security control execution |
+| TC-005-04: Auditable Evidence for Every Automated Control | An automated control executes (e.g., secret scan, image scan, Ansible hardening) | The control produces a pass or fail outcome | A normalised, KMS-signed evidence record is written to the evidence store within the same pipeline run | Evidence record is retrievable by `run_id`, `control_id`, and `system_id`; record contains the control outcome and timestamp |
+
 ### 6) App_as_Code_006
 
 **Requirement Summary**
@@ -347,6 +390,15 @@ _Scenario 3 – Evidence and Audit Logging_
 **Architect Verdict**
 - App_as_Code_006 is **largely implemented** for continuous platform/runtime/database health and compliance monitoring with strong evidence retention and auditability. To fully satisfy the requirement, the architecture must add an explicit and enforceable scope-boundary control that excludes custom application code from this requirement's monitoring and validation evidence set. The three implementation recommendations above — a scope allowlist policy, a mandatory `layer_scope` evidence attribute, and a visual diagram boundary — together close the remaining gaps.
 
+**Test Scenarios**
+
+| Test Case | Given | When | Then | Pass Criteria |
+|---|---|---|---|---|
+| TC-006-01: Scheduled Platform Health Reconciliation Runs Automatically | The platform/runtime environment is in a known state | EventBridge triggers the scheduled reconciliation cycle | The Drift Reconciler compares live AWS state against the Git/Terraform baseline and publishes findings | Reconciliation cycle completes without manual trigger; drift or compliant findings are published to EventBridge within the scheduled window |
+| TC-006-02: Application Code Excluded from Monitoring Scope | A monitoring cycle runs against the platform/runtime environment | The Evidence Ingestor Lambda processes incoming evidence records | Any record carrying `layer_scope: application_code` for the App_as_Code_006 control set is rejected at ingest | Ingestor returns an ingest error for `application_code`-scoped records; rejection is written to the audit log; no such record is stored in the evidence store |
+| TC-006-03: Health Evidence Retained with Required Attributes | A reconciliation cycle produces drift or compliant findings | The Evidence Ingestor Lambda writes the normalised evidence record | Timestamped records including `system_id`, `baseline_ref`, `control_id`, and `result` are written to the immutable evidence store | Evidence records are present in S3 with correct schema fields; records are indexed in DynamoDB and queryable by `system_id` and `control_id` |
+| TC-006-04: Database Layer Monitoring Produces Evidence | A database instance is running in the environment | The DB Drift Detector triggers during the reconciliation cycle | DB schema/parameter drift is identified, findings are published, and post-remediation validation evidence is stored | DB findings are recorded in the evidence store; compliant-state evidence is stored after post-remediation validation completes |
+
 ### 7) App_as_Code_007
 
 **Requirement Summary**
@@ -412,6 +464,15 @@ _Scenario 2 – Detection of Non-Compliant Configuration_
 **Architect Verdict**
 - App_as_Code_007 is **met** at the architecture level. The diagrams explicitly define centralized governed template usage, mandatory embedded security controls (secret scanning, IaC policy scanning), and deterministic fail-closed behavior with policy-violation errors for override attempts. This satisfies both acceptance scenarios for standardized secure deployment and non-compliant configuration detection. **Image signing, signed template releases, and pre-promotion signature verification are out of scope** and excluded from the implementation; the non-compliant configuration detection scenario is fulfilled by playbook-level enforcement (app owner commits config → App as Code team's playbook validates against mandatory controls → error and prevention on mismatch).
 
+**Test Scenarios**
+
+| Test Case | Given | When | Then | Pass Criteria |
+|---|---|---|---|---|
+| TC-007-01: App Team Onboards via Governed Template | An app team creates a new pipeline in the application repository referencing a governed reusable workflow from the CICD template repository at a pinned version | The pipeline is triggered | All mandatory security controls (secret scanning, IaC policy scanning) execute automatically without any additional app team configuration | Pipeline run shows all mandatory control stages as passed; no app team action was required to enable them; template version is pinned and verified |
+| TC-007-02: Mandatory Control Removal Blocked at PR Time | An app team attempts to remove or bypass a mandatory control in the pipeline definition via a pull request | The PR-time template governance validator runs | The PR validator returns FAIL with a standardised policy-violation error (`Policy violation [CTRL-007]`) and blocks the PR from merging | PR merge is blocked; policy-violation error is visible in the PR check result; the PR cannot be merged until the violation is resolved |
+| TC-007-03: Non-Compliant App Config Change Blocked | An app owner commits a configuration file change that disables a playbook-enforced mandatory control (e.g., disabling the required port 443 setting) | The App as Code team's playbook validates the committed configuration against mandatory controls | The pipeline throws a policy-violation error and the non-compliant change is not applied to any environment | Pipeline fails with a clear error message identifying the violated mandatory control; the configuration change is not applied; the error is surfaced to the app owner |
+| TC-007-04: Compliant App Config Change Passes | An app owner commits a configuration change that is fully compliant with all playbook-enforced mandatory controls | The pipeline validates the configuration against the playbook | The pipeline proceeds without policy-violation errors and the change is applied to the target environment | All validation gates pass; the change is applied; no `Policy violation [CTRL-007]` error is raised |
+
 ### 8) App_as_Code_008
 
 **Requirement Summary**
@@ -471,3 +532,12 @@ _Scenario 3 – Provide clear audit trail of approved and rejected deployments_
 
 **Architect Verdict**
 - App_as_Code_008 is now **fully met**. The architecture explicitly defines a governed Runtime Technology Compatibility Matrix artifact, mirrors the approved baseline into SSM Parameter Store, validates application/middleware/database versions before any installation or build activity, blocks unsupported stacks through the existing fail-closed gate and remediation flow, and publishes an approved or rejected RTCM evidence record for every validation decision into the immutable compliance evidence store. The result is a pre-install guardrail with a complete, retrievable audit trail over time.
+
+**Test Scenarios**
+
+| Test Case | Given | When | Then | Pass Criteria |
+|---|---|---|---|---|
+| TC-008-01: Approved Runtime Stack Proceeds | An application declares runtime, middleware, and database versions that are all listed as approved in the current RTCM | The RTCM Validator runs at Stage 2 before any installation, image build, or migration | Validation returns APPROVED and the pipeline proceeds to subsequent stages | An RTCM evidence record with `result: approved` is written to the evidence store; the pipeline does not halt at the RTCM gate |
+| TC-008-02: Unapproved Runtime Stack is Blocked | An application declares a runtime version that is not listed in the RTCM or is marked as unsupported | The RTCM Validator runs at Stage 2 | Validation returns REJECTED with the specific non-compliant version and reason; the pipeline halts before any installation, image build, or migration | Pipeline stops at the RTCM gate; an evidence record with `result: rejected` and the rejection reason is written to the evidence store; a ServiceNow remediation task is opened automatically |
+| TC-008-03: RTCM Validation Occurs Before Any Installation | An application pipeline is triggered for a new deployment | The pipeline executes Stage 2 | The RTCM validation step completes before any package installation, image build, or database migration activity begins | No installation or build step is initiated if the RTCM validator has not returned APPROVED; pipeline stage ordering is enforced by the workflow definition |
+| TC-008-04: RTCM Decision Produces Retrievable Audit Record | An RTCM validation decision (approved or rejected) is produced by the validator | The RTCM Validator publishes the decision to the EventBridge Compliance Evidence Bus | A signed evidence record with `run_id`, `system_id`, `control_id`, `result`, `baseline_ref`, and (if rejected) `details_ref` containing the rejection reason is stored immutably in the evidence store | Evidence record is retrievable by `run_id` and `control_id`; rejection records include the non-compliant version and rejection reason; the record is signed and written to S3 Object Lock |
