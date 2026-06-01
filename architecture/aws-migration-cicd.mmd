@@ -32,7 +32,7 @@ flowchart TB
             A7{Approval granted?}
         end
 
-        subgraph A_SN[ServiceNow (Phase 2 target state / Phase 1 manual handoff)]
+        subgraph A_SN["ServiceNow (Phase 2 target state / Phase 1 manual handoff)"]
             direction TB
             A10[Project team creates ServiceNow service request]
             A11{ServiceNow request approved?}
@@ -89,7 +89,7 @@ flowchart TB
 
     subgraph S5[Stage 5 - Promotion, Deployment, and CMDB Feedback]
         direction TB
-        E1[Prepare CMDB and change evidence update<br/>(auto patch in Phase 2)]
+        E1["Prepare CMDB and change evidence update<br/>(auto patch in Phase 2)"]
         E2{Promotion criteria met for target environment?}
         E3[Deploy via Terraform and ASG through dev -> test -> prod]
         E4[Execute rollback or remediation path]
