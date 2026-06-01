@@ -58,8 +58,8 @@ flowchart TB
         direction TB
         B1["Generate GitHub dispatch payload (or governed manual trigger)"]
         B1A{Application repository model?}
-        B2A[Checkout app source from environment-specific repo plus shared CICD repo]
-        B2B[Checkout app source from single multi-environment repo plus shared CICD repo]
+        B2A[Checkout app source from environment-specific repo plus shared CI/CD repo]
+        B2B[Checkout app source from single multi-environment repo plus shared CI/CD repo]
         B2C[Load approved RTCM from repo and SSM Parameter Store]
         B2D[Validate app middleware and database versions against RTCM]
         B3[Build and run quality and security checks]
