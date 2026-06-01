@@ -6,7 +6,7 @@ graph TD
     classDef runtime fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px;
 
     subgraph Sources
-      A1[Application as Code Repo]
+      A1[Application as Code Repo(s)<br/>One Repo per Environment or One Repo for All Environments]
       A2[OS/Image as Code Repo<br/>Ansible Image Build + Config]
       A3[Infrastructure as Code Repo<br/>Terraform]
     end
@@ -51,7 +51,7 @@ graph TD
     subgraph Drift Detection and Reconciliation
       G1[EventBridge Scheduled Reconciliation]
       G2[Drift Reconciler Lambda/Step Function<br/>Compare Live AWS vs Git/Terraform State]
-      G3[Drift Findings<br/>CloudWatch + Security Hub + CMDB]
+      G3[Drift Findings<br/>CloudWatch + Security Hub + CMDB (Phase 2)]
       G4[Policy Decision and Approval Gate]
       G5[Enforce Repo Baseline<br/>Terraform Apply + Config Re-run]
       G6[Convergence Verification]

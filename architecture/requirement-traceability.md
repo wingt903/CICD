@@ -8,7 +8,7 @@ This document traces business requirements to the architecture artifacts under `
 |---|---|
 | Digital signature control is **out of scope** | Digital signing of artefacts (e.g., image signing, signed template releases, signature verification gates) is explicitly excluded from this project's in-scope requirements. References to signing or signature verification in upstream requirement text are noted for completeness but will **not** be designed or implemented unless the requirement owner explicitly brings them back into scope. |
 | ServiceNow integration is **moved to Phase 2** | Phase 1 will not implement the live ServiceNow webhook trigger, CMDB callback, or automatic remediation-ticket integration. References in this matrix to ServiceNow/CMDB automation should be read as **Phase 2 target-state traceability** unless the requirement text explicitly says otherwise. For Phase 1, governance is enforced through GitHub approvals, branch protection, required change/ticket references, and standardized deployment evidence packs/manual ITSM handoff. |
-| Application repository models vary by team | Application teams may operate either **one repository per environment** or **one repository for all environments**. The governed CI/CD pattern must support both models while enforcing the same mandatory controls, promotion traceability, and environment-specific configuration governance. |
+| Application repository models vary by team | Application teams operate in two supported models: **one repository per environment** and **one repository for all environments**. The governed CI/CD pattern must support both while enforcing the same mandatory controls, promotion traceability, and environment-specific configuration governance. |
 
 ## Requirement Assessments
 

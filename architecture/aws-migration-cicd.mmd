@@ -32,7 +32,7 @@ flowchart TB
             A7{Approval granted?}
         end
 
-        subgraph A_SN[ServiceNow]
+        subgraph A_SN[ServiceNow (Phase 2 target state / Phase 1 manual handoff)]
             direction TB
             A10[Project team creates ServiceNow service request]
             A11{ServiceNow request approved?}
@@ -56,8 +56,8 @@ flowchart TB
 
     subgraph S2[Stage 2 - CI/CD Orchestration and Quality Gates]
         direction TB
-        B1[Generate GitHub dispatch payload]
-        B2[Checkout source and IaC]
+        B1[Generate GitHub dispatch payload / governed manual trigger]
+        B2[Checkout source and IaC from single multi-env repo or env-specific repo]
         B2A[Load approved RTCM from repo and SSM Parameter Store]
         B2B[Validate app middleware and database versions against RTCM]
         B3[Build and run quality and security checks]
@@ -89,7 +89,7 @@ flowchart TB
 
     subgraph S5[Stage 5 - Promotion, Deployment, and CMDB Feedback]
         direction TB
-        E1[Patch CMDB and change record with AMI and evidence]
+        E1[Prepare CMDB and change evidence update<br/>(auto patch in Phase 2)]
         E2{Promotion criteria met for target environment?}
         E3[Deploy via Terraform and ASG through dev -> test -> prod]
         E4[Execute rollback or remediation path]

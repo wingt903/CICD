@@ -2,16 +2,21 @@
 
 This document explains each numbered integration in the component context diagram (`component-context-diagram.mmd`), grouped by flow area.
 
+## Scope assumptions
+
+- **ServiceNow integration is moved to Phase 2.** Any ServiceNow / CMDB automation below should be read as target-state integration. Phase 1 uses GitHub approvals / workflow dispatch plus manual ITSM / CMDB handoff.
+- **Application teams use two operating models.** The same controls apply whether teams use **one repository per environment** or **one repository for all environments**.
+
 ---
 
 ## Governance & Request
 
 | # | From → To | Explanation |
 |---|-----------|-------------|
-| 1 | ServiceNow → GitHub Actions | GitHub Actions pulls CMDB context (server details, environment metadata) from ServiceNow to parameterize the pipeline run. |
-| 2 | ServiceNow → IntegrationHub | ServiceNow raises a migration/change request and emits a trigger event to IntegrationHub to start the automation flow. |
-| 3 | IntegrationHub → GitHub Actions | IntegrationHub translates the ServiceNow event into a GitHub Actions workflow dispatch call, kicking off the pipeline. |
-| F3 | ServiceNow → Team | When a remediation action is required (e.g., change request rejected), ServiceNow notifies the Project / Migration Team directly. |
+| 1 | ServiceNow → GitHub Actions | **Phase 2 target state:** GitHub Actions pulls CMDB context (server details, environment metadata) from ServiceNow to parameterize the pipeline run. In Phase 1, the equivalent inputs are supplied from GitHub-governed deployment metadata and approved change references. |
+| 2 | ServiceNow → IntegrationHub | **Phase 2 target state:** ServiceNow raises a migration/change request and emits a trigger event to IntegrationHub to start the automation flow. |
+| 3 | IntegrationHub → GitHub Actions | **Phase 2 target state:** IntegrationHub translates the ServiceNow event into a GitHub Actions workflow dispatch call, kicking off the pipeline. |
+| F3 | ServiceNow → Team | **Phase 2 target state:** when a remediation action is required (e.g., change request rejected), ServiceNow notifies the Project / Migration Team directly. Phase 1 uses the same remediation decision through GitHub governance and manual ITSM follow-up. |
 
 ---
 
@@ -19,7 +24,7 @@ This document explains each numbered integration in the component context diagra
 
 | # | From → To | Explanation |
 |---|-----------|-------------|
-| 4 | GitHub Repository → GitHub Actions | A code push or workflow dispatch event in the GitHub repository triggers the CI/CD pipeline run. |
+| 4 | GitHub Repository → GitHub Actions | A code push or workflow dispatch event in the GitHub repository triggers the CI/CD pipeline run. This supports both application team models: **one repository per environment** and **one repository for all environments**. |
 | 5 | GitHub Actions → IAM OIDC Provider | GitHub Actions requests a short-lived AWS access token via the OIDC federation endpoint, with no long-lived credentials stored. |
 | 6 | IAM OIDC Provider → GitHub Actions | The IAM OIDC Provider returns temporary STS credentials scoped to the permitted IAM role for the pipeline job. |
 
@@ -39,7 +44,7 @@ This document explains each numbered integration in the component context diagra
 | 14 | Code Scans → Security Gates | The SAST/dependency/secret scan results are forwarded as gate evidence to the Security Gates decision point. |
 | 15 | IaC Scans → Security Gates | The IaC scan results from tfsec and Checkov are forwarded as gate evidence to the Security Gates decision point. |
 | 16 | Security Gates → Ansible Image Build | When all security gates pass, the pipeline proceeds to the image build step via Ansible. |
-| F1 | Security Gates → ServiceNow | When a security gate fails, a remediation ticket is automatically raised back in ServiceNow for the team to action. |
+| F1 | Security Gates → ServiceNow | **Phase 2 target state:** when a security gate fails, a remediation ticket is automatically raised back in ServiceNow for the team to action. In Phase 1, the failed gate is captured in GitHub evidence and handed off manually through ITSM / change governance. |
 
 ---
 
@@ -64,15 +69,15 @@ This document explains each numbered integration in the component context diagra
 | 24 | Golden AMI Registry → Artifact Scans (ECR + Inspector) | The candidate AMI/container image is submitted to ECR and AWS Inspector for vulnerability scanning before promotion. |
 | 25 | Artifact Scans → Image Scan Gate | Inspector/ECR scan findings are forwarded to the Image Scan Gate decision point as evidence. |
 | 26 | Image Scan Gate → Target Workloads | When the image scan passes, the approved image is deployed to the target workloads (WebLogic / Tomcat / Python). |
-| F2 | Image Scan Gate → ServiceNow | When the image scan fails, a remediation ticket is raised in ServiceNow to address the identified vulnerabilities. |
+| F2 | Image Scan Gate → ServiceNow | **Phase 2 target state:** when the image scan fails, a remediation ticket is raised in ServiceNow to address the identified vulnerabilities. In Phase 1, the failure is handled through GitHub controls plus manual ITSM follow-up. |
 | 27 | Private Builder EC2 → SSM Inventory | The builder EC2 reports its installed software and configuration state into SSM Inventory after the build completes. |
-| 28 | SSM Inventory → ServiceNow | SSM Inventory syncs the up-to-date host inventory data back to the ServiceNow CMDB to keep configuration records current. |
+| 28 | SSM Inventory → ServiceNow | **Phase 2 target state:** SSM Inventory syncs the up-to-date host inventory data back to the ServiceNow CMDB to keep configuration records current. In Phase 1, the same inventory evidence is packaged for manual CMDB update. |
 | 29 | Target Workloads → Runtime Posture (SecHub + GuardDuty + IAM AA) | Deployed workloads emit runtime security telemetry to AWS Security Hub, GuardDuty, and IAM Access Analyzer for continuous posture monitoring. |
-| 30 | Runtime Posture → ServiceNow | Posture findings and alerts from Security Hub/GuardDuty are fed back to ServiceNow to trigger remediation workflows. |
+| 30 | Runtime Posture → ServiceNow | **Phase 2 target state:** posture findings and alerts from Security Hub/GuardDuty are fed back to ServiceNow to trigger remediation workflows. In Phase 1, findings are routed through GitHub / evidence outputs and manual operational follow-up. |
 | 49 | GitHub Actions → SSM Decision Records | Before each deployment, the governed template queries the centralized SSM decision record for the release identity to enforce fail-closed no-redeploy controls. |
 | 50 | SSM Decision Records → GitHub Actions | If the release identity is already marked failed/blocked, the governed deployment stage is denied and re-deploy of that same release is prevented. |
 | 51 | GitHub Actions → SSM Decision Records | Deployment outcomes (passed/failed) are written back as authoritative decisions for the release identity and target environment. |
-| 52 | SSM Decision Records → ServiceNow | Failed/blocked decisions are propagated to ServiceNow as remediation context so operational teams can track and resolve security control violations. |
+| 52 | SSM Decision Records → ServiceNow | **Phase 2 target state:** failed/blocked decisions are propagated to ServiceNow as remediation context so operational teams can track and resolve security control violations. In Phase 1, the same decision record drives manual ITSM / CMDB updates. |
 
 ---
 

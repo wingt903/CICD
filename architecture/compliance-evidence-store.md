@@ -2,6 +2,11 @@
 
 This document specifies the evidence schema, storage controls, access/change audit trail, and audit reporting layer that close the gaps identified in App_as_Code_004.
 
+## Scope assumptions
+
+- **ServiceNow integration is moved to Phase 2.** References to ServiceNow / CMDB webhooks or incident creation below describe the target-state integration. Phase 1 uses the same evidence outputs with manual or governed ITSM / CMDB handoff.
+- **Application teams operate in two repository models:** **one repository per environment** and **one repository for all environments**. The evidence model applies to both without changing schema or control expectations.
+
 ---
 
 ## 1. Evidence Schema
@@ -37,7 +42,7 @@ All fields are required. Evidence records are immutable once written; correction
 | Drift Reconciler | Post-convergence verification | Infrastructure drift detection, baseline enforcement, convergence confirmation |
 | Database Drift Controller | Post-remediation DB validation | Schema/config drift status, migration outcome, rollback events |
 | Security Hub / GuardDuty | EventBridge finding event | Runtime threat/posture findings linked to CI asset |
-| ServiceNow (CMDB) | CMDB CI update webhook | CMDB change record reference and change closure confirmation |
+| ServiceNow (CMDB) | CMDB CI update webhook | **Phase 2 target state:** CMDB change record reference and change closure confirmation. In Phase 1, the same reference is attached through manual / governed ITSM handoff. |
 
 Each source publishes evidence to an **Evidence Ingestor Lambda** via an EventBridge event bus using the normalized schema above.
 
@@ -157,8 +162,8 @@ A dedicated IAM role (`compliance-evidence-audit-reader`) with read-only permiss
 | Control | Mechanism | Schedule / Trigger |
 |---|---|---|
 | Evidence hash verification | Integrity Verifier Lambda re-hashes all records and validates KMS signatures | Daily at 02:00 UTC via EventBridge rule |
-| Tamper anomaly alerting | CloudWatch Metric Alarm on `EvidenceIntegrityFailure` count > 0 | Real-time alarm → SNS → PagerDuty/ServiceNow incident |
+| Tamper anomaly alerting | CloudWatch Metric Alarm on `EvidenceIntegrityFailure` count > 0 | Real-time alarm → SNS → PagerDuty / **Phase 2** ServiceNow incident |
 | Unexpected access alerting | CloudWatch Logs Insights rule on CloudTrail — GetObject by non-approved principals | Real-time via CloudWatch Logs subscription filter |
 | Lock override alerting | CloudTrail CloudWatch Logs metric filter on `BypassGovernanceRetention` | Real-time alarm → SNS |
 | Periodic attestation | Integrity Verifier publishes signed attestation JSON to `integrity-results/` prefix | Weekly; summary linked to Audit Manager assessment cycle |
-| Evidence completeness check | Lambda compares expected evidence records (from CMDB CI list × control matrix) against actual records in index | Daily; gaps published as CloudWatch metric and ServiceNow incident |
+| Evidence completeness check | Lambda compares expected evidence records (from CMDB CI list × control matrix) against actual records in index | Daily; gaps published as CloudWatch metric and manual / governed ITSM handoff in Phase 1 or ServiceNow incident in Phase 2 |
