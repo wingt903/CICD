@@ -2,6 +2,12 @@
 
 This document traces business requirements to the architecture artifacts under `./architecture`.
 
+## Global Scope Assumptions
+
+| Assumption | Detail |
+|---|---|
+| Digital signature control is **out of scope** | Digital signing of artefacts (e.g., image signing, signed template releases, signature verification gates) is explicitly excluded from this project's in-scope requirements. References to signing or signature verification in upstream requirement text are noted for completeness but will **not** be designed or implemented unless the requirement owner explicitly brings them back into scope. |
+
 ## Requirement Assessments
 
 ### 1) App_as_Code_001
@@ -352,8 +358,14 @@ _Scenario 3 – Evidence and Audit Logging_
 
 **Assessment Assumptions Applied**
 - Controls are embedded into the governed template and are non-optional for application teams.
-- Template security is verified/governed via approved source, pinned version, CODEOWNERS review, signed release process, and guardrail validation to prevent removal of mandatory controls.
+- Template security is verified/governed via approved source, pinned version, CODEOWNERS review, and guardrail validation to prevent removal of mandatory controls.
 - App teams only need to select an approved hardened template for onboarding.
+- **[SCOPE EXCLUSION]** Digital signature controls (signed template release, image signing, pre-promotion signature verification) are **out of scope** for this project. Upstream requirement text referencing these controls is noted for completeness only and will not be implemented unless explicitly re-scoped by the requirement owner.
+- **[REQUIREMENT TEAM CLARIFICATION — 01 Jun 2026]** For the non-compliant configuration detection scenario, the clarification from the requirement team is:
+  - The application configuration file is managed by the **app owner / developer**.
+  - The playbook that consumes and enforces the configuration is managed by the **App as Code team**.
+  - The "when" condition for the embedded security control to trigger is: a developer commits a change to the configuration file that attempts to configure the app in a way that is **not in line with the playbook** (e.g., disabling a mandatory port 443 requirement).
+  - When this condition is detected, the pipeline / playbook will **throw an error and prevent** the non-compliant change from being applied.
 
 **Status**: **Met** (architecture now explicitly models centralized governed template consumption, mandatory secret-scan and image-signing controls, and fail-closed override detection with policy-violation errors)
 
@@ -373,9 +385,9 @@ _Scenario 1 – Standardised Deployment using a Governed Template_
 | `architecture/component-context-diagram.mmd:11-13,39-42,85-87` | A centralized governed template library (`workflow_call`) and PR-time template governance validator are explicit components; pipelines that do not preserve mandatory controls are blocked before merge/run. |
 | `architecture/target-component-context.mmd:9-12,60-63,103-106` | Target architecture enforces template-repo consumption and non-bypass PR guardrails as first-class interactions, not optional implementation notes. |
 | `architecture/sequence-diagram.mmd:22-32` | Onboarding flow explicitly requires referencing a governed template version and validates pipeline diffs before deployment execution. |
-| `architecture/full-pipeline-tech-stack.md:4-7,16-20` | Technology baseline defines reusable governed templates plus branch protection/CODEOWNERS/required checks and mandatory security controls (including secret scanning and image signing verification). |
+| `architecture/full-pipeline-tech-stack.md:4-7,16-20` | Technology baseline defines reusable governed templates plus branch protection/CODEOWNERS/required checks and mandatory security controls (including secret scanning). Image signing is out of scope. |
 | `architecture/full-pipeline-tech-stack.md:5`, `architecture/sequence-diagram.mmd:25-29` | Template governance is verified through protected-branch controls (required status checks + CODEOWNERS review), and non-compliant template/control changes are rejected with policy-violation failures. |
-| `architecture/sequence-diagram.mmd:39-51` | Image signing is mandatory after build and signature verification is mandatory before each promotion stage, ensuring inherited and consistent security behavior across environments. |
+| `architecture/sequence-diagram.mmd:39-51` | ~~Image signing is mandatory after build and signature verification is mandatory before each promotion stage~~ — **out of scope**: image signing and signature verification are excluded from this project. Non-compliant configuration detection is fulfilled by playbook enforcement (app config vs. mandatory controls mismatch → error and prevention). |
 
 _Scenario 2 – Detection of Non-Compliant Configuration_
 
@@ -391,13 +403,13 @@ _Scenario 2 – Detection of Non-Compliant Configuration_
 | Capability | Design Detail |
 |---|---|
 | Centralized governed onboarding model | App teams only select approved hardened templates; application repositories reference reusable workflows from a governed template repository using pinned versions, establishing a single hardened deployment blueprint for onboarding. |
-| Embedded mandatory cyber controls | Secret scanning, IaC policy scanning, image signing, and pre-promotion signature verification are modeled as mandatory fail-closed stages that every governed pipeline run must execute. |
-| Template security verification/governance | Template trust is enforced by approved source control, pinned template versions, CODEOWNERS review + required checks, signed template release governance, and PR-time validation that mandatory controls are not removed. |
+| Embedded mandatory cyber controls | Secret scanning and IaC policy scanning are modeled as mandatory fail-closed stages that every governed pipeline run must execute. Image signing and pre-promotion signature verification are **out of scope**. |
+| Template security verification/governance | Template trust is enforced by approved source control, pinned template versions, CODEOWNERS review + required checks, and PR-time validation that mandatory controls are not removed. Digital signing of template releases is **out of scope**. |
 | Non-compliant override detection and response | PR-time guardrail validation blocks attempted removal/override of mandatory controls and returns standardized policy-violation errors to the requestor. |
 | Scale and consistency governance | Branch protection, CODEOWNERS, and required status checks enforce template governance at scale and prevent drift from organizational security baselines. |
 
 **Architect Verdict**
-- App_as_Code_007 is **met** at the architecture level. The diagrams now explicitly define centralized governed template usage, mandatory embedded security controls (including secret scanning and image-sign/verify), and deterministic fail-closed behavior with policy-violation errors for override attempts. This satisfies both acceptance scenarios for standardized secure deployment and non-compliant configuration detection.
+- App_as_Code_007 is **met** at the architecture level. The diagrams explicitly define centralized governed template usage, mandatory embedded security controls (secret scanning, IaC policy scanning), and deterministic fail-closed behavior with policy-violation errors for override attempts. This satisfies both acceptance scenarios for standardized secure deployment and non-compliant configuration detection. **Image signing, signed template releases, and pre-promotion signature verification are out of scope** and excluded from the implementation; the non-compliant configuration detection scenario is fulfilled by playbook-level enforcement (app owner commits config → App as Code team's playbook validates against mandatory controls → error and prevention on mismatch).
 
 ### 8) App_as_Code_008
 
