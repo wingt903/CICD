@@ -57,13 +57,18 @@ flowchart TB
     subgraph S2[Stage 2 - CI/CD Orchestration and Quality Gates]
         direction TB
         B1[Generate GitHub dispatch payload / governed manual trigger]
-        B2[Checkout source and IaC from single multi-env repo or env-specific repo]
+        B1A{Application repository model?}
+        B2_ENV[Checkout app source from environment-specific repo plus shared CICD repo]
+        B2_MULTI[Checkout app source from single multi-environment repo plus shared CICD repo]
         B2A[Load approved RTCM from repo and SSM Parameter Store]
         B2B[Validate app middleware and database versions against RTCM]
         B3[Build and run quality and security checks]
         B4{All policy gates passed?}
         B5[Open remediation task with RTCM and policy rejection detail]
-        B1 --> B2 --> B2A --> B2B --> B3 --> B4
+        B1 --> B1A
+        B1A -- One repo per environment --> B2_ENV --> B2A
+        B1A -- One repo for all environments --> B2_MULTI --> B2A
+        B2A --> B2B --> B3 --> B4
         B4 -- No --> B5
     end
 
@@ -129,12 +134,14 @@ flowchart TB
     style A2 fill:#ffffff,stroke:#444444,stroke-width:1.5px,color:#000
     style A7 fill:#ffffff,stroke:#444444,stroke-width:1.5px,color:#000
     style A11 fill:#ffffff,stroke:#444444,stroke-width:1.5px,color:#000
+    style B1A fill:#ffffff,stroke:#444444,stroke-width:1.5px,color:#000
     style D1 fill:#ffffff,stroke:#444444,stroke-width:1.5px,color:#000
     style E2 fill:#ffffff,stroke:#444444,stroke-width:1.5px,color:#000
     %% systemProcess (blue) - automation/pipeline steps
     style A9 fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#000
     style B1 fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#000
-    style B2 fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#000
+    style B2_ENV fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#000
+    style B2_MULTI fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#000
     style B3 fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#000
     style B4 fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#000
     style B5 fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#000
