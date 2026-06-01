@@ -345,9 +345,15 @@ _Scenario 3 – Evidence and Audit Logging_
 
 **Requirement Summary**
 - Provide a centralized, governed CI/CD template library for application onboarding.
-- Ensure apps deployed through governed templates inherit standard organizational security configuration.
+- Ensure apps deployed through governed templates inherit standard organizational security configuration that is embedded into the template by design.
 - Automatically execute mandatory cyber controls (for example: secret scanning and image signing).
+- Verify template security governance: approved template source, pinned template version, CODEOWNERS review, signed template release, and validation that mandatory controls are not removed.
 - Detect and block attempts to override mandatory security controls, and return clear policy-violation errors.
+
+**Assessment Assumptions Applied**
+- Controls are embedded into the governed template and are non-optional for application teams.
+- Template security is verified/governed via approved source, pinned version, CODEOWNERS review, signed release process, and guardrail validation to prevent removal of mandatory controls.
+- App teams only need to select an approved hardened template for onboarding.
 
 **Status**: **Met** (architecture now explicitly models centralized governed template consumption, mandatory secret-scan and image-signing controls, and fail-closed override detection with policy-violation errors)
 
@@ -355,7 +361,7 @@ _Scenario 3 – Evidence and Audit Logging_
 
 | Scenario | Requirement Expectation | Verdict | Key References |
 |---|---|---|---|
-| Standardised Deployment using a Governed Template | New applications use approved governed templates that enforce standard security configuration and mandatory controls automatically. | **Met** | `architecture/component-context-diagram.mmd:11-13,39-42,85-87`, `architecture/target-component-context.mmd:9-12,60-63,103-106`, `architecture/sequence-diagram.mmd:22-32`, `architecture/full-pipeline-tech-stack.md:4-7,16-20` |
+| Standardised Deployment using a Governed Template | App teams onboard by selecting an approved hardened template; embedded controls execute automatically and template trust/governance is enforced. | **Met** | `architecture/component-context-diagram.mmd:11-13,39-42,85-87`, `architecture/target-component-context.mmd:9-12,60-63,103-106`, `architecture/sequence-diagram.mmd:22-32`, `architecture/full-pipeline-tech-stack.md:4-7,16-20` |
 | Detection of Non-Compliant Configuration | Attempts to override mandatory security controls fail the pipeline and return policy-violation feedback. | **Met** | `architecture/sequence-diagram.mmd:26-30,43-57`, `architecture/component-context-diagram.mmd:40-42,85-87`, `architecture/target-component-context.mmd:61-63,103-106` |
 
 **Traceability Evidence**
@@ -368,6 +374,7 @@ _Scenario 1 – Standardised Deployment using a Governed Template_
 | `architecture/target-component-context.mmd:9-12,60-63,103-106` | Target architecture enforces template-repo consumption and non-bypass PR guardrails as first-class interactions, not optional implementation notes. |
 | `architecture/sequence-diagram.mmd:22-32` | Onboarding flow explicitly requires referencing a governed template version and validates pipeline diffs before deployment execution. |
 | `architecture/full-pipeline-tech-stack.md:4-7,16-20` | Technology baseline defines reusable governed templates plus branch protection/CODEOWNERS/required checks and mandatory security controls (including secret scanning and image signing verification). |
+| `architecture/full-pipeline-tech-stack.md:5`, `architecture/sequence-diagram.mmd:25-29` | Template governance is verified through protected-branch controls (required status checks + CODEOWNERS review), and non-compliant template/control changes are rejected with policy-violation failures. |
 | `architecture/sequence-diagram.mmd:39-51` | Image signing is mandatory after build and signature verification is mandatory before each promotion stage, ensuring inherited and consistent security behavior across environments. |
 
 _Scenario 2 – Detection of Non-Compliant Configuration_
@@ -383,8 +390,9 @@ _Scenario 2 – Detection of Non-Compliant Configuration_
 
 | Capability | Design Detail |
 |---|---|
-| Centralized governed onboarding model | Application repositories reference approved reusable workflow templates from a governed template repository using pinned versions, establishing a single hardened deployment blueprint for all onboarding pipelines. |
+| Centralized governed onboarding model | App teams only select approved hardened templates; application repositories reference reusable workflows from a governed template repository using pinned versions, establishing a single hardened deployment blueprint for onboarding. |
 | Embedded mandatory cyber controls | Secret scanning, IaC policy scanning, image signing, and pre-promotion signature verification are modeled as mandatory fail-closed stages that every governed pipeline run must execute. |
+| Template security verification/governance | Template trust is enforced by approved source control, pinned template versions, CODEOWNERS review + required checks, signed template release governance, and PR-time validation that mandatory controls are not removed. |
 | Non-compliant override detection and response | PR-time guardrail validation blocks attempted removal/override of mandatory controls and returns standardized policy-violation errors to the requestor. |
 | Scale and consistency governance | Branch protection, CODEOWNERS, and required status checks enforce template governance at scale and prevent drift from organizational security baselines. |
 
