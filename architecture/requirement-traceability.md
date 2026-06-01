@@ -374,7 +374,7 @@ _Scenario 3 – Evidence and Audit Logging_
 | Scenario | Requirement Expectation | Verdict | Key References |
 |---|---|---|---|
 | Standardised Deployment using a Governed Template | App teams onboard by selecting an approved hardened template; embedded controls execute automatically and template trust/governance is enforced. | **Met** | `architecture/component-context-diagram.mmd:11-13,39-42,85-87`, `architecture/target-component-context.mmd:9-12,60-63,103-106`, `architecture/sequence-diagram.mmd:22-32`, `architecture/full-pipeline-tech-stack.md:4-7,16-20` |
-| Detection of Non-Compliant Configuration | Attempts to override mandatory security controls fail the pipeline and return policy-violation feedback. | **Met** | `architecture/sequence-diagram.mmd:26-30,43-57`, `architecture/component-context-diagram.mmd:40-42,85-87`, `architecture/target-component-context.mmd:61-63,103-106` |
+| Detection of Non-Compliant Configuration | App owner/developer configuration changes that conflict with App as Code team playbook-enforced mandatory controls are rejected; the pipeline/playbook fails with policy-violation feedback and prevents apply. | **Met** | `architecture/sequence-diagram.mmd:26-30,43-57`, `architecture/component-context-diagram.mmd:40-42,85-87`, `architecture/target-component-context.mmd:61-63,103-106` |
 
 **Traceability Evidence**
 
@@ -394,6 +394,7 @@ _Scenario 2 – Detection of Non-Compliant Configuration_
 | Evidence | Traceability |
 |---|---|
 | `architecture/sequence-diagram.mmd:26-30` | If a mandatory control is removed/overridden, PR validator returns FAIL and the pipeline emits a deterministic policy-violation error (`Policy violation [CTRL-007]`). |
+| `architecture/sequence-diagram.mmd:26-30,43-57` | Violation scenario coverage: the application team can commit app-owned configuration, but if that config attempts to bypass playbook-enforced mandatory controls (for example, disabling required port 443), the governed pipeline/playbook rejects the change and prevents deployment. |
 | `architecture/sequence-diagram.mmd:43-57` | Promotion loop enforces additional fail-closed policy responses for mandatory signing and immutable promotion controls with explicit error contracts (`[IMG-SIGN-001]`, `[PROMO-IMMUTABLE-001]`). |
 | `architecture/component-context-diagram.mmd:40-42,85-87` | Logical integration mandates validator pass/fail enforcement for mandatory controls and documents the non-bypass governance rule. |
 | `architecture/target-component-context.mmd:61-63,103-106` | PR-time guardrail validator is wired to the workflow orchestrator with pass/fail control-flow semantics, proving override attempts are blocked by design. |
