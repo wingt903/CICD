@@ -13,8 +13,8 @@ graph TB
     subgraph Sources["Code Sources"]
         direction LR
         APPCODE["Application Repo(s)<br/>One Repo per Env or One Repo for All Envs"]
-        IMGCODE[OS / Image as Code Repo\nAnsible Image Build + Config]
-        IACCODE[Infrastructure as Code Repo\nTerraform]
+        IMGCODE["OS / Image as Code Repo<br/>Ansible Image Build + Config"]
+        IACCODE["Infrastructure as Code Repo<br/>Terraform"]
     end
 
     subgraph Pipeline["CI/CD Orchestration"]
