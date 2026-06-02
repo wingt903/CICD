@@ -138,6 +138,6 @@
 - **Amazon Athena — Ad-hoc and Scheduled Reporting**
   - SQL queries over partitioned evidence S3 prefix for current posture, historical trend, remediation history, integrity, and access audit reports.
   - Report outputs written to `s3://compliance-evidence-<account>/reports/`.
-- **Auditor Export API**
+- **Cyber Security Operations Analyst Export API**
   - API Gateway + read-only Lambda authenticated via IAM Identity Center.
   - Issues S3 presigned URLs for report download; access logged to CloudTrail.

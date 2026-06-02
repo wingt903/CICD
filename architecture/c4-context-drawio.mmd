@@ -3,20 +3,24 @@ graph TB
     %% People
     migTeam([CAR Architecture Team])
     appTeam([TPAM Team])
-    auditor([Auditor])
+    platformEngineer([Platform Engineer])
+    auditor([Cyber Security Operations Analyst])
 
     %% System under design
     cicd[App as Code CICD Platform]
 
     %% External systems
     appRepos[Application Repos]
+    infraRepos[Infrastructure Repos]
     aws[AWS Cloud]
     sn[ServiceNow]
 
     %% Relationships
     migTeam -->|approves promotion and remediation| cicd
-    appTeam -->|pushes app, IaC, image changes| appRepos
+    appTeam -->|pushes app code changes| appRepos
+    platformEngineer -->|pushes OS/image IaC changes| infraRepos
     appRepos -->|triggers pipeline runs| cicd
+    infraRepos -->|triggers pipeline runs| cicd
     auditor -->|reads evidence and reports| cicd
     cicd -->|builds, deploys, stores artifacts| aws
     cicd -.->|creates change and remediation tickets| sn
@@ -27,7 +31,9 @@ graph TB
     style cicd fill:#1168BD,color:#ffffff,stroke:#0b4884
     style migTeam fill:#08427B,color:#ffffff,stroke:#052E56
     style appTeam fill:#08427B,color:#ffffff,stroke:#052E56
+    style platformEngineer fill:#08427B,color:#ffffff,stroke:#052E56
     style auditor fill:#08427B,color:#ffffff,stroke:#052E56
     style appRepos fill:#999999,color:#ffffff,stroke:#666666
+    style infraRepos fill:#999999,color:#ffffff,stroke:#666666
     style aws fill:#999999,color:#ffffff,stroke:#666666
     style sn fill:#999999,color:#ffffff,stroke:#666666

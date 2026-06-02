@@ -205,8 +205,8 @@ This document explains each numbered integration in the unified component contex
 | 93 | S3 Evidence Bucket → Audit Manager | AWS Audit Manager aggregates evidence records from S3 to produce structured compliance assessment reports. |
 | 94 | S3 Evidence Bucket → Athena | Athena is pointed at the S3 Evidence Bucket to enable ad-hoc SQL queries over raw evidence data for custom reporting. |
 | 95 | DynamoDB Evidence Index → Athena | The DynamoDB index metadata is made available to Athena queries, allowing joins between index fields and S3 evidence objects. |
-| 96 | Audit Manager → Auditor Export API | Audit Manager exports structured compliance reports through the Auditor Export API for consumption by auditors or external GRC tools. |
-| 97 | Athena → Auditor Export API | Athena query results are surfaced via the Auditor Export API, providing on-demand evidence exports for audit requests. |
+| 96 | Audit Manager → Cyber Security Operations Analyst Export API | Audit Manager exports structured compliance reports through the Cyber Security Operations Analyst Export API for consumption by cyber security operations analysts or external GRC tools. |
+| 97 | Athena → Cyber Security Operations Analyst Export API | Athena query results are surfaced via the Cyber Security Operations Analyst Export API, providing on-demand evidence exports for audit requests. |
 
 ---
 

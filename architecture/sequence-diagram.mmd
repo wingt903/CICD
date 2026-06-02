@@ -115,4 +115,4 @@ sequenceDiagram
 
     %% Phase 8: Daily Integrity Verification and Audit Reporting
     Note over EvidenceStore,AuditTrail: Daily: Integrity Verifier re-hashes evidence records,<br/>validates KMS signatures, and publishes pass/fail metrics.<br/>CloudWatch alarms on verification failure → SNS alert.
-    Note over EvidenceStore,AuditTrail: Auditors access reports via Auditor Export API<br/>(AWS Audit Manager PDF + Athena CSV/JSON).<br/>All report access is logged to CloudTrail.
+    Note over EvidenceStore,AuditTrail: Cyber Security Operations Analysts access reports via Cyber Security Operations Analyst Export API<br/>(AWS Audit Manager PDF + Athena CSV/JSON).<br/>All report access is logged to CloudTrail.
