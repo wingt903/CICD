@@ -87,7 +87,7 @@ sequenceDiagram
     DriftReconciler->>SN: Update CMDB/compliance status with closure evidence
     DriftReconciler->>EvidenceBus: Publish drift remediation evidence event
     Note over DriftReconciler,EvidenceBus: Fields include system_id, baseline_ref, result, remediation_state, source.<br>Full 12-field schema: compliance-evidence-store.md section 1.
-    EvidenceBus->>EvidenceStore: Ingestor Lambda signs and writes evidence record (S3 Object Lock + DynamoDB index)
+    EvidenceBus->>EvidenceStore: Ingestor signs + writes evidence<br/>to S3 Object Lock + DynamoDB index
     EvidenceStore->>AuditTrail: S3 PutObject event captured
 
     %% Phase 7: Dedicated Database Drift Detection and Remediation
@@ -104,12 +104,12 @@ sequenceDiagram
         DatabaseDriftController->>SN: Publish DB drift status and remediation evidence
         DatabaseDriftController->>EvidenceBus: Publish DB remediation evidence event
         Note over DatabaseDriftController,EvidenceBus: Fields include system_id, baseline_ref, control_id=db-schema, result, remediation_state, source.<br>Full 12-field schema: compliance-evidence-store.md section 1.
-        EvidenceBus->>EvidenceStore: Ingestor Lambda signs and writes evidence record (S3 Object Lock + DynamoDB index)
+        EvidenceBus->>EvidenceStore: Ingestor signs + writes evidence<br/>to S3 Object Lock + DynamoDB index
         EvidenceStore->>AuditTrail: S3 PutObject event captured
     else No DB drift
         DatabaseDriftController->>SN: Record compliant DB baseline state
         DatabaseDriftController->>EvidenceBus: Publish compliant DB evidence event<br>[result=PASS, remediation_state=NOT_REQUIRED, source=db-drift-controller]
-        EvidenceBus->>EvidenceStore: Ingestor Lambda signs and writes evidence record
+        EvidenceBus->>EvidenceStore: Ingestor signs + writes compliant evidence
     end
     deactivate GH
 
