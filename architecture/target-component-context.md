@@ -2,6 +2,11 @@
 
 This target context extends the reference migration diagram with full automated CI/CD controls for AWS-only deployments.
 
+## Scope assumptions
+
+- **ServiceNow integration is moved to Phase 2.** Phase 1 starts from GitHub-governed approvals and standardized deployment evidence handoff rather than live ServiceNow-triggered orchestration.
+- **Application teams operate in two repository models:** **one repository per environment** and **one repository for all environments**. The target control model supports both.
+
 ## Promotion model
 
 - Single promotion path: `dev -> test -> prod`
@@ -13,6 +18,11 @@ This target context extends the reference migration diagram with full automated 
   - `/dev/approved/ami/base`
   - `/test/approved/ami/base`
   - `/prod/approved/ami/base`
+
+## Supported application team operating models
+
+- **One repository per environment**: each environment-specific repository triggers the same governed pipeline controls for its target environment.
+- **One repository for all environments**: a single repository carries environment-specific configuration and promotes the same release through `dev -> test -> prod`.
 
 ## Capability mapping
 

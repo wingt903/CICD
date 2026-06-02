@@ -5,13 +5,13 @@ graph TB
 
     subgraph Governance["Governance & Request"]
         direction LR
-        SN[ServiceNow\nCatalog + CMDB]
-        IH[IntegrationHub]
+        SN[ServiceNow\nCatalog + CMDB\nPhase 2]
+        IH[IntegrationHub\nPhase 2]
     end
 
     subgraph Pipeline["CI/CD Orchestration"]
         direction LR
-        GH[GitHub\nRepository]
+        GH[GitHub Repository / Repositories\nPer-Environment or Multi-Environment]
         GHA[GitHub Actions]
         RTCMVAL[RTCM Validator]
         IMG[Ansible Image Build]
@@ -59,10 +59,10 @@ graph TB
     end
 
     %% Governance → Pipeline
-    SN -.->|1. CMDB context| GHA
-    SN -->|2. trigger event| IH
-    IH -->|3. dispatch run| GHA
-    SN -->|F3: remediation| Team
+    SN -.->|1. CMDB context (Phase 2)| GHA
+    SN -->|2. trigger event (Phase 2)| IH
+    IH -->|3. dispatch run (Phase 2)| GHA
+    SN -->|F3: remediation (Phase 2)| Team
 
     %% Pipeline bootstrap
     GH -->|4. pipeline trigger| GHA
@@ -80,7 +80,7 @@ graph TB
     SAST -->|14. gate evidence| SGATE
     IAC -->|15. gate evidence| SGATE
     SGATE -->|16. passed: build| IMG
-    SGATE -->|F1: remediation| SN
+    SGATE -->|F1: remediation (Phase 2)| SN
 
     %% Image build
     IMG -->|17. run playbook| EC2
@@ -95,15 +95,15 @@ graph TB
     AMI -->|24. scan candidate| AMISCAN
     AMISCAN -->|25. scan evidence| IGATE
     IGATE -->|26. passed: deploy| APP
-    IGATE -->|F2: remediation| SN
+    IGATE -->|F2: remediation (Phase 2)| SN
     EC2 -->|27. inventory state| INV
-    INV -->|28. sync to CMDB| SN
+    INV -->|28. sync to CMDB (Phase 2)| SN
     APP -->|29. posture telemetry| RUNTIMESEC
-    RUNTIMESEC -->|30. posture feedback| SN
+    RUNTIMESEC -->|30. posture feedback (Phase 2)| SN
     GHA -->|49. check release status| DREC
     DREC -->|50. allow/block deploy| GHA
     GHA -->|51. write pass/fail| DREC
-    DREC -->|52. no-redeploy policy| SN
+    DREC -->|52. no-redeploy policy (Phase 2)| SN
 
     %% Evidence flows
     GHA -->|31. pipeline evidence| EVTBUS

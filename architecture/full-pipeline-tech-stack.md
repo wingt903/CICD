@@ -1,11 +1,16 @@
 # Full Pipeline Technology Stack
 
+## Scope assumptions
+
+- **ServiceNow integration is moved to Phase 2.** Phase 1 starts from governed GitHub approvals / workflow dispatch and uses standardized evidence packs plus manual ITSM / CMDB handoff instead of live ServiceNow-triggered orchestration.
+- **Application teams operate in two repository models.** The target pipeline must support both **one repository per environment** and **one repository for all environments** without changing the mandatory controls.
+
 | Layer | Component | Chosen Tool | Architectural Role & Business Value |
 |---|---|---|---|
-| Governance & Portal | Request & CMDB | ServiceNow (IntegrationHub) | Operational intake and CMDB update source for migration activities. |
-| Governance Automation | Change-Controlled Runbooks | Ansible Playbooks | Executes CMDB-driven pre-check, patch, and remediation runbooks as code, with auditable execution logs linked to change records. |
+| Governance & Portal | Request & CMDB | ServiceNow (IntegrationHub) | **Phase 2 target-state** operational intake and CMDB update source. In Phase 1, the equivalent control point is handled through GitHub approvals, required change references, and manual ITSM / CMDB handoff. |
+| Governance Automation | Change-Controlled Runbooks | Ansible Playbooks | Executes governed pre-check, patch, and remediation runbooks as code, with auditable execution logs linked to change records. ServiceNow-driven invocation is deferred to Phase 2. |
 | Runtime Baseline Governance | Runtime Technology Compatibility Matrix | Versioned JSON artifact + AWS SSM Parameter Store | Stores the approved application, middleware, and database version baseline consumed by the pipeline before any installation or deployment activity. |
-| Orchestration | CI/CD Engine | GitHub Actions | Event-driven pipeline manager for build, test, scan, release, and controlled promotion. |
+| Orchestration | CI/CD Engine | GitHub Actions | Event-driven pipeline manager for build, test, scan, release, and controlled promotion across both application team repository models: one repository per environment and one repository for all environments. |
 | Runtime Compliance Gate | Pre-install Version Validation | GitHub Actions + RTCM Validator | Reads declared stack versions from deployment payloads/manifests, checks them against the approved RTCM, fails closed on unsupported versions, and logs every approval/rejection decision. |
 | Environment Governance | Promotion Controls | GitHub Environments (`dev`, `test`, `prod`) | Enforces release order, approvals, and deployment protection rules per stage. |
 | Identity / Trust | Security Gateway | AWS IAM OIDC Provider | Federated short-lived credentials for GitHub deployments without long-lived keys. |
@@ -22,7 +27,7 @@
 | Communication Channel | Zero-Trust Tunnel | AWS SSM Session Manager | Secure control path for private build/configuration actions without SSH exposure. |
 | Config & Secret Store | Runtime Configuration | AWS Systems Manager Parameter Store + AWS Secrets Manager | Segregates environment config and secrets (`/dev`, `/test`, `/prod`) from code. |
 | Deployment Governance | Fail-Closed Release Decision Record | AWS Systems Manager Parameter Store | Stores pass/fail deployment decisions per immutable release identity and environment; blocks re-deploy of previously failed/blocked releases by policy. |
-| Operations Feedback | Asset State Reconciliation | AWS SSM Inventory + ServiceNow CMDB Sync | Reconciles runtime software/OS state from managed nodes back to CMDB to improve audit accuracy and operational visibility. |
+| Operations Feedback | Asset State Reconciliation | AWS SSM Inventory + ServiceNow CMDB Sync | Reconciles runtime software/OS state from managed nodes back to CMDB as a **Phase 2 target state**. In Phase 1, the same evidence is exported for governed manual ITSM / CMDB update. |
 | Observability | Telemetry and Tracing | CloudWatch + OpenTelemetry + AWS X-Ray | Provides logs, metrics, traces, and release health visibility for triage. |
 | Incident Signaling | Alert Routing | CloudWatch Alarms + SNS | Enables centralized alert notifications and incident integration. |
 | Release Contract | Release Manifest | JSON Manifest Artifact | Carries approved digests, AMI paths, and IaC version as the deployable unit. |
@@ -38,15 +43,19 @@
 
 ### 1) Governance, Intake, and Change Control
 - **ServiceNow Catalog + CMDB**
-  - Service request intake, approval routing, and CI ownership mapping.
-  - Stores target app metadata (`app_id`, `middleware_type`, `env`) and change context (`change_id`).
+  - **Phase 2 target state** for service request intake, approval routing, and CI ownership mapping.
+  - Stores target app metadata (`app_id`, `middleware_type`, `env`) and change context (`change_id`) when the ServiceNow integration is introduced.
 - **ServiceNow IntegrationHub**
-  - Triggers GitHub repository dispatch events.
-  - Receives callback payloads (AMI ID, Ansible run status).
+  - **Phase 2 target state** to trigger GitHub repository dispatch events.
+  - **Phase 2 target state** to receive callback payloads (AMI ID, Ansible run status).
+  - Phase 1 starts from governed GitHub approval / dispatch and manual evidence handoff instead of live ServiceNow orchestration.
 
 ### 2) CI/CD Orchestration and Build Toolchain
 - **GitHub Actions**
-  - Workflow trigger on push/PR and external repository dispatch.
+  - Workflow trigger on push/PR and governed workflow dispatch.
+  - Supports both application team operating models:
+    - one repository per environment
+    - one repository for all environments
   - Matrix build flow for `weblogic`, `tomcat`, and `python` tracks.
   - Dedicated pre-install RTCM validation job reads declared app, middleware, and database versions from the payload/manifests and blocks unsupported stacks before any image build or installation.
 - **Build runtimes**
@@ -92,8 +101,9 @@
 - **AWS SSM Inventory**
   - Captures managed-node software/OS/runtime details after build/deployment steps.
 - **CMDB Sync Loop**
-  - Updates ServiceNow CIs with active AMI, Ansible execution evidence, and reconciled runtime state.
-  - Improves audit readiness and operational traceability.
+  - **Phase 2 target state:** updates ServiceNow CIs with active AMI, Ansible execution evidence, and reconciled runtime state.
+  - **Phase 1:** produces the same evidence for manual / governed ITSM and CMDB update.
+  - Improves audit readiness and operational traceability in both phases.
 
 ### 7) Compliance Evidence Store and Audit Controls
 - **EventBridge Compliance Evidence Bus**

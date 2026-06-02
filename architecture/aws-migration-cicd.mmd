@@ -32,7 +32,7 @@ flowchart TB
             A7{Approval granted?}
         end
 
-        subgraph A_SN[ServiceNow]
+        subgraph A_SN["ServiceNow (Phase 2 target state; Phase 1 uses manual handoff)"]
             direction TB
             A10[Project team creates ServiceNow service request]
             A11{ServiceNow request approved?}
@@ -56,14 +56,19 @@ flowchart TB
 
     subgraph S2[Stage 2 - CI/CD Orchestration and Quality Gates]
         direction TB
-        B1[Generate GitHub dispatch payload]
-        B2[Checkout source and IaC]
-        B2A[Load approved RTCM from repo and SSM Parameter Store]
-        B2B[Validate app middleware and database versions against RTCM]
+        B1["Generate GitHub dispatch payload (or governed manual trigger)"]
+        B1A{Application repository model?}
+        B2A[Checkout app source from environment-specific repo plus shared CI/CD repo]
+        B2B[Checkout app source from single multi-environment repo plus shared CI/CD repo]
+        B2C[Load approved RTCM from repo and SSM Parameter Store]
+        B2D[Validate app middleware and database versions against RTCM]
         B3[Build and run quality and security checks]
         B4{All policy gates passed?}
         B5[Open remediation task with RTCM and policy rejection detail]
-        B1 --> B2 --> B2A --> B2B --> B3 --> B4
+        B1 --> B1A
+        B1A -- One repo per environment --> B2A --> B2C
+        B1A -- One repo for all environments --> B2B --> B2C
+        B2C --> B2D --> B3 --> B4
         B4 -- No --> B5
     end
 
@@ -89,7 +94,7 @@ flowchart TB
 
     subgraph S5[Stage 5 - Promotion, Deployment, and CMDB Feedback]
         direction TB
-        E1[Patch CMDB and change record with AMI and evidence]
+        E1["Prepare CMDB and change evidence update<br/>(auto patch in Phase 2)"]
         E2{Promotion criteria met for target environment?}
         E3[Deploy via Terraform and ASG through dev -> test -> prod]
         E4[Execute rollback or remediation path]
@@ -129,12 +134,16 @@ flowchart TB
     style A2 fill:#ffffff,stroke:#444444,stroke-width:1.5px,color:#000
     style A7 fill:#ffffff,stroke:#444444,stroke-width:1.5px,color:#000
     style A11 fill:#ffffff,stroke:#444444,stroke-width:1.5px,color:#000
+    style B1A fill:#ffffff,stroke:#444444,stroke-width:1.5px,color:#000
     style D1 fill:#ffffff,stroke:#444444,stroke-width:1.5px,color:#000
     style E2 fill:#ffffff,stroke:#444444,stroke-width:1.5px,color:#000
     %% systemProcess (blue) - automation/pipeline steps
     style A9 fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#000
     style B1 fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#000
-    style B2 fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#000
+    style B2A fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#000
+    style B2B fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#000
+    style B2C fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#000
+    style B2D fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#000
     style B3 fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#000
     style B4 fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#000
     style B5 fill:#e3f2fd,stroke:#1565c0,stroke-width:1.5px,color:#000

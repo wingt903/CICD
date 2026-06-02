@@ -1,7 +1,7 @@
 sequenceDiagram
     autonumber
     actor Team as Project Migration Team
-    participant SN as ServiceNow (CMDB)
+    participant SN as ServiceNow (CMDB / Phase 2)
     participant GH as GitHub Actions Runner
     participant RTCM as Runtime Technology Compatibility Matrix
     participant Scheduler as EventBridge Scheduler Service
@@ -19,10 +19,12 @@ sequenceDiagram
     Team->>SN: Submit Catalog Migration Request
     Note over SN: Approvals complete.<br>Create/Update CMDB CI Configuration.
     SN->>GH: Trigger Workflow via REST Webhook (Repository Dispatch)<br>[Payload: AppID, Middleware Type, Env, ChangeID]
+    Note over SN,GH: ServiceNow webhook trigger is a Phase 2 target state.<br/>Phase 1 starts from governed GitHub approval / dispatch plus manual ITSM handoff.
 
     %% Phase 2: Orchestration & Checkout
     activate GH
     GH->>GH: Execute Git Checkout (App Code + Ansible Roles)
+    Note over GH: Supports both application team models:<br/>one repository per environment or one repository for all environments.
     Note over GH: If Java (Tomcat/WebLogic):<br>Compile Source to .WAR / .EAR via Maven
     GH->>RTCM: Load approved RTCM baseline<br/>[versioned repo artifact + /cicd/rtcm/approved/current]
     GH->>GH: Validate declared app middleware and DB versions<br/>against approved RTCM before any installation
@@ -61,7 +63,7 @@ sequenceDiagram
     deactivate AWS_SSM
 
     GH->>SN: Send API Patch Request:<br>Update CMDB CI with New Active AMI ID + Ansible execution references
-    Note over SN: CMDB and Change Record are updated with<br>AMI + Ansible execution evidence for audit tracking
+    Note over SN: Phase 2 target state: CMDB and Change Record are updated with<br>AMI + Ansible execution evidence for audit tracking.<br/>Phase 1 uses manual / governed evidence handoff.
     GH->>EvidenceBus: Publish normalized evidence event<br>[system_id, env, baseline_ref, control_id, result, run_id, source=github-actions]<br>(partial schema shown — full 12-field schema per compliance-evidence-store.md §1)
     EvidenceBus->>EvidenceStore: Ingestor Lambda validates schema, signs record (KMS alias/evidence-signing), writes to S3 (Object Lock) + indexes in DynamoDB
     EvidenceStore->>AuditTrail: S3 PutObject event captured (actor, timestamp, key, requestId)
