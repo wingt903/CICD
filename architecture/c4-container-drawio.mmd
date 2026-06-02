@@ -24,24 +24,24 @@ graph TB
     end
 
     %% External interactions
-    appRepos -->|[1] push / PR events| orch
-    infraRepos -->|[2] IaC push events| orch
-    appOwner -.->|[3] manual workflow_dispatch approval| orch
-    appOwner -->|[11] promotion approval| deploy
-    auditor -->|[16] read-only audit and report access| audit
+    appRepos -->|1. push / PR events| orch
+    infraRepos -->|2. IaC push events| orch
+    appOwner -.->|3. manual workflow_dispatch approval| orch
+    appOwner -->|11. promotion approval| deploy
+    auditor -->|16. read-only audit and report access| audit
 
     %% Internal interactions
-    orch -->|[4] exchanges OIDC token for STS credentials| trust
-    orch -->|[5] validates runtime baseline| rtcm
-    rtcm -->|[6] reads approved baseline| config
-    orch -->|[7] triggers image build| build
-    build -->|[8] pushes container images and packages| artifact
-    orch -->|[9] code, IaC, image, and runtime scans| secscan
-    secscan -->|[10] emits security findings as evidence| evidence
-    orch -->|[12] reads config and checks no-redeploy decision| deploy
-    deploy -->|[13] reads config and decision records| config
-    orch -->|[14] emits pipeline stage evidence| evidence
-    evidence -->|[15] feeds compliance evidence for audit| audit
+    orch -->|4. exchanges OIDC token for STS credentials| trust
+    orch -->|5. validates runtime baseline| rtcm
+    rtcm -->|6. reads approved baseline| config
+    orch -->|7. triggers image build| build
+    build -->|8. pushes container images and packages| artifact
+    orch -->|9. code, IaC, image, and runtime scans| secscan
+    secscan -->|10. emits security findings as evidence| evidence
+    orch -->|12. reads config and checks no-redeploy decision| deploy
+    deploy -->|13. reads config and decision records| config
+    orch -->|14. emits pipeline stage evidence| evidence
+    evidence -->|15. feeds compliance evidence for audit| audit
 
     %% Styling - internal containers
     style orch fill:#85BBF0,color:#000000,stroke:#5D82A8
