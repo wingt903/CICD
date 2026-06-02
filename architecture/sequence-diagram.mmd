@@ -65,7 +65,7 @@ sequenceDiagram
     GH->>SN: Send API patch:<br/>Update CMDB CI with new AMI ID + Ansible run refs
     Note over SN: Phase 2 target: CMDB and change record updated with<br/>AMI + Ansible evidence for audit tracking.<br/>Phase 1 uses manual/governed handoff.
     GH->>EvidenceBus: Publish normalized evidence event
-    Note over GH,EvidenceBus: Fields include system_id, env, baseline_ref, control_id, result, run_id, source.<br>Full 12-field schema: compliance-evidence-store.md section 1.
+    Note over GH,EvidenceBus: Fields include system_id, env, baseline_ref, control_id, result, run_id, source.<br/>Full 12-field schema: compliance-evidence-store.md section 1.
     EvidenceBus->>EvidenceStore: Ingestor validates schema, signs record (KMS),<br/>writes to S3 Object Lock + DynamoDB index
     EvidenceStore->>AuditTrail: S3 PutObject event captured (actor, timestamp, key, requestId)
 
@@ -86,7 +86,7 @@ sequenceDiagram
     DriftReconciler->>DriftReconciler: Verify convergence to desired baseline
     DriftReconciler->>SN: Update CMDB/compliance status with closure evidence
     DriftReconciler->>EvidenceBus: Publish drift remediation evidence event
-    Note over DriftReconciler,EvidenceBus: Fields include system_id, baseline_ref, result, remediation_state, source.<br>Full 12-field schema: compliance-evidence-store.md section 1.
+    Note over DriftReconciler,EvidenceBus: Fields include system_id, baseline_ref, result, remediation_state, source.<br/>Full 12-field schema: compliance-evidence-store.md section 1.
     EvidenceBus->>EvidenceStore: Ingestor signs + writes evidence<br/>to S3 Object Lock + DynamoDB index
     EvidenceStore->>AuditTrail: S3 PutObject event captured
 
@@ -103,7 +103,7 @@ sequenceDiagram
         DatabaseDriftController->>DatabaseDriftController: Perform post-remediation validation
         DatabaseDriftController->>SN: Publish DB drift status and remediation evidence
         DatabaseDriftController->>EvidenceBus: Publish DB remediation evidence event
-        Note over DatabaseDriftController,EvidenceBus: Fields include system_id, baseline_ref, control_id=db-schema, result, remediation_state, source.<br>Full 12-field schema: compliance-evidence-store.md section 1.
+        Note over DatabaseDriftController,EvidenceBus: Fields include system_id, baseline_ref, control_id=db-schema, result, remediation_state, source.<br/>Full 12-field schema: compliance-evidence-store.md section 1.
         EvidenceBus->>EvidenceStore: Ingestor signs + writes evidence<br/>to S3 Object Lock + DynamoDB index
         EvidenceStore->>AuditTrail: S3 PutObject event captured
     else No DB drift
