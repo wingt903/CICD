@@ -1,0 +1,63 @@
+graph TB
+    %% C4 Container (Level 2) - draw.io compatible
+
+    %% External actors
+    appOwner([App Owner])
+    auditor([Cyber Security Operations Analyst])
+
+    %% External systems
+    appRepos[Application Repos]
+    infraRepos[Infrastructure Repos]
+
+    %% System boundary
+    subgraph cicd ["App as Code CICD Platform"]
+        orch[CI/CD Orchestration Engine\nGitHub Actions]
+        trust[Identity and Trust Broker\nAWS IAM OIDC Provider]
+        rtcm[Runtime Compliance Gate\nRTCM Validator + SSM Parameter Store]
+        build[Private Build Environment\nEC2 + Ansible + SSM Session Manager]
+        artifact[Artifact Repositories\nAmazon ECR + AWS CodeArtifact]
+        config[Config and Decision Store\nSSM Parameter Store + Secrets Manager]
+        deploy[Deployment Controller\nGitHub Environments + Terraform + Ansible]
+        secscan[Security Scanning Platform\nGHAS + tfsec + Checkov + Inspector + Security Hub]
+        evidence[Compliance Evidence Platform\nEventBridge + Lambda + S3 Object Lock + DynamoDB + KMS]
+        audit[Audit and Reporting Platform\nAudit Manager + Athena + CloudTrail + CloudWatch + API Gateway]
+    end
+
+    %% External interactions
+    appRepos -->|push / PR / workflow_dispatch| orch
+    infraRepos -->|IaC changes / workflow_dispatch| orch
+    appOwner -->|promotion approval| deploy
+    auditor -->|read-only audit and report access| audit
+
+    %% Internal interactions
+    orch -->|exchanges OIDC token for STS credentials| trust
+    orch -->|validates runtime baseline| rtcm
+    rtcm -->|reads approved baseline| config
+    orch -->|triggers image build| build
+    build -->|pushes container images and packages| artifact
+    orch -->|reads config and checks no-redeploy decision| deploy
+    deploy -->|reads config and decision records| config
+    orch -->|code, IaC, image, and runtime scans| secscan
+    secscan -->|emits security findings as evidence| evidence
+    orch -->|emits pipeline stage evidence| evidence
+    evidence -->|feeds compliance evidence for audit| audit
+
+    %% Styling - internal containers
+    style orch fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style trust fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style rtcm fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style build fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style artifact fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style config fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style deploy fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style secscan fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style evidence fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style audit fill:#85BBF0,color:#000000,stroke:#5D82A8
+
+    %% Styling - people
+    style appOwner fill:#08427B,color:#ffffff,stroke:#052E56
+    style auditor fill:#08427B,color:#ffffff,stroke:#052E56
+
+    %% Styling - external systems
+    style appRepos fill:#999999,color:#ffffff,stroke:#666666
+    style infraRepos fill:#999999,color:#ffffff,stroke:#666666
