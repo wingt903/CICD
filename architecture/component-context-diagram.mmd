@@ -1,29 +1,36 @@
 %%{init: {'flowchart': {'nodeSpacing': 6, 'rankSpacing': 10, 'diagramPadding': 2, 'curve': 'linear'}}}%%
 graph TB
     %% Edge labels: short verb phrases describe each flow; F1/F2/F3 = failure/remediation paths.
+    %% Merged from component-context-diagram and target-component-context (single unified diagram).
     Team[Project / Migration Team]
 
-    subgraph Governance["Governance & Request"]
+    subgraph Governance["Governance & Request (Phase 2)"]
         direction LR
-        SN[ServiceNow\nCatalog + CMDB\nPhase 2]
-        IH[IntegrationHub\nPhase 2]
+        SN[ServiceNow\nCatalog + CMDB]
+        IH[IntegrationHub]
+    end
+
+    subgraph Sources["Code Sources"]
+        direction LR
+        APPCODE[Application Repo(s)\nOne Repo per Env or One Repo for All Envs]
+        IMGCODE[OS / Image as Code Repo\nAnsible Image Build + Config]
+        IACCODE[Infrastructure as Code Repo\nTerraform]
     end
 
     subgraph Pipeline["CI/CD Orchestration"]
         direction LR
-        GH[GitHub Repository / Repositories\nPer-Environment or Multi-Environment]
         GHA[GitHub Actions]
-        RTCMVAL[RTCM Validator]
-        IMG[Ansible Image Build]
+        GHENV[GitHub Environments\ndev / test / prod]
+        RELMANIFEST[Release Manifest\nDigest + AMI + IaC Version]
+        RTCMVAL[RTCM Validation Gate]
         ANS[Ansible]
-        SGATE{Security Gates\nPassed?}
     end
 
     subgraph Security["Security & Quality Gates"]
         direction LR
         SAST[Code Scans\nSAST + Dep + Secret]
         IAC[IaC Scans\ntfsec + Checkov]
-        RTCM[RTCM\nApproved Versions]
+        SGATE{Security Gates\nPassed?}
         AMISCAN[Artifact Scans\nECR + Inspector]
         IGATE{Image Scan\nPassed?}
         RUNTIMESEC[Runtime Posture\nSecHub + GuardDuty + IAM AA]
@@ -36,10 +43,59 @@ graph TB
         PARAM[SSM Parameter\nStore]
         DREC[SSM Decision\nRecords]
         INV[SSM\nInventory]
+    end
+
+    subgraph Artifacts["Artifact Management"]
+        direction LR
+        ECR[Amazon ECR\nImmutable Tags + Digest]
+        CODEARTIFACT[AWS CodeArtifact\nPython / Java Packages]
+        RTCM[RTCM\nApproved Versions]
+        SBOM[SBOM + Build Provenance]
+    end
+
+    subgraph Build["Build Runtime"]
+        direction LR
+        EC2[Private Builder EC2]
         AMI[Golden AMI\nRegistry]
     end
 
-    subgraph Compliance["Compliance Evidence & Audit"]
+    subgraph Runtime["AWS Runtime by Environment"]
+        direction LR
+        DEVACCT[Dev Account]
+        TESTACCT[Test Account]
+        PRODACCT[Prod Account]
+        APP[Target Workloads\nWebLogic / Tomcat / Python]
+        TFRUNTIME[Terraform Provisioned Runtime\nVPC IAM ECS/EKS/ASG ALB]
+    end
+
+    subgraph Ops["Operations & Rollback"]
+        direction LR
+        OBS[CloudWatch + OpenTelemetry + X-Ray]
+        ALARMS[CloudWatch Alarms + SNS]
+        BGROLL[Blue/Green or Canary Rollback]
+        AMIROLL[AMI Rollback\nPrevious Approved ID]
+        IACROLL[IaC Controlled\nRevert Pipeline]
+    end
+
+    subgraph Drift["Drift Detection & Reconciliation"]
+        direction LR
+        SCHED[EventBridge\nScheduler]
+        DRIFTREC[Drift Reconciler\nLambda / Step Function]
+        DRIFTFIND[Drift Findings\nCloudWatch + SecHub + CMDB]
+        POLICYGATE[Policy Decision\nApproval Gate]
+        ENFORCE[Enforce Repo Baseline\nTerraform Apply + Config Re-run]
+        CONVVERIFY[Convergence\nVerification]
+    end
+
+    subgraph DBDrift["Database Drift Management"]
+        direction LR
+        DBDETECT[Database Drift Detector\nSchema + Parameter Drift]
+        DBMIG[Migration Orchestrator\nVersioned DB Migration Plan]
+        DBROLL[DB Rollback Path\nSnapshot Restore + Previous Migration]
+        DBVALID[Post-Remediation\nDB Validation]
+    end
+
+    subgraph Compliance["Compliance Evidence Store"]
         direction LR
         EVTBUS[EventBridge\nEvidence Bus]
         INGESTOR[Evidence Ingestor\nLambda]
@@ -47,115 +103,204 @@ graph TB
         EVIDX[DynamoDB\nEvidence Index]
         INTVERIFY[Integrity Verifier\nLambda]
         CLOUDTRAIL[CloudTrail\nEvidence Audit]
+    end
+
+    subgraph Audit["Audit Reporting"]
+        direction LR
         AUDITMAN[Audit Manager]
         ATHENA[Athena\nReport Queries]
         AUDITAPI[Auditor\nExport API]
     end
 
-    subgraph Runtime["AWS Runtime / Build Targets"]
-        direction LR
-        EC2[Private Builder EC2]
-        APP[Target Workloads\nWebLogic / Tomcat / Python]
-    end
+    %% Governance & Request (Phase 2)
+    Team -->|1. submit request| SN
+    SN -.->|2. CMDB context (Phase 2)| GHA
+    SN -->|3. trigger event (Phase 2)| IH
+    IH -->|4. dispatch run (Phase 2)| GHA
+    SN -->|F1: remediation notify (Phase 2)| Team
 
-    %% Governance → Pipeline
-    SN -.->|1. CMDB context (Phase 2)| GHA
-    SN -->|2. trigger event (Phase 2)| IH
-    IH -->|3. dispatch run (Phase 2)| GHA
-    SN -->|F3: remediation (Phase 2)| Team
+    %% Pipeline Bootstrap
+    APPCODE -->|5. code repo trigger| GHA
+    IMGCODE -->|6. image repo trigger| GHA
+    IACCODE -->|7. IaC repo trigger| GHA
+    GHA -->|8. request token| OIDC
+    OIDC -->|9. temp credentials| GHA
 
-    %% Pipeline bootstrap
-    GH -->|4. pipeline trigger| GHA
-    GHA -->|5. request token| OIDC
-    OIDC -->|6. temp credentials| GHA
+    %% RTCM & Security Scan Gates
+    GHA -->|10. validate stack versions| RTCMVAL
+    PARAM -->|11. mirror baseline| RTCM
+    RTCM -->|12. version policy| RTCMVAL
+    GHA -->|13. run code scans| SAST
+    GHA -->|14. run IaC scans| IAC
+    RTCMVAL -->|15. gate evidence| SGATE
+    SAST -->|16. gate evidence| SGATE
+    IAC -->|17. gate evidence| SGATE
+    SGATE -->|18. passed: build| ANS
+    SGATE -->|F2: failed: remediation (Phase 2)| SN
 
-    %% RTCM + security scan gates
-    GH -->|7. RTCM artifact| RTCM
-    PARAM -->|8. mirror baseline| RTCM
-    GHA -->|9. read stack versions| RTCMVAL
-    RTCM -->|10. version policy| RTCMVAL
-    GHA -->|11. run code scans| SAST
-    GHA -->|12. run IaC scans| IAC
-    RTCMVAL -->|13. gate evidence| SGATE
-    SAST -->|14. gate evidence| SGATE
-    IAC -->|15. gate evidence| SGATE
-    SGATE -->|16. passed: build| IMG
-    SGATE -->|F1: remediation (Phase 2)| SN
+    %% Image Build
+    GHA -->|19. start session| SSMSESS
+    SSMSESS -->|20. secure channel| EC2
+    GHA -->|21. launch config| ANS
+    ANS -->|22. configure host| EC2
+    PARAM -->|23. build params| EC2
+    EC2 -->|24. publish AMI| AMI
 
-    %% Image build
-    IMG -->|17. run playbook| EC2
-    GHA -->|18. start session| SSMSESS
-    SSMSESS -->|19. secure channel| EC2
-    GHA -->|20. launch config| ANS
-    ANS -->|21. configure host| EC2
-    PARAM -->|22. build params| EC2
+    %% Artifact Management
+    GHA -->|25. push image| ECR
+    GHA -->|26. publish packages| CODEARTIFACT
+    GHA -->|27. store params| PARAM
+    GHA -->|28. publish RTCM baseline| RTCM
+    GHA -->|29. generate SBOM| SBOM
+    SBOM -->|30. build provenance| RELMANIFEST
 
-    %% AMI scan + deploy
-    EC2 -->|23. publish AMI| AMI
-    AMI -->|24. scan candidate| AMISCAN
-    AMISCAN -->|25. scan evidence| IGATE
-    IGATE -->|26. passed: deploy| APP
-    IGATE -->|F2: remediation (Phase 2)| SN
-    EC2 -->|27. inventory state| INV
-    INV -->|28. sync to CMDB (Phase 2)| SN
-    APP -->|29. posture telemetry| RUNTIMESEC
-    RUNTIMESEC -->|30. posture feedback (Phase 2)| SN
-    GHA -->|49. check release status| DREC
-    DREC -->|50. allow/block deploy| GHA
-    GHA -->|51. write pass/fail| DREC
-    DREC -->|52. no-redeploy policy (Phase 2)| SN
+    %% AMI Scan & Deploy
+    AMI -->|31. scan candidate| AMISCAN
+    AMISCAN -->|32. scan evidence| IGATE
+    IGATE -->|33. passed: deploy| GHENV
+    IGATE -->|F3: failed: remediation (Phase 2)| SN
+    EC2 -->|34. inventory state| INV
+    INV -->|35. sync to CMDB (Phase 2)| SN
 
-    %% Evidence flows
-    GHA -->|31. pipeline evidence| EVTBUS
-    RTCMVAL -->|32. RTCM evidence| EVTBUS
-    SAST -->|33. scan evidence| EVTBUS
-    IAC -->|34. IaC evidence| EVTBUS
-    AMISCAN -->|35. image evidence| EVTBUS
-    RUNTIMESEC -->|36. posture evidence| EVTBUS
-    INV -->|37. inventory evidence| EVTBUS
-    EVTBUS -->|38. validate + sign| INGESTOR
-    INGESTOR -->|39. write record| EVIDENCES3
-    INGESTOR -->|40. index record| EVIDX
-    EVIDENCES3 -->|41. daily check| INTVERIFY
-    EVIDENCES3 -->|42. S3 events| CLOUDTRAIL
-    INTVERIFY -->|43. tamper alert| CLOUDTRAIL
+    %% No-Redeploy Governance
+    GHA -->|36. check release status| DREC
+    DREC -->|37. allow/block deploy| GHA
+    GHA -->|38. write pass/fail| DREC
+    DREC -->|39. no-redeploy policy (Phase 2)| SN
 
-    %% Audit reporting
-    EVIDENCES3 -->|44. aggregate| AUDITMAN
-    EVIDENCES3 -->|45. ad-hoc queries| ATHENA
-    EVIDX -->|46. index queries| ATHENA
-    AUDITMAN -->|47. report export| AUDITAPI
-    ATHENA -->|48. report export| AUDITAPI
+    %% Release Promotion
+    GHENV -->|40. capture release| RELMANIFEST
+    RELMANIFEST -->|41. deploy dev| DEVACCT
+    DEVACCT -->|42. provision runtime| TFRUNTIME
+    DEVACCT -->|43. promote test| TESTACCT
+    TESTACCT -->|44. promote prod| PRODACCT
+    PRODACCT -->|45. deploy workloads| APP
 
+    %% Runtime Security
+    AMISCAN -->|46. scan dev artifacts| DEVACCT
+    AMISCAN -->|47. scan test artifacts| TESTACCT
+    AMISCAN -->|48. scan prod artifacts| PRODACCT
+    APP -->|49. posture telemetry| RUNTIMESEC
+    RUNTIMESEC -->|50. posture feedback (Phase 2)| SN
+
+    %% Operations & Rollback
+    TFRUNTIME -->|51. emit telemetry| OBS
+    OBS -->|52. trigger alarms| ALARMS
+    ALARMS -->|53. canary rollback| BGROLL
+    ALARMS -->|54. AMI rollback| AMIROLL
+    ALARMS -->|55. IaC revert| IACROLL
+
+    %% Drift Detection & Reconciliation
+    SCHED -->|56. scheduled trigger| DRIFTREC
+    DEVACCT -->|57. dev live state| DRIFTREC
+    TESTACCT -->|58. test live state| DRIFTREC
+    PRODACCT -->|59. prod live state| DRIFTREC
+    IACCODE -->|60. Terraform baseline| DRIFTREC
+    DRIFTREC -->|61. drift findings| DRIFTFIND
+    DRIFTFIND -->|62. policy decision| POLICYGATE
+    POLICYGATE -->|63. manual approval request| Team
+    Team -->|64. approve remediation| POLICYGATE
+    POLICYGATE -->|65. enforce baseline| ENFORCE
+    ENFORCE -->|66. verify convergence| CONVVERIFY
+    CONVVERIFY -->|67. convergence state| DRIFTFIND
+    CONVVERIFY -->|68. reconciled state| OBS
+    CONVVERIFY -->|69. update posture| RUNTIMESEC
+    DRIFTFIND -->|70. drift status (Phase 2)| SN
+
+    %% Database Drift Management
+    TFRUNTIME -->|71. runtime schema| DBDETECT
+    DBDETECT -->|72. migration plan| DBMIG
+    DBMIG -->|73. validate migration| DBVALID
+    DBMIG -->|74. rollback path| DBROLL
+    DBROLL -->|75. validate rollback| DBVALID
+    DBVALID -->|76. DB findings| DRIFTFIND
+
+    %% Evidence Flows
+    GHA -->|77. pipeline evidence| EVTBUS
+    RTCMVAL -->|78. RTCM evidence| EVTBUS
+    SAST -->|79. scan evidence| EVTBUS
+    IAC -->|80. IaC evidence| EVTBUS
+    AMISCAN -->|81. image evidence| EVTBUS
+    RUNTIMESEC -->|82. posture evidence| EVTBUS
+    INV -->|83. inventory evidence| EVTBUS
+    CONVVERIFY -->|84. drift evidence| EVTBUS
+    DBVALID -->|85. DB evidence| EVTBUS
+    DRIFTFIND -->|86. findings evidence| EVTBUS
+    EVTBUS -->|87. validate + ingest| INGESTOR
+    INGESTOR -->|88. write record| EVIDENCES3
+    INGESTOR -->|89. index record| EVIDX
+    EVIDENCES3 -->|90. daily check| INTVERIFY
+    INTVERIFY -->|91. tamper alert| CLOUDTRAIL
+    EVIDENCES3 -->|92. S3 events| CLOUDTRAIL
+
+    %% Audit Reporting
+    EVIDENCES3 -->|93. aggregate| AUDITMAN
+    EVIDENCES3 -->|94. ad-hoc queries| ATHENA
+    EVIDX -->|95. index queries| ATHENA
+    AUDITMAN -->|96. report export| AUDITAPI
+    ATHENA -->|97. report export| AUDITAPI
+
+    %% Styling
     %% actor
     style Team fill:#E1F5FE,stroke:#01579B,stroke-width:2px,color:#000
     %% governance
     style SN fill:#E8EAF6,stroke:#283593,stroke-width:2px,color:#000
     style IH fill:#E8EAF6,stroke:#283593,stroke-width:2px,color:#000
+    %% sources
+    style APPCODE fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
+    style IMGCODE fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
+    style IACCODE fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
     %% pipeline
-    style GH fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
     style GHA fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
+    style GHENV fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
+    style RELMANIFEST fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
     style RTCMVAL fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
-    style IMG fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
     style ANS fill:#F3E5F5,stroke:#6A1B9A,stroke-width:2px,color:#000
     style SGATE fill:#ffffff,stroke:#444444,stroke-width:1.5px,color:#000
     %% security
     style SAST fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#000
     style IAC fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#000
-    style RTCM fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#000
     style AMISCAN fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#000
     style IGATE fill:#ffffff,stroke:#444444,stroke-width:1.5px,color:#000
     style RUNTIMESEC fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#000
-    %% aws
+    %% aws control plane
     style OIDC fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
     style SSMSESS fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
     style PARAM fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
     style DREC fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
     style INV fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
-    style AMI fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
-    %% runtime
+    %% artifacts
+    style ECR fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
+    style CODEARTIFACT fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
+    style RTCM fill:#FFEBEE,stroke:#B71C1C,stroke-width:2px,color:#000
+    style SBOM fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
+    %% build
     style EC2 fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style AMI fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    %% runtime
+    style DEVACCT fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style TESTACCT fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style PRODACCT fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
     style APP fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style TFRUNTIME fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    %% ops
+    style OBS fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style ALARMS fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style BGROLL fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style AMIROLL fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style IACROLL fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    %% drift
+    style SCHED fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
+    style DRIFTREC fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style DRIFTFIND fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style POLICYGATE fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style ENFORCE fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style CONVVERIFY fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    %% db drift
+    style DBDETECT fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style DBMIG fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style DBROLL fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style DBVALID fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
     %% compliance evidence
     style EVTBUS fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
     style INGESTOR fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
@@ -163,6 +308,7 @@ graph TB
     style EVIDX fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
     style INTVERIFY fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
     style CLOUDTRAIL fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
+    %% audit
     style AUDITMAN fill:#EDE7F6,stroke:#4A148C,stroke-width:2px,color:#000
     style ATHENA fill:#EDE7F6,stroke:#4A148C,stroke-width:2px,color:#000
     style AUDITAPI fill:#EDE7F6,stroke:#4A148C,stroke-width:2px,color:#000

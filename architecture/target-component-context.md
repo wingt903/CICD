@@ -1,6 +1,9 @@
-# AWS Target Component Context (Dev/Test/Prod)
+# AWS Target Component Context (Superseded)
 
-This target context extends the reference migration diagram with full automated CI/CD controls for AWS-only deployments.
+> ⚠️ **This document has been merged into the unified component context diagram.**
+> Please refer to the single authoritative source:
+> - Diagram: [`architecture/component-context-diagram.mmd`](./component-context-diagram.mmd)
+> - Integration reference: [`architecture/component-context-diagram.md`](./component-context-diagram.md)
 
 ## Scope assumptions
 
