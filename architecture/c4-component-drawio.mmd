@@ -1,0 +1,77 @@
+graph TB
+    %% C4 Component (Level 3) - draw.io compatible
+    %% External inputs
+    appRepos[(Application Repos)]
+
+    %% Internal components
+    subgraph pipeline ["CI/CD Pipeline - GitHub Actions"]
+        trigger[Trigger Handler]
+        oidcMod[OIDC Auth]
+        rtcmGate[RTCM Gate]
+        secGate[Security Gate]
+        imgBuild[Image Builder]
+        artMgr[Artifact Manager]
+        deployer[Deployment Controller]
+        govGuard[No-Redeploy Guard]
+        evidEmit[Evidence Emitter]
+    end
+
+    %% External AWS and GitHub systems
+    oidcProv[(IAM OIDC Provider)]
+    ssmParam[(SSM Parameter Store)]
+    ssmDrec[(SSM Decision Records)]
+    ssmSess[SSM Session Manager]
+    buildHost[Private Builder EC2]
+    ecr[(Amazon ECR)]
+    ca[(AWS CodeArtifact)]
+    ghEnv[GitHub Environments]
+    evtBus[EventBridge Evidence Bus]
+    compStore[(Compliance Evidence Store)]
+
+    %% Relationships
+    appRepos -->|push / workflow_dispatch| trigger
+    trigger --> oidcMod
+    oidcMod -->|exchanges OIDC for STS| oidcProv
+    trigger --> rtcmGate
+    ssmParam -->|approved baseline| rtcmGate
+    trigger --> secGate
+    rtcmGate -->|gate evidence| secGate
+    secGate -->|passes gate| imgBuild
+    imgBuild --> ssmSess
+    ssmSess --> buildHost
+    imgBuild --> buildHost
+    ssmParam -->|build parameters| buildHost
+    trigger --> artMgr
+    artMgr --> ecr
+    artMgr --> ca
+    artMgr -->|writes params| ssmParam
+    trigger --> govGuard
+    govGuard --> ssmDrec
+    trigger --> deployer
+    deployer -->|promotion approval| ghEnv
+    trigger --> evidEmit
+    evidEmit --> evtBus
+    evtBus --> compStore
+
+    %% Styling - internal components
+    style trigger fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style oidcMod fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style rtcmGate fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style secGate fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style imgBuild fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style artMgr fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style deployer fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style govGuard fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style evidEmit fill:#85BBF0,color:#000000,stroke:#5D82A8
+    %% External systems
+    style appRepos fill:#999999,color:#ffffff,stroke:#666666
+    style oidcProv fill:#999999,color:#ffffff,stroke:#666666
+    style ssmParam fill:#999999,color:#ffffff,stroke:#666666
+    style ssmDrec fill:#999999,color:#ffffff,stroke:#666666
+    style ssmSess fill:#999999,color:#ffffff,stroke:#666666
+    style buildHost fill:#999999,color:#ffffff,stroke:#666666
+    style ecr fill:#999999,color:#ffffff,stroke:#666666
+    style ca fill:#999999,color:#ffffff,stroke:#666666
+    style ghEnv fill:#999999,color:#ffffff,stroke:#666666
+    style evtBus fill:#999999,color:#ffffff,stroke:#666666
+    style compStore fill:#999999,color:#ffffff,stroke:#666666
