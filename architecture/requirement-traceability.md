@@ -141,7 +141,7 @@ _Scenario 2 – Validate security hardening and patches after application_
 **Requirement Summary**
 - Continuously assess deployed systems against approved configuration and patch baselines.
 - Store auditable compliance evidence with timestamps, system identifiers, baseline references, and compliance status.
-- Produce clear, exportable historical and current compliance reporting for auditors.
+- Produce clear, exportable historical and current compliance reporting for cyber security operations analysts.
 - Ensure stored evidence is tamper-evident and preserves a complete audit trail of changes and access.
 - Validate applied hardening and patch controls and record failures or non-compliance.
 
@@ -183,7 +183,7 @@ _Scenario 3 – Audit Reporting_
 | Evidence | Traceability |
 |---|---|
 | `architecture/compliance-evidence-store.md:§6` | Defines five report types (current posture, historical trend, remediation history, integrity report, access/change audit report) and the generation/export mechanism. |
-| `architecture/target-component-context.mmd integrations 63-67` — evidence aggregation, ad-hoc queries, index queries, report export | AWS Audit Manager (App_as_Code control framework), Athena report queries (current posture, history, remediation), and Auditor Export API (API Gateway + IAM Identity Center) are explicitly modeled. |
+| `architecture/target-component-context.mmd integrations 63-67` — evidence aggregation, ad-hoc queries, index queries, report export | AWS Audit Manager (App_as_Code control framework), Athena report queries (current posture, history, remediation), and Cyber Security Operations Analyst Export API (API Gateway + IAM Identity Center) are explicitly modeled. |
 | `architecture/full-pipeline-tech-stack.md` (Audit Reporting row) | Audit Manager + Athena + S3 export architecture is documented in the tech stack. |
 | `architecture/component-context-diagram.mmd integrations 44-48` — evidence aggregation, query, and report export flows | Audit Manager and Athena draw from the evidence store; export is available via the auditor API with full access logging. |
 
@@ -211,7 +211,7 @@ _Scenario 5 – Security hardening and patches are validated after application_
 | Gap Area (Closed) | Architectural Addition |
 |---|---|
 | Central evidence record | Added Evidence Ingestor Lambda + S3 Evidence Bucket + DynamoDB Evidence Index. Every assessment outcome is normalized to the canonical schema (timestamp, system_id, baseline_ref, control_id, result, remediation_state, source_system, run_id, details_ref, signature) and written as an immutable record. |
-| Exportable audit reporting | Added AWS Audit Manager (App_as_Code control framework), Athena report queries, and Auditor Export API. Five report types (current posture, historical trend, remediation history, integrity report, access/change audit) are available for export as PDF or CSV/JSON. |
+| Exportable audit reporting | Added AWS Audit Manager (App_as_Code control framework), Athena report queries, and Cyber Security Operations Analyst Export API. Five report types (current posture, historical trend, remediation history, integrity report, access/change audit) are available for export as PDF or CSV/JSON. |
 | Tamper-evident evidence | Added S3 Object Lock (Governance mode, 7-year retention), SSE-KMS encryption, KMS-signed SHA-256 per record, hash-chain integrity, and daily Integrity Verifier Lambda. Evidence cannot be modified or deleted within the retention window. |
 | Audit trail of access and change | Added CloudTrail S3 data events (PutObject/GetObject/DeleteObject) and management events for the evidence bucket, DynamoDB Streams for index mutations, and a separate write-once audit log bucket (Compliance mode Object Lock). Every evidence read, write, delete attempt, and lock override is captured with full actor, timestamp, and request metadata. |
 
@@ -224,9 +224,9 @@ _Scenario 5 – Security hardening and patches are validated after application_
 |---|---|---|---|---|
 | TC-004-01: Evidence Record Schema Completeness | Any pipeline or runtime assessment produces a compliance outcome | The Evidence Ingestor Lambda receives the event | A record containing `evidence_id`, `timestamp`, `system_id`, `environment`, `baseline_ref`, `control_id`, `result`, `remediation_state`, `source_system`, `run_id`, and `details_ref` is written to S3 Object Lock | All required schema fields are present in the stored record; the record is written as an immutable Object Lock object and indexed in DynamoDB |
 | TC-004-02: Daily Integrity Verification | Evidence records have been written to the S3 evidence store | The daily Integrity Verifier Lambda runs | Each record's KMS-signed SHA-256 hash is re-verified and the outcome is published to CloudWatch | All records pass hash verification; a CloudWatch metric is emitted; any failure triggers a CloudWatch alarm and alert |
-| TC-004-03: Audit Report Export | An auditor requests a historical compliance report for a specific time range, control set, or system | The auditor queries the Audit Export API (API Gateway + IAM Identity Center) | A report covering the requested scope is returned in PDF or CSV/JSON format | Report is generated without manual data extraction; all requested fields (system_id, control_id, result, timestamp) are present; export is accessible only to authenticated auditors |
+| TC-004-03: Audit Report Export | A cyber security operations analyst requests a historical compliance report for a specific time range, control set, or system | The cyber security operations analyst queries the Cyber Security Operations Analyst Export API (API Gateway + IAM Identity Center) | A report covering the requested scope is returned in PDF or CSV/JSON format | Report is generated without manual data extraction; all requested fields (system_id, control_id, result, timestamp) are present; export is accessible only to authenticated cyber security operations analysts |
 | TC-004-04: Evidence Immutability Under Deletion Attempt | A record has been written to S3 Object Lock in Governance mode within the 7-year retention window | An attempt is made to delete or overwrite the record | The deletion or overwrite is rejected by S3 Object Lock | AWS S3 returns an access-denied error for the delete/overwrite request; CloudTrail records the attempt with actor identity and timestamp |
-| TC-004-05: Access Audit Trail | An auditor reads an evidence record from the compliance evidence store | The read request completes | A CloudTrail S3 data event (GetObject) is captured with the actor identity, timestamp, and resource ARN | CloudTrail log entry is present in the write-once audit log bucket; event contains the expected actor, timestamp, and object identifier |
+| TC-004-05: Access Audit Trail | A cyber security operations analyst reads an evidence record from the compliance evidence store | The read request completes | A CloudTrail S3 data event (GetObject) is captured with the actor identity, timestamp, and resource ARN | CloudTrail log entry is present in the write-once audit log bucket; event contains the expected actor, timestamp, and object identifier |
 
 ### 5) App_as_Code_005
 
@@ -378,12 +378,12 @@ _Scenario 3 – Evidence and Audit Logging_
 | Gap Area (Open) | Required Addition to Fulfill Requirement |
 |---|---|
 | Explicit exclusion of custom application code | Add a formal monitoring-scope policy for App_as_Code_006 that limits eligible `control_id` domains to `platform`, `middleware`, `runtime`, and `database`, and rejects/filters `application_code` controls at evidence ingest and reporting layers. |
-| Enforced evidence classification for scope auditing | Extend evidence governance with a mandatory layer-scope attribute and validation rule so auditors can prove all App_as_Code_006 records exclude custom code assessments. |
+| Enforced evidence classification for scope auditing | Extend evidence governance with a mandatory layer-scope attribute and validation rule so cyber security operations analysts can prove all App_as_Code_006 records exclude custom code assessments. |
 | Visual scope-boundary representation in architecture diagrams | Update architecture diagrams to explicitly label the monitoring scope boundary so the exclusion of custom application code is auditable and unambiguous. |
 
 **Implementation Recommendations to Close App_as_Code_006 Gaps**
 
-1. **Define a monitoring-scope allowlist policy** — Introduce a formal policy document (or policy-as-code rule) that declares the eligible `control_id` domain prefixes for App_as_Code_006 as: `platform`, `middleware`, `runtime`, and `database`. Configure the evidence signing ingestor to reject or quarantine any evidence record carrying an `application_code`-scoped `control_id`, and surface rejections in the reporting layer so auditors have a traceable exclusion log.
+1. **Define a monitoring-scope allowlist policy** — Introduce a formal policy document (or policy-as-code rule) that declares the eligible `control_id` domain prefixes for App_as_Code_006 as: `platform`, `middleware`, `runtime`, and `database`. Configure the evidence signing ingestor to reject or quarantine any evidence record carrying an `application_code`-scoped `control_id`, and surface rejections in the reporting layer so cyber security operations analysts have a traceable exclusion log.
 
 2. **Add a mandatory `layer_scope` attribute to the compliance evidence schema** — Extend the canonical evidence record (defined in `architecture/compliance-evidence-store.md`) with a required `layer_scope` field accepting values `platform | middleware | runtime | database | application_code`. Enforce at the signing ingestor that any evidence record tagged to the App_as_Code_006 control set must not carry `layer_scope: application_code`; records that violate this rule must be rejected with an ingest error and written to the audit log.
 

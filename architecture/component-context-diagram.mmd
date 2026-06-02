@@ -2,7 +2,7 @@
 graph TB
     %% Edge labels: short verb phrases describe each flow; F1/F2/F3 = failure/remediation paths.
     %% Merged from component-context-diagram and target-component-context (single unified diagram).
-    Team[Project / Migration Team]
+    Team[CAR Architecture Team]
 
     subgraph Governance["Governance & Request (Phase 2)"]
         direction LR
@@ -12,9 +12,9 @@ graph TB
 
     subgraph Sources["Code Sources"]
         direction LR
-        APPCODE[Application Repo(s)\nOne Repo per Env or One Repo for All Envs]
-        IMGCODE[OS / Image as Code Repo\nAnsible Image Build + Config]
-        IACCODE[Infrastructure as Code Repo\nTerraform]
+        APPCODE["Application Repo(s)<br/>One Repo per Env or One Repo for All Envs"]
+        IMGCODE["OS / Image as Code Repo<br/>Ansible Image Build + Config"]
+        IACCODE["Infrastructure as Code Repo<br/>Terraform"]
     end
 
     subgraph Pipeline["CI/CD Orchestration"]
@@ -109,15 +109,15 @@ graph TB
         direction LR
         AUDITMAN[Audit Manager]
         ATHENA[Athena\nReport Queries]
-        AUDITAPI[Auditor\nExport API]
+        AUDITAPI[Cyber Security Operations Analyst\nExport API]
     end
 
     %% Governance & Request (Phase 2)
     Team -->|1. submit request| SN
-    SN -.->|2. CMDB context (Phase 2)| GHA
-    SN -->|3. trigger event (Phase 2)| IH
-    IH -->|4. dispatch run (Phase 2)| GHA
-    SN -->|F1: remediation notify (Phase 2)| Team
+    SN -.->|"2. CMDB context (Phase 2)"| GHA
+    SN -->|"3. trigger event (Phase 2)"| IH
+    IH -->|"4. dispatch run (Phase 2)"| GHA
+    SN -->|"F1: remediation notify (Phase 2)"| Team
 
     %% Pipeline Bootstrap
     APPCODE -->|5. code repo trigger| GHA
@@ -136,7 +136,7 @@ graph TB
     SAST -->|16. gate evidence| SGATE
     IAC -->|17. gate evidence| SGATE
     SGATE -->|18. passed: build| ANS
-    SGATE -->|F2: failed: remediation (Phase 2)| SN
+    SGATE -->|"F2: failed: remediation (Phase 2)"| SN
 
     %% Image Build
     GHA -->|19. start session| SSMSESS
@@ -158,15 +158,15 @@ graph TB
     AMI -->|31. scan candidate| AMISCAN
     AMISCAN -->|32. scan evidence| IGATE
     IGATE -->|33. passed: deploy| GHENV
-    IGATE -->|F3: failed: remediation (Phase 2)| SN
+    IGATE -->|"F3: failed: remediation (Phase 2)"| SN
     EC2 -->|34. inventory state| INV
-    INV -->|35. sync to CMDB (Phase 2)| SN
+    INV -->|"35. sync to CMDB (Phase 2)"| SN
 
     %% No-Redeploy Governance
     GHA -->|36. check release status| DREC
     DREC -->|37. allow/block deploy| GHA
     GHA -->|38. write pass/fail| DREC
-    DREC -->|39. no-redeploy policy (Phase 2)| SN
+    DREC -->|"39. no-redeploy policy (Phase 2)"| SN
 
     %% Release Promotion
     GHENV -->|40. capture release| RELMANIFEST
@@ -181,7 +181,7 @@ graph TB
     AMISCAN -->|47. scan test artifacts| TESTACCT
     AMISCAN -->|48. scan prod artifacts| PRODACCT
     APP -->|49. posture telemetry| RUNTIMESEC
-    RUNTIMESEC -->|50. posture feedback (Phase 2)| SN
+    RUNTIMESEC -->|"50. posture feedback (Phase 2)"| SN
 
     %% Operations & Rollback
     TFRUNTIME -->|51. emit telemetry| OBS
@@ -205,7 +205,7 @@ graph TB
     CONVVERIFY -->|67. convergence state| DRIFTFIND
     CONVVERIFY -->|68. reconciled state| OBS
     CONVVERIFY -->|69. update posture| RUNTIMESEC
-    DRIFTFIND -->|70. drift status (Phase 2)| SN
+    DRIFTFIND -->|"70. drift status (Phase 2)"| SN
 
     %% Database Drift Management
     TFRUNTIME -->|71. runtime schema| DBDETECT

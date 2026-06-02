@@ -132,7 +132,7 @@ s3://compliance-evidence-<account>/
 
 All CloudTrail logs are delivered to the audit log S3 bucket with Object Lock (Compliance mode, 7-year retention) and cannot be modified after delivery.
 
-A dedicated IAM role (`compliance-evidence-audit-reader`) with read-only permissions on the audit log bucket is the only mechanism for auditors to access trail records. All access by this role is itself logged.
+A dedicated IAM role (`compliance-evidence-audit-reader`) with read-only permissions on the audit log bucket is the only mechanism for cyber security operations analysts to access trail records. All access by this role is itself logged.
 
 ---
 
