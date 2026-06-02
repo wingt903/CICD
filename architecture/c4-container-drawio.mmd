@@ -24,8 +24,9 @@ graph TB
     end
 
     %% External interactions
-    appRepos -->|push / PR / workflow_dispatch| orch
-    infraRepos -->|IaC changes / workflow_dispatch| orch
+    appRepos -->|push / PR events| orch
+    infraRepos -->|IaC push events| orch
+    appOwner -.->|manual workflow_dispatch approval| orch
     appOwner -->|promotion approval| deploy
     auditor -->|read-only audit and report access| audit
 
