@@ -1,7 +1,7 @@
 graph TB
     %% C4 Component (Level 3) - draw.io compatible
     %% External inputs
-    appRepos[(Application Repos)]
+    appRepos[Application Repos]
 
     %% Internal components
     subgraph pipeline ["CI/CD Pipeline - GitHub Actions"]
@@ -17,16 +17,16 @@ graph TB
     end
 
     %% External AWS and GitHub systems
-    oidcProv[(IAM OIDC Provider)]
-    ssmParam[(SSM Parameter Store)]
-    ssmDrec[(SSM Decision Records)]
+    oidcProv[IAM OIDC Provider]
+    ssmParam[SSM Parameter Store]
+    ssmDrec[SSM Decision Records]
     ssmSess[SSM Session Manager]
     buildHost[Private Builder EC2]
-    ecr[(Amazon ECR)]
-    ca[(AWS CodeArtifact)]
+    ecr[Amazon ECR]
+    ca[AWS CodeArtifact]
     ghEnv[GitHub Environments]
     evtBus[EventBridge Evidence Bus]
-    compStore[(Compliance Evidence Store)]
+    compStore[Compliance Evidence Store]
 
     %% Relationships
     appRepos -->|push / workflow_dispatch| trigger

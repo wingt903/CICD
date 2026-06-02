@@ -15,8 +15,8 @@ C4Component
 
     System_Ext(appRepos, "Application Repositories", "GitHub repos for app, Terraform, and Ansible")
     Container_Ext(oidcProv, "IAM OIDC Provider", "AWS IAM", "Issues temporary STS credentials")
-    ContainerDb_Ext(ssmParam, "SSM Parameter Store", "AWS SSM", "Holds RTCM baseline and runtime parameters")
-    ContainerDb_Ext(ssmDrec, "SSM Decision Records", "AWS SSM", "Holds per-release deploy decisions")
+    Container_Ext(ssmParam, "SSM Parameter Store", "AWS SSM", "Holds RTCM baseline and runtime parameters")
+    Container_Ext(ssmDrec, "SSM Decision Records", "AWS SSM", "Holds per-release deploy decisions")
     Container_Ext(ssmSess, "SSM Session Manager", "AWS SSM", "Secure channel to private builder EC2")
     Container_Ext(buildHost, "Private Builder EC2 + Ansible", "EC2 / Ansible", "Runs image build playbooks")
     Container_Ext(ecr, "Amazon ECR", "AWS ECR", "Container registry")
