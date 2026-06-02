@@ -1,0 +1,23 @@
+C4Context
+    title System Context Diagram — App as Code CICD Platform (Level 1)
+
+    Person(migTeam, "Project / Migration Team", "Submits migration requests and approves remediation actions via governance workflow")
+    Person(appTeam, "Application Team", "Develops application code; manages application, IaC, and image repositories")
+    Person(auditor, "Auditor", "Reviews compliance evidence, audit reports, and gate outcomes")
+
+    System(cicd, "App as Code CICD Platform", "GitHub Actions-based CI/CD system enforcing RTCM validation, security gates, image build governance, no-redeploy policy, drift detection, and compliance evidence collection")
+
+    System_Ext(appRepos, "Application Repositories", "GitHub repositories (separate from CICD repo) containing application code, Terraform IaC, and Ansible image build configuration managed by application teams")
+    System_Ext(aws, "AWS Cloud", "Target cloud platform providing runtime environments (Dev / Test / Prod), security services (IAM, SSM, SecHub, GuardDuty), and artifact registries (ECR, CodeArtifact)")
+    System_Ext(sn, "ServiceNow", "ITSM platform for change request management and CMDB synchronisation (Phase 2 integration)")
+
+    Rel(migTeam, cicd, "Approves environment promotion gates and remediation actions")
+    Rel(appTeam, appRepos, "Pushes application code, IaC, and image config")
+    Rel(appRepos, cicd, "Triggers pipeline via push or workflow dispatch")
+    Rel(auditor, cicd, "Queries compliance evidence and audit reports")
+    Rel(cicd, aws, "Provisions infrastructure, builds images, deploys workloads, stores artifacts and evidence")
+    Rel(cicd, sn, "Raises change and remediation tickets; syncs inventory (Phase 2)")
+    Rel(sn, cicd, "Triggers pipeline runs via IntegrationHub (Phase 2)")
+    Rel(sn, migTeam, "Sends remediation and rejection notifications (Phase 2)")
+
+    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
