@@ -5,7 +5,7 @@
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Team as Project Migration Team
+    actor Team as CAR Architecture Team
     participant SN as ServiceNow (CMDB / Phase 2)
     participant GH as GitHub Actions Runner
     participant RTCM as RTCM Baseline
@@ -129,7 +129,7 @@ sequenceDiagram
 
 | # | Component | Description |
 |---|-----------|-------------|
-| 1 | **Project Migration Team** | The human actor (project team) who initiates the process by submitting a migration catalog request and is also the manual approver for controlled remediation decisions. |
+| 1 | **CAR Architecture Team** | The human actor who initiates the process by submitting a migration catalog request and is also the manual approver for controlled remediation decisions. |
 | 2 | **ServiceNow (CMDB / Phase 2)** | The entry point where project teams submit migration requests; it manages CMDB CI configuration, approvals, change records, and receives status updates throughout the pipeline. |
 | 3 | **GitHub Actions Runner** | The central orchestration engine that coordinates all pipeline stages—from code checkout and RTCM validation to Ansible playbook execution, AMI registration, and evidence publishing. |
 | 4 | **RTCM Baseline** | The approved runtime compatibility matrix (stored as a repo artifact and mirrored in SSM Parameter Store) that GitHub Actions queries to validate declared middleware and DB versions before any build proceeds. |
