@@ -16,11 +16,11 @@ This document explains each numbered integration in the unified component contex
 
 | # | From → To | Explanation |
 |---|-----------|-------------|
-| 1 | Team → ServiceNow | The Project / Migration Team submits a catalog migration request into ServiceNow to initiate the governance and approval workflow. |
+| 1 | Team → ServiceNow | The CAR Architecture Team submits a catalog migration request into ServiceNow to initiate the governance and approval workflow. |
 | 2 | ServiceNow → GitHub Actions | **Phase 2 target state:** GitHub Actions pulls CMDB context (server details, environment metadata) from ServiceNow to parameterise the pipeline run. In Phase 1, equivalent inputs come from GitHub-governed deployment metadata and approved change references. |
 | 3 | ServiceNow → IntegrationHub | **Phase 2 target state:** ServiceNow raises a migration/change request and emits a trigger event to IntegrationHub to start the automation flow. |
 | 4 | IntegrationHub → GitHub Actions | **Phase 2 target state:** IntegrationHub translates the ServiceNow event into a GitHub Actions workflow dispatch call, kicking off the pipeline. |
-| F1 | ServiceNow → Team | **Phase 2 target state:** when a remediation action is required (e.g., change request rejected or gate failure), ServiceNow notifies the Project / Migration Team directly. Phase 1 uses the same remediation decision through GitHub governance and manual ITSM follow-up. |
+| F1 | ServiceNow → Team | **Phase 2 target state:** when a remediation action is required (e.g., change request rejected or gate failure), ServiceNow notifies the CAR Architecture Team directly. Phase 1 uses the same remediation decision through GitHub governance and manual ITSM follow-up. |
 
 ---
 
@@ -151,7 +151,7 @@ This document explains each numbered integration in the unified component contex
 | 60 | IaC Repo → Drift Reconciler | The Drift Reconciler reads the Terraform baseline from the IaC repository as the source of truth for desired state. |
 | 61 | Drift Reconciler → Drift Findings | Any deviation between live state and the Git baseline is reported as a drift finding. |
 | 62 | Drift Findings → Policy Decision / Approval Gate | Drift findings are submitted to the Policy Gate to determine whether auto-remediation or manual approval is required. |
-| 63 | Policy Gate → Team | When manual approval is required, the Policy Gate requests approval from the Project / Migration Team before enforcement. |
+| 63 | Policy Gate → Team | When manual approval is required, the Policy Gate requests approval from the CAR Architecture Team before enforcement. |
 | 64 | Team → Policy Gate | The team approves the controlled remediation, authorising the enforce step. |
 | 65 | Policy Gate → Enforce Repo Baseline | The Policy Gate authorises enforcement; Terraform apply and/or config re-run is executed to restore desired state. |
 | 66 | Enforce Repo Baseline → Convergence Verification | After enforcement, the Convergence Verifier checks whether live state now matches the baseline. |
@@ -205,8 +205,8 @@ This document explains each numbered integration in the unified component contex
 | 93 | S3 Evidence Bucket → Audit Manager | AWS Audit Manager aggregates evidence records from S3 to produce structured compliance assessment reports. |
 | 94 | S3 Evidence Bucket → Athena | Athena is pointed at the S3 Evidence Bucket to enable ad-hoc SQL queries over raw evidence data for custom reporting. |
 | 95 | DynamoDB Evidence Index → Athena | The DynamoDB index metadata is made available to Athena queries, allowing joins between index fields and S3 evidence objects. |
-| 96 | Audit Manager → Auditor Export API | Audit Manager exports structured compliance reports through the Auditor Export API for consumption by auditors or external GRC tools. |
-| 97 | Athena → Auditor Export API | Athena query results are surfaced via the Auditor Export API, providing on-demand evidence exports for audit requests. |
+| 96 | Audit Manager → Cyber Security Operations Analyst Export API | Audit Manager exports structured compliance reports through the Cyber Security Operations Analyst Export API for consumption by cyber security operations analysts or external GRC tools. |
+| 97 | Athena → Cyber Security Operations Analyst Export API | Athena query results are surfaced via the Cyber Security Operations Analyst Export API, providing on-demand evidence exports for audit requests. |
 
 ---
 
