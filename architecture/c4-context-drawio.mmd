@@ -11,10 +11,10 @@ graph TB
     cicd[GitHub Organization App as Code CI/CD Platform]
 
     %% External systems
-    appRepos[Application Repositories (GitHub)]
-    infraRepos[Infrastructure Repositories (GitHub)]
+    appRepos[Application Repositories - GitHub]
+    infraRepos[Infrastructure Repositories - GitHub]
     aws[AWS Target Accounts]
-    sn[ServiceNow (Phase 2)]
+    sn[ServiceNow - Phase 2]
 
     %% Relationships
     migTeam -->|approves promotions/remediations| cicd
@@ -25,7 +25,7 @@ graph TB
     auditor -->|reads evidence and reports| cicd
     cicd -->|builds/deploys/stores artifacts via OIDC| aws
     cicd -.->|optional: creates change/remediation tickets| sn
-    sn -.->|optional: triggers runs (IntegrationHub)| cicd
+    sn -.->|optional: triggers runs via IntegrationHub| cicd
     sn -.->|sends remediation notices| migTeam
 
     %% Styling
