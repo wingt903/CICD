@@ -1,3 +1,4 @@
+%%{init: {'themeVariables': {'fontSize': 9}, 'flowchart': {'nodeSpacing': 8, 'rankSpacing': 10, 'diagramPadding': 2, 'curve': 'linear'}}}%%
 graph TB
     %% C4 Container (Level 2) - draw.io compatible
 
@@ -11,46 +12,62 @@ graph TB
 
     %% System boundary
     subgraph cicd ["App as Code CICD Platform"]
-        orch[CI/CD Orchestration Engine
-GitHub Actions]
-        trust[Identity and Trust Broker
-AWS IAM OIDC Provider]
-        baseline[Approved Baseline Publisher
-Release Manifest + SSM Parameter Store]
-        drift[Scheduled Drift Detection
-EventBridge Scheduler + Drift Scan]
-        compare[State Collection and Comparison
-AWS Config + SSM + Comparison Engine]
-        remediate[Auto Remediation Controller
-Terraform + Ansible + DB Migration]
-        evidence[Audit Evidence Platform
-EventBridge + Lambda + S3 Object Lock + DynamoDB + KMS]
-        dashboards[Audit Reporting Platform
-Splunk + Grafana + CloudTrail]
+        templates["[1] Governed Template Library
+GitHub Template Repos + CODEOWNERS + Pinned Versions"]
+        orch["[2] CI/CD Orchestration Engine
+GitHub Actions"]
+        trust["[3] Identity and Trust Broker
+AWS IAM OIDC Provider"]
+        rtcm["[4] Runtime Compatibility Validation Gate
+RTCM Engine + SSM Parameter Store"]
+        imagebuild["[5] Image Build and Hardening Container
+Ansible + Private Builder EC2 + Golden AMI Registry"]
+        baseline["[6] Approved Baseline Publisher
+Release Manifest + SSM Parameter Store"]
+        drift["[7] Scheduled Drift Detection
+EventBridge Scheduler + Drift Scan"]
+        compare["[8] State Collection and Comparison
+AWS Config + SSM + Comparison Engine"]
+        remediate["[9] Auto Remediation Controller
+Terraform + Ansible + DB Migration"]
+        evidence["[10] Audit Evidence Platform
+EventBridge + Lambda + S3 Object Lock + DynamoDB + KMS"]
+        dashboards["[11] Audit Reporting Platform
+Splunk + Grafana + CloudTrail"]
     end
 
     %% External interactions
-    appRepos -->|1. push / PR events| orch
-    infraRepos -->|2. IaC push events| orch
-    appOwner -.->|3. manual workflow_dispatch approval| orch
-    appOwner -->|10. governed promotion approval| remediate
-    auditor -->|15. read-only dashboard and audit access| dashboards
+    appOwner -->|"selects governed template [HTTPS/Git]"| templates
+    appRepos -->|"push / PR events [HTTPS/Webhook]"| orch
+    infraRepos -->|"IaC push events [HTTPS/Webhook]"| orch
+    appOwner -.->|"manual workflow_dispatch approval [HTTPS/GitHub API]"| orch
+    appOwner -->|"governed promotion approval [HTTPS/GitHub API]"| remediate
+    auditor -->|"read-only dashboard and audit access [HTTPS]"| dashboards
+
+    %% Template governance
+    templates -->|"supplies governed pipeline definition [HTTPS/Git]"| orch
 
     %% Internal interactions
-    orch -->|4. exchanges OIDC token for STS credentials| trust
-    orch -->|5. publishes approved baseline| baseline
-    baseline -->|6. supplies approved desired state| drift
-    drift -->|7. schedules drift scan| compare
-    compare -->|8. drift event or compliance result| evidence
-    compare -->|9. triggers restore-to-baseline action| remediate
-    remediate -->|11. writes remediation outcome| evidence
-    orch -->|12. emits pipeline stage evidence| evidence
-    evidence -->|13. stores audit records| dashboards
-    evidence -->|14. streams compliance events| dashboards
+    orch -->|"exchanges OIDC token for STS credentials [HTTPS/OIDC]"| trust
+    orch -->|"validates versions against approved baseline [AWS API/SSM]"| rtcm
+    rtcm -->|"gate pass - proceeds to image build [AWS SSM Session]"| imagebuild
+    imagebuild -->|"publishes hardened AMI and build provenance [AWS API/SSM]"| baseline
+    orch -->|"publishes approved baseline [AWS API/SSM]"| baseline
+    baseline -->|"supplies approved desired state [AWS EventBridge]"| drift
+    drift -->|"schedules drift scan [AWS EventBridge]"| compare
+    compare -->|"drift event or compliance result [AWS EventBridge]"| evidence
+    compare -->|"triggers restore-to-baseline action [AWS API]"| remediate
+    remediate -->|"writes remediation outcome [AWS EventBridge]"| evidence
+    orch -->|"emits pipeline stage evidence [AWS EventBridge]"| evidence
+    evidence -->|"stores and indexes audit records [HTTPS/API]"| dashboards
+    evidence -->|"streams compliance events [HTTPS/API]"| dashboards
 
     %% Styling - internal containers
+    style templates fill:#85BBF0,color:#000000,stroke:#5D82A8
     style orch fill:#85BBF0,color:#000000,stroke:#5D82A8
     style trust fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style rtcm fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style imagebuild fill:#85BBF0,color:#000000,stroke:#5D82A8
     style baseline fill:#85BBF0,color:#000000,stroke:#5D82A8
     style drift fill:#85BBF0,color:#000000,stroke:#5D82A8
     style compare fill:#85BBF0,color:#000000,stroke:#5D82A8
