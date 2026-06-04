@@ -80,11 +80,13 @@ graph TB
     subgraph Drift["Drift Detection & Reconciliation"]
         direction LR
         SCHED[EventBridge\nScheduler]
-        DRIFTREC[Drift Reconciler\nLambda / Step Function]
-        DRIFTFIND[Drift Findings\nCloudWatch + SecHub + CMDB]
-        POLICYGATE[Policy Decision\nApproval Gate]
-        ENFORCE[Enforce Repo Baseline\nTerraform Apply + Config Re-run]
-        CONVVERIFY[Convergence\nVerification]
+        DRIFTREC[Scheduled Drift Scan\nLambda / Step Function]
+        STATECOLLECT[State Collection\nAWS Config + SSM + Runtime APIs]
+        COMPARE[Comparison Engine\nBaseline vs Live State]
+        DRIFTDEC{Drift Found?}
+        COMPLIANT[Compliance State\nNo Drift Recorded]
+        DRIFTEVENT[Store Event\nEvidence + Finding Record]
+        ENFORCE[Auto Remediation\nTerraform Apply + Config Re-run]
     end
 
     subgraph DBDrift["Database Drift Management"]
@@ -100,16 +102,15 @@ graph TB
         EVTBUS[EventBridge\nEvidence Bus]
         INGESTOR[Evidence Ingestor\nLambda]
         EVIDENCES3[S3 Evidence Bucket\nObject Lock + SSE-KMS]
-        EVIDX[DynamoDB\nEvidence Index]
+        AUDITDB[Audit Database\nDynamoDB Evidence Index]
         INTVERIFY[Integrity Verifier\nLambda]
         CLOUDTRAIL[CloudTrail\nEvidence Audit]
     end
 
     subgraph Audit["Audit Reporting"]
         direction LR
-        AUDITMAN[Audit Manager]
-        ATHENA[Athena\nReport Queries]
-        AUDITAPI[Cyber Security Operations Analyst\nExport API]
+        SPLUNK[Splunk\nAudit Event Search]
+        GRAFANA[Grafana\nCompliance Dashboards]
     end
 
     %% Governance & Request (Phase 2)
@@ -213,7 +214,7 @@ graph TB
     DBMIG -->|73. validate migration| DBVALID
     DBMIG -->|74. rollback path| DBROLL
     DBROLL -->|75. validate rollback| DBVALID
-    DBVALID -->|76. DB findings| DRIFTFIND
+    DBVALID -->|76. DB findings| DRIFTEVENT
 
     %% Evidence Flows
     GHA -->|77. pipeline evidence| EVTBUS
@@ -290,10 +291,12 @@ graph TB
     %% drift
     style SCHED fill:#FFF3E0,stroke:#E65100,stroke-width:2px,color:#000
     style DRIFTREC fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
-    style DRIFTFIND fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
-    style POLICYGATE fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style STATECOLLECT fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style COMPARE fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style DRIFTDEC fill:#ffffff,stroke:#444444,stroke-width:1.5px,color:#000
+    style COMPLIANT fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
+    style DRIFTEVENT fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
     style ENFORCE fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
-    style CONVVERIFY fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
     %% db drift
     style DBDETECT fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000
     style DBMIG fill:#E8F5E9,stroke:#1B5E20,stroke-width:2px,color:#000

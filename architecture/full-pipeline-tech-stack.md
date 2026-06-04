@@ -116,8 +116,8 @@
   - Object Lock enabled in Governance mode with a minimum 7-year retention period.
   - Versioning enabled; SSE-KMS encryption with a dedicated Customer Managed Key.
   - S3 server access logging and CloudTrail S3 data events (read + write) enabled for all objects.
-  - Partitioned by `year/month/day/env` for efficient Athena querying.
-- **Amazon DynamoDB — Evidence Index**
+  - Partitioned by `year/month/day/env` for efficient audit drill-down and evidence retention management.
+- **Amazon DynamoDB — Audit Database**
   - Global Secondary Indexes on `system_id`, `control_id`, and `timestamp` allow point-in-time and historical queries without S3 scans.
 - **AWS KMS — Evidence Signing CMK**
   - Customer Managed Key used exclusively for evidence signing and verification.

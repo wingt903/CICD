@@ -77,10 +77,9 @@ Integrity Verifier Lambda (scheduled daily via EventBridge)
    │  - Alerts via SNS on any verification failure
    ▼
 Audit Reporting Layer
-   │  - Athena queries over S3 partitioned by env/date
-   │  - AWS Audit Manager (custom framework mapped to App_as_Code controls)
-   │  - Pre-built report templates: point-in-time, historical, per-control, per-asset
-   │  - Export: S3 presigned URL or direct audit manager report PDF
+   │  - Splunk search, alerting, and drift-event correlation
+   │  - Grafana dashboards for compliance posture and remediation trends
+   │  - Raw evidence drill-down from immutable S3 records
 ```
 
 ### S3 Bucket Layout
@@ -165,5 +164,5 @@ A dedicated IAM role (`compliance-evidence-audit-reader`) with read-only permiss
 | Tamper anomaly alerting | CloudWatch Metric Alarm on `EvidenceIntegrityFailure` count > 0 | Real-time alarm → SNS → PagerDuty / **Phase 2** ServiceNow incident |
 | Unexpected access alerting | CloudWatch Logs Insights rule on CloudTrail — GetObject by non-approved principals | Real-time via CloudWatch Logs subscription filter |
 | Lock override alerting | CloudTrail CloudWatch Logs metric filter on `BypassGovernanceRetention` | Real-time alarm → SNS |
-| Periodic attestation | Integrity Verifier publishes signed attestation JSON to `integrity-results/` prefix | Weekly; summary linked to Audit Manager assessment cycle |
+| Periodic attestation | Integrity Verifier publishes signed attestation JSON to `integrity-results/` prefix | Weekly; summary linked to the operational audit review cycle |
 | Evidence completeness check | Lambda compares expected evidence records (from CMDB CI list × control matrix) against actual records in index | Daily; gaps published as CloudWatch metric and manual / governed ITSM handoff in Phase 1 or ServiceNow incident in Phase 2 |
