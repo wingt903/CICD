@@ -11,10 +11,16 @@ graph TB
 
     %% System boundary
     subgraph cicd ["App as Code CICD Platform"]
+        templates[Governed Template Library
+GitHub Template Repos + CODEOWNERS + Pinned Versions]
         orch[CI/CD Orchestration Engine
 GitHub Actions]
         trust[Identity and Trust Broker
 AWS IAM OIDC Provider]
+        rtcm[Runtime Compatibility Validation Gate
+RTCM Engine + SSM Parameter Store]
+        imagebuild[Image Build and Hardening Container
+Ansible + Private Builder EC2 + Golden AMI Registry]
         baseline[Approved Baseline Publisher
 Release Manifest + SSM Parameter Store]
         drift[Scheduled Drift Detection
@@ -30,27 +36,37 @@ Splunk + Grafana + CloudTrail]
     end
 
     %% External interactions
-    appRepos -->|1. push / PR events| orch
-    infraRepos -->|2. IaC push events| orch
-    appOwner -.->|3. manual workflow_dispatch approval| orch
-    appOwner -->|10. governed promotion approval| remediate
-    auditor -->|15. read-only dashboard and audit access| dashboards
+    appOwner -->|1. selects governed template for app pipeline| templates
+    appRepos -->|2. push / PR events| orch
+    infraRepos -->|3. IaC push events| orch
+    appOwner -.->|4. manual workflow_dispatch approval| orch
+    appOwner -->|13. governed promotion approval| remediate
+    auditor -->|18. read-only dashboard and audit access| dashboards
+
+    %% Template governance
+    templates -->|supplies governed pipeline definition and embedded controls| orch
 
     %% Internal interactions
-    orch -->|4. exchanges OIDC token for STS credentials| trust
-    orch -->|5. publishes approved baseline| baseline
-    baseline -->|6. supplies approved desired state| drift
-    drift -->|7. schedules drift scan| compare
-    compare -->|8. drift event or compliance result| evidence
-    compare -->|9. triggers restore-to-baseline action| remediate
-    remediate -->|11. writes remediation outcome| evidence
-    orch -->|12. emits pipeline stage evidence| evidence
-    evidence -->|13. stores audit records| dashboards
-    evidence -->|14. streams compliance events| dashboards
+    orch -->|5. exchanges OIDC token for STS credentials| trust
+    orch -->|6. validates app/middleware/DB versions against approved baseline| rtcm
+    rtcm -->|7. gate pass - proceeds to image build and hardening| imagebuild
+    imagebuild -->|8. publishes hardened AMI and build provenance| baseline
+    orch -->|9. publishes approved baseline| baseline
+    baseline -->|10. supplies approved desired state| drift
+    drift -->|11. schedules drift scan| compare
+    compare -->|12. drift event or compliance result| evidence
+    compare -->|14. triggers restore-to-baseline action| remediate
+    remediate -->|15. writes remediation outcome| evidence
+    orch -->|16. emits pipeline stage evidence| evidence
+    evidence -->|17. stores audit records| dashboards
+    evidence -->|19. streams compliance events| dashboards
 
     %% Styling - internal containers
+    style templates fill:#85BBF0,color:#000000,stroke:#5D82A8
     style orch fill:#85BBF0,color:#000000,stroke:#5D82A8
     style trust fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style rtcm fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style imagebuild fill:#85BBF0,color:#000000,stroke:#5D82A8
     style baseline fill:#85BBF0,color:#000000,stroke:#5D82A8
     style drift fill:#85BBF0,color:#000000,stroke:#5D82A8
     style compare fill:#85BBF0,color:#000000,stroke:#5D82A8
