@@ -2,8 +2,8 @@
 graph TB
     %% C4 Context (Level 1) - draw.io compatible
     %% People
-    migTeam([CAR Architecture Team])
-    appTeam([TPAM Team])
+    migTeam([Product Engineer])
+    appTeam([Product Team])
     platformEngineer([Platform Engineer])
     auditor([Cyber Security Operations Analyst])
 
@@ -30,7 +30,7 @@ graph TB
     cicd -->|publishes compliance dashboards| grafana
     cicd -.->|optional: creates change and remediation tickets| sn
     sn -.->|optional: triggers runs via IntegrationHub| cicd
-    sn -.->|sends remediation notices| migTeam
+    sn -.->|sends remediation notices| appTeam
 
     %% Styling
     style cicd fill:#1168BD,color:#ffffff,stroke:#0b4884

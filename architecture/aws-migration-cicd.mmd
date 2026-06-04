@@ -1,5 +1,5 @@
 flowchart TB
-    Team[CAR Architecture Team]
+    Team[Product Team]
     I1[New app onboarding request]
     I2[Existing app technical change]
     I3[Cyber remediation migration wave]
@@ -13,20 +13,20 @@ flowchart TB
     subgraph S1[Stage 1 - Intake and Architecture Governance]
         direction TB
 
-        subgraph A_TPAM[TPAM]
+        subgraph A_TPAM[Product Team]
             direction TB
             A1[Draft or update HLD and non-functional requirements]
             A2{App exists in ServiceNow CMDB inventory?}
-            A4[Notify CAR team to create CMDB record]
-            A8[Update artifacts per CAR feedback]
+            A4[Notify platform team to create CMDB record]
+            A8[Update artifacts per governance feedback]
         end
 
-        subgraph A_CAR_TEAM[CAR Team]
+        subgraph A_CAR_TEAM[Platform Team]
             direction TB
             A5[Create CMDB CI record]
         end
 
-        subgraph A_CAR_ARCH[CAR Architect]
+        subgraph A_CAR_ARCH[Platform Architect]
             direction TB
             A6[Review HLD and NFR]
             A7{Approval granted?}
@@ -141,7 +141,7 @@ flowchart TB
     style I1 fill:#f7f7f7,stroke:#6c6c6c,stroke-width:1.5px,color:#000
     style I2 fill:#f7f7f7,stroke:#6c6c6c,stroke-width:1.5px,color:#000
     style I3 fill:#f7f7f7,stroke:#6c6c6c,stroke-width:1.5px,color:#000
-    %% manualProcess (orange) - TPAM steps, CAR steps, ServiceNow steps
+    %% manualProcess (orange) - Product Team steps, platform/governance steps, ServiceNow steps
     style A1 fill:#fff8e1,stroke:#ef6c00,stroke-width:1.5px,color:#000
     style A4 fill:#fff8e1,stroke:#ef6c00,stroke-width:1.5px,color:#000
     style A5 fill:#fff8e1,stroke:#ef6c00,stroke-width:1.5px,color:#000

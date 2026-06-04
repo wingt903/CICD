@@ -5,7 +5,7 @@
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Team as CAR Architecture Team
+    actor Team as Product Team
     participant GH as GitHub Actions Runner
     participant Baseline as Approved Baseline Publisher
     participant Scheduler as EventBridge Scheduler
@@ -59,7 +59,7 @@ sequenceDiagram
 
 | # | Component | Description |
 |---|-----------|-------------|
-| 1 | **CAR Architecture Team** | The human actor who approves the governed change and owns the approved target baseline. |
+| 1 | **Product Team** | The human actor who approves the governed change and owns the approved target baseline. |
 | 2 | **GitHub Actions Runner** | The orchestration engine that publishes approved baselines and manages the scheduled drift control workflow. |
 | 3 | **Approved Baseline Publisher** | The component that records the approved release manifest, AMI, IaC version, and runtime policy used as drift-comparison input. |
 | 4 | **EventBridge Scheduler** | The time-based trigger that starts recurring drift scans after the approved baseline is published. |

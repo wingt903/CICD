@@ -16,11 +16,11 @@ This document explains each numbered integration in the unified component contex
 
 | # | From → To | Explanation |
 |---|-----------|-------------|
-| 1 | Team → ServiceNow | The CAR Architecture Team submits a catalog migration request into ServiceNow to initiate the governance and approval workflow. |
+| 1 | Team → ServiceNow | The Product Team submits a catalog migration request into ServiceNow to initiate the governance and approval workflow. |
 | 2 | ServiceNow → GitHub Actions | **Phase 2 target state:** GitHub Actions pulls CMDB context (server details, environment metadata) from ServiceNow to parameterise the pipeline run. In Phase 1, equivalent inputs come from GitHub-governed deployment metadata and approved change references. |
 | 3 | ServiceNow → IntegrationHub | **Phase 2 target state:** ServiceNow raises a migration/change request and emits a trigger event to IntegrationHub to start the automation flow. |
 | 4 | IntegrationHub → GitHub Actions | **Phase 2 target state:** IntegrationHub translates the ServiceNow event into a GitHub Actions workflow dispatch call, kicking off the pipeline. |
-| F1 | ServiceNow → Team | **Phase 2 target state:** when a remediation action is required (e.g., change request rejected or gate failure), ServiceNow notifies the CAR Architecture Team directly. Phase 1 uses the same remediation decision through GitHub governance and manual ITSM follow-up. |
+| F1 | ServiceNow → Team | **Phase 2 target state:** when a remediation action is required (e.g., change request rejected or gate failure), ServiceNow notifies the Product Team directly. Phase 1 uses the same remediation decision through GitHub governance and manual ITSM follow-up. |
 
 ---
 
