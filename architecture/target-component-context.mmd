@@ -1,5 +1,6 @@
 graph TD
-    note["⚠️ This diagram has been merged into the unified component context diagram.\nSee: architecture/component-context-diagram.mmd"]
+    note["⚠️ This diagram has been merged into the unified component context diagram.
+See: architecture/component-context-diagram.mmd"]
     style note fill:#FFF9C4,stroke:#F9A825,stroke-width:2px,color:#000
 
     subgraph Sources
@@ -10,156 +11,47 @@ graph TD
 
     subgraph CI and Governance
       B1[GitHub Actions Pipeline]
-      B2[GitHub Environments<br/>dev/test/prod]
-      B3[Release Manifest<br/>Digest + AMI + IaC Version]
-      B4[RTCM Validation Gate<br/>Pre-install Runtime Policy Check]
+      B2[Approved Baseline Publisher<br/>Release Manifest + SSM Parameter Store]
+      B3[Git Commit Approved<br/>Governed Merge + Promotion Contract]
     end
 
-    subgraph Security and Quality Gates
-      C1[SAST + Dependency + Secret Scans]
-      C2[IaC Policy Scans<br/>tfsec + Checkov]
-      C3[Container/AMI Scans<br/>ECR + Inspector]
-      C4[Runtime Security Posture<br/>Security Hub + GuardDuty + IAM Access Analyzer]
+    subgraph Drift Control
+      C1[Scheduled Drift Scan<br/>EventBridge Scheduler]
+      C2[State Collection<br/>AWS Config + SSM + Runtime APIs]
+      C3[Comparison Engine<br/>Baseline vs Live State]
+      C4{Drift Found?}
+      C5[Compliance Result<br/>No Drift]
+      C6[Store Event<br/>Evidence + Drift Record]
+      C7[Auto Remediation<br/>Terraform Apply + Config Re-run]
     end
 
-    subgraph Artifact Management
-      D1[Amazon ECR<br/>Immutable Tags + Digest]
-      D2[AWS CodeArtifact<br/>Python/Java Packages]
-      D3[SSM Parameter Store<br/>/dev /test /prod Approved AMIs + RTCM Baseline]
-      D4[SBOM + Build Provenance]
-      D5[Runtime Technology Compatibility Matrix<br/>Approved App + Middleware + DB Versions]
-    end
-
-    subgraph AWS Runtime by Environment
-      E1[Dev Account]
-      E2[Test Account]
-      E3[Prod Account]
-      E4[Terraform Provisioned Runtime<br/>VPC IAM ECS/EKS/ASG ALB]
-    end
-
-    subgraph Operations and Rollback
-      F1[CloudWatch + OpenTelemetry + X-Ray]
-      F2[CloudWatch Alarms + SNS]
-      F3[Blue/Green or Canary Rollback]
-      F4[AMI Rollback via Previous Approved ID]
-      F5[IaC Controlled Revert Pipeline]
-    end
-
-    subgraph Drift Detection and Reconciliation
-      G1[EventBridge Scheduled Reconciliation]
-      G2[Drift Reconciler Lambda/Step Function<br/>Compare Live AWS vs Git/Terraform State]
-      G3[Drift Findings<br/>CloudWatch + Security Hub + CMDB (Phase 2)]
-      G4[Policy Decision and Approval Gate]
-      G5[Enforce Repo Baseline<br/>Terraform Apply + Config Re-run]
-      G6[Convergence Verification]
-    end
-
-    subgraph Database Drift Management
-      H1[Database Drift Detector<br/>Schema + Parameter Drift]
-      H2[Migration Orchestrator<br/>Versioned DB Migration Plan]
-      H3[DB Rollback Path<br/>Snapshot Restore + Previous Migration]
-      H4[Post-Remediation DB Validation]
-    end
-
-    subgraph Compliance Evidence Store
-      I1[EventBridge Compliance Evidence Bus]
-      I2[Evidence Ingestor Lambda<br/>Schema Validation + KMS Signing]
-      I3[S3 Evidence Bucket<br/>Object Lock WORM + SSE-KMS + Versioning]
-      I4[DynamoDB Evidence Index<br/>GSI: system_id + control_id + timestamp]
-      I5[Integrity Verifier Lambda<br/>Daily Hash + Signature Verification]
-      I6[CloudTrail Evidence Audit Log<br/>S3 Data Events + Management Events]
-    end
-
-    subgraph Audit Reporting
-      J1[AWS Audit Manager<br/>App_as_Code Control Framework]
-      J2[Athena Report Queries<br/>Current Posture + Historical Trend + Remediation]
-      J3[Cyber Security Operations Analyst Export API<br/>API Gateway + IAM Identity Center]
+    subgraph Audit and Reporting
+      D1[Audit Database<br/>DynamoDB Evidence Index]
+      D2[Splunk]
+      D3[Grafana]
     end
 
     A1 -->|1. code repo trigger| B1
     A2 -->|2. image repo trigger| B1
     A3 -->|3. IaC repo trigger| B1
-    B1 -->|4. validate stack versions| B4
-    D3 -->|5. mirror baseline| B4
-    D5 -->|6. RTCM baseline| B4
-    B4 -->|7. run code scans| C1
-    C1 -->|8. scan gate| B3
-    B4 -->|9. run IaC scans| C2
-    C2 -->|10. IaC gate| B3
-    B4 -->|11. generate SBOM| D4
-    D4 -->|12. build provenance| B3
-    B1 -->|13. push image| D1
-    B1 -->|14. publish packages| D2
-    B1 -->|15. store params| D3
-    B1 -->|16. publish RTCM| D5
-
-    B3 -->|17. promote release| B2
-    B2 -->|18. deploy dev| E1
-    E1 -->|19. provision runtime| E4
-    E1 -->|20. promote test| E2
-    E2 -->|21. promote prod| E3
-
-    C3 -->|22. scan dev artifacts| E1
-    C3 -->|23. scan test artifacts| E2
-    C3 -->|24. scan prod artifacts| E3
-    C4 -->|25. posture dev| E1
-    C4 -->|26. posture test| E2
-    C4 -->|27. posture prod| E3
-
-    E4 -->|28. emit telemetry| F1
-    F1 -->|29. trigger alarms| F2
-    F2 -->|30. canary rollback| F3
-    F2 -->|31. AMI rollback| F4
-    F2 -->|32. IaC revert| F5
-
-    G1 -->|33. scheduled trigger| G2
-    E1 -->|34. dev live state| G2
-    E2 -->|35. test live state| G2
-    E3 -->|36. prod live state| G2
-    A3 -->|37. Terraform baseline| G2
-    G2 -->|38. drift findings| G3
-    G3 -->|39. policy decision| G4
-    G4 -->|40. enforce baseline| G5
-    G5 -->|41. verify convergence| G6
-    G6 -->|42. convergence state| G3
-    G6 -->|43. reconciled state| F1
-    G6 -->|44. update posture| C4
-
-    E4 -->|45. runtime schema| H1
-    H1 -->|46. migration plan| H2
-    H2 -->|47. validate migration| H4
-    H2 -->|48. rollback path| H3
-    H3 -->|49. validate rollback| H4
-    H4 -->|50. DB findings| G3
-
-    %% Evidence ingest from all sources into the central evidence bus
-    B1 -->|51. pipeline evidence| I1
-    B4 -->|52. RTCM evidence| I1
-    G6 -->|53. drift evidence| I1
-    H4 -->|54. DB evidence| I1
-    C4 -->|55. posture evidence| I1
-    G3 -->|56. findings evidence| I1
-    I1 -->|57. validate + sign| I2
-    I2 -->|58. write record| I3
-    I2 -->|59. index record| I4
-    I3 -->|60. daily check| I5
-    I5 -->|61. tamper alert| I6
-    I3 -->|62. S3 events| I6
-
-    %% Audit reporting draws from evidence store and index
-    I3 -->|63. aggregate| J1
-    I3 -->|64. ad-hoc queries| J2
-    I4 -->|65. index queries| J2
-    J1 -->|66. report export| J3
-    J2 -->|67. report export| J3
+    B1 -->|4. approved commit| B3
+    B3 -->|5. publish approved baseline| B2
+    B2 -->|6. schedule drift checks| C1
+    C1 -->|7. collect current state| C2
+    C2 -->|8. compare with baseline| C3
+    B2 -->|9. desired baseline| C3
+    C3 -->|10. decision| C4
+    C4 -->|11. no| C5
+    C4 -->|12. yes| C6
+    C6 -->|13. trigger remediation| C7
+    C5 -->|14. record compliant state| D1
+    C7 -->|15. write remediation outcome| D1
+    C6 -->|16. write drift event| D1
+    D1 -->|17. forward audit events| D2
+    D1 -->|18. dashboard metrics| D3
 
     class A1,A2,A3 source;
-    class D1,D2,D3,D4 artifact;
     class B1,B2,B3 delivery;
-    class C1,C2,C3,C4 security;
-    class E1,E2,E3,E4 runtime;
-    class F1,F2,F3,F4,F5 runtime;
-    class G1,G2,G3,G4,G5,G6 runtime;
-    class H1,H2,H3,H4 runtime;
-    class I1,I2,I3,I4,I5,I6 security;
-    class J1,J2,J3 delivery;
+    class C1,C2,C3,C5,C6,C7 runtime;
+    class C4 decision;
+    class D1,D2,D3 security;

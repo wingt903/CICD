@@ -191,21 +191,21 @@ graph TB
     ALARMS -->|55. IaC revert| IACROLL
 
     %% Drift Detection & Reconciliation
-    SCHED -->|56. scheduled trigger| DRIFTREC
-    DEVACCT -->|57. dev live state| DRIFTREC
-    TESTACCT -->|58. test live state| DRIFTREC
-    PRODACCT -->|59. prod live state| DRIFTREC
-    IACCODE -->|60. Terraform baseline| DRIFTREC
-    DRIFTREC -->|61. drift findings| DRIFTFIND
-    DRIFTFIND -->|62. policy decision| POLICYGATE
-    POLICYGATE -->|63. manual approval request| Team
-    Team -->|64. approve remediation| POLICYGATE
-    POLICYGATE -->|65. enforce baseline| ENFORCE
-    ENFORCE -->|66. verify convergence| CONVVERIFY
-    CONVVERIFY -->|67. convergence state| DRIFTFIND
-    CONVVERIFY -->|68. reconciled state| OBS
-    CONVVERIFY -->|69. update posture| RUNTIMESEC
-    DRIFTFIND -->|"70. drift status (Phase 2)"| SN
+    SCHED -->|56. scheduled drift scan| DRIFTREC
+    DEVACCT -->|57. dev live state| STATECOLLECT
+    TESTACCT -->|58. test live state| STATECOLLECT
+    PRODACCT -->|59. prod live state| STATECOLLECT
+    IACCODE -->|60. Terraform baseline| COMPARE
+    RELMANIFEST -->|61. approved release baseline| COMPARE
+    DRIFTREC -->|62. collect state| STATECOLLECT
+    STATECOLLECT -->|63. current state snapshot| COMPARE
+    COMPARE -->|64. drift decision| DRIFTDEC
+    DRIFTDEC -->|65. no drift| COMPLIANT
+    DRIFTDEC -->|66. drift found| DRIFTEVENT
+    DRIFTEVENT -->|67. trigger remediation| ENFORCE
+    ENFORCE -->|68. remediation outcome| DRIFTEVENT
+    COMPLIANT -->|69. compliant evidence| RUNTIMESEC
+    DRIFTEVENT -->|"70. drift event (Phase 2)"| SN
 
     %% Database Drift Management
     TFRUNTIME -->|71. runtime schema| DBDETECT
@@ -223,22 +223,20 @@ graph TB
     AMISCAN -->|81. image evidence| EVTBUS
     RUNTIMESEC -->|82. posture evidence| EVTBUS
     INV -->|83. inventory evidence| EVTBUS
-    CONVVERIFY -->|84. drift evidence| EVTBUS
+    COMPLIANT -->|84. compliance evidence| EVTBUS
     DBVALID -->|85. DB evidence| EVTBUS
-    DRIFTFIND -->|86. findings evidence| EVTBUS
+    DRIFTEVENT -->|86. drift evidence| EVTBUS
     EVTBUS -->|87. validate + ingest| INGESTOR
     INGESTOR -->|88. write record| EVIDENCES3
-    INGESTOR -->|89. index record| EVIDX
+    INGESTOR -->|89. update audit db| AUDITDB
     EVIDENCES3 -->|90. daily check| INTVERIFY
     INTVERIFY -->|91. tamper alert| CLOUDTRAIL
     EVIDENCES3 -->|92. S3 events| CLOUDTRAIL
 
     %% Audit Reporting
-    EVIDENCES3 -->|93. aggregate| AUDITMAN
-    EVIDENCES3 -->|94. ad-hoc queries| ATHENA
-    EVIDX -->|95. index queries| ATHENA
-    AUDITMAN -->|96. report export| AUDITAPI
-    ATHENA -->|97. report export| AUDITAPI
+    AUDITDB -->|93. search audit events| SPLUNK
+    AUDITDB -->|94. feed compliance views| GRAFANA
+    EVIDENCES3 -->|95. immutable evidence drill-down| SPLUNK
 
     %% Styling
     %% actor
@@ -305,10 +303,9 @@ graph TB
     style EVTBUS fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
     style INGESTOR fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
     style EVIDENCES3 fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
-    style EVIDX fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
+    style AUDITDB fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
     style INTVERIFY fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
     style CLOUDTRAIL fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
     %% audit
-    style AUDITMAN fill:#EDE7F6,stroke:#4A148C,stroke-width:2px,color:#000
-    style ATHENA fill:#EDE7F6,stroke:#4A148C,stroke-width:2px,color:#000
-    style AUDITAPI fill:#EDE7F6,stroke:#4A148C,stroke-width:2px,color:#000
+    style SPLUNK fill:#EDE7F6,stroke:#4A148C,stroke-width:2px,color:#000
+    style GRAFANA fill:#EDE7F6,stroke:#4A148C,stroke-width:2px,color:#000

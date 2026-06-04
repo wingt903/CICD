@@ -14,17 +14,21 @@ graph TB
     appRepos[Application Repositories - GitHub]
     infraRepos[Infrastructure Repositories - GitHub]
     aws[AWS Target Accounts]
+    splunk[Splunk]
+    grafana[Grafana]
     sn[ServiceNow - Phase 2]
 
     %% Relationships
-    migTeam -->|approves promotions/remediations| cicd
-    appTeam -->|pushes app code/config| appRepos
+    migTeam -->|approves promotions and baseline updates| cicd
+    appTeam -->|pushes app code and config| appRepos
     platformEngineer -->|pushes OS/image IaC changes| infraRepos
     appRepos -->|triggers GitHub Actions| cicd
     infraRepos -->|triggers GitHub Actions| cicd
-    auditor -->|reads evidence and reports| cicd
-    cicd -->|builds/deploys/stores artifacts via OIDC| aws
-    cicd -.->|optional: creates change/remediation tickets| sn
+    auditor -->|reviews dashboards and audit events| cicd
+    cicd -->|builds deploys and publishes approved baselines via OIDC| aws
+    cicd -->|streams audit events| splunk
+    cicd -->|publishes compliance dashboards| grafana
+    cicd -.->|optional: creates change and remediation tickets| sn
     sn -.->|optional: triggers runs via IntegrationHub| cicd
     sn -.->|sends remediation notices| migTeam
 
@@ -37,4 +41,6 @@ graph TB
     style appRepos fill:#999999,color:#ffffff,stroke:#666666
     style infraRepos fill:#999999,color:#ffffff,stroke:#666666
     style aws fill:#999999,color:#ffffff,stroke:#666666
+    style splunk fill:#999999,color:#ffffff,stroke:#666666
+    style grafana fill:#999999,color:#ffffff,stroke:#666666
     style sn fill:#999999,color:#ffffff,stroke:#666666

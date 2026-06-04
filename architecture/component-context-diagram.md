@@ -144,21 +144,21 @@ This document explains each numbered integration in the unified component contex
 
 | # | From → To | Explanation |
 |---|-----------|-------------|
-| 56 | EventBridge Scheduler → Drift Reconciler | EventBridge fires a scheduled trigger to the Drift Reconciler Lambda/Step Function at configured intervals. |
-| 57 | Dev Account → Drift Reconciler | The Drift Reconciler reads the live configuration state from the Dev account for comparison against the Git baseline. |
-| 58 | Test Account → Drift Reconciler | The Drift Reconciler reads the live configuration state from the Test account for comparison against the Git baseline. |
-| 59 | Prod Account → Drift Reconciler | The Drift Reconciler reads the live configuration state from the Prod account for comparison against the Git baseline. |
-| 60 | IaC Repo → Drift Reconciler | The Drift Reconciler reads the Terraform baseline from the IaC repository as the source of truth for desired state. |
-| 61 | Drift Reconciler → Drift Findings | Any deviation between live state and the Git baseline is reported as a drift finding. |
-| 62 | Drift Findings → Policy Decision / Approval Gate | Drift findings are submitted to the Policy Gate to determine whether auto-remediation or manual approval is required. |
-| 63 | Policy Gate → Team | When manual approval is required, the Policy Gate requests approval from the CAR Architecture Team before enforcement. |
-| 64 | Team → Policy Gate | The team approves the controlled remediation, authorising the enforce step. |
-| 65 | Policy Gate → Enforce Repo Baseline | The Policy Gate authorises enforcement; Terraform apply and/or config re-run is executed to restore desired state. |
-| 66 | Enforce Repo Baseline → Convergence Verification | After enforcement, the Convergence Verifier checks whether live state now matches the baseline. |
-| 67 | Convergence Verification → Drift Findings | The convergence result (resolved or still drifted) is fed back into Drift Findings for updated status reporting. |
-| 68 | Convergence Verification → CloudWatch + OpenTelemetry + X-Ray | The reconciled infrastructure state is reported back to the observability stack. |
-| 69 | Convergence Verification → Runtime Posture | The updated posture state after reconciliation is forwarded to Runtime Posture for continuous compliance tracking. |
-| 70 | Drift Findings → ServiceNow | **Phase 2 target state:** drift findings and closure evidence are pushed to ServiceNow CMDB to update compliance status. In Phase 1, handled via evidence records and manual ITSM update. |
+| 56 | EventBridge Scheduler → Scheduled Drift Scan | EventBridge fires the recurring drift job only after an approved baseline has been published for the target release. |
+| 57 | Dev Account → State Collection | The drift workflow collects the live Dev environment state for comparison. |
+| 58 | Test Account → State Collection | The drift workflow collects the live Test environment state for comparison. |
+| 59 | Prod Account → State Collection | The drift workflow collects the live Prod environment state for comparison. |
+| 60 | IaC Repo → Comparison Engine | The comparison engine reads the infrastructure baseline from the governed IaC repository. |
+| 61 | Release Manifest → Comparison Engine | The approved release manifest supplies the baseline that was published after the governed commit was accepted. |
+| 62 | Scheduled Drift Scan → State Collection | The scheduled drift controller starts the state-collection step for the current scan. |
+| 63 | State Collection → Comparison Engine | The collected live runtime, infrastructure, and DB state is submitted for comparison against the approved baseline. |
+| 64 | Comparison Engine → Drift Found? | The comparison engine evaluates whether drift exists and emits the decision point. |
+| 65 | Drift Found? → Compliance State | If no drift is found, the workflow records a compliant state result. |
+| 66 | Drift Found? → Store Event | If drift is detected, the workflow stores a drift event before remediation starts. |
+| 67 | Store Event → Auto Remediation | The stored drift event triggers restore-to-baseline automation. |
+| 68 | Auto Remediation → Store Event | Auto-remediation writes the remediation outcome back as an auditable event. |
+| 69 | Compliance State → Runtime Posture | A no-drift result updates the runtime posture view as compliant. |
+| 70 | Store Event → ServiceNow | **Phase 2 target state:** the stored drift event is also pushed to ServiceNow for operational follow-up. In Phase 1, the same event is retained in the audit store and handled through governed ITSM handoff. |
 
 ---
 
@@ -171,7 +171,7 @@ This document explains each numbered integration in the unified component contex
 | 73 | Migration Orchestrator → Post-Remediation DB Validation | After migration execution, the Post-Remediation Validator checks that the database schema matches the target baseline. |
 | 74 | Migration Orchestrator → DB Rollback Path | If migration validation fails, the Migration Orchestrator invokes the Rollback Path (snapshot restore or previous migration). |
 | 75 | DB Rollback Path → Post-Remediation DB Validation | After rollback, the validator re-checks database state to confirm successful restoration. |
-| 76 | Post-Remediation DB Validation → Drift Findings | DB remediation results are reported back as drift findings to keep compliance posture up to date. |
+| 76 | Post-Remediation DB Validation → Store Event | DB remediation results are reported back into the same stored-event path so they reach the audit database and dashboards. |
 
 ---
 
@@ -186,12 +186,12 @@ This document explains each numbered integration in the unified component contex
 | 81 | Artifact Scans → EventBridge Evidence Bus | Image/container scan results from ECR and Inspector are published to EventBridge as artifact security evidence. |
 | 82 | Runtime Posture → EventBridge Evidence Bus | Ongoing runtime posture findings from Security Hub and GuardDuty are published to EventBridge as continuous compliance evidence. |
 | 83 | SSM Inventory → EventBridge Evidence Bus | SSM Inventory state snapshots are published to EventBridge to provide host-level inventory evidence records. |
-| 84 | Convergence Verification → EventBridge Evidence Bus | Drift remediation convergence results are published to EventBridge as infrastructure compliance evidence. |
+| 84 | Compliance State → EventBridge Evidence Bus | The no-drift compliance result is published as a PASS evidence event so compliant scans are still auditable. |
 | 85 | Post-Remediation DB Validation → EventBridge Evidence Bus | DB remediation and validation outcomes are published to EventBridge as database compliance evidence. |
-| 86 | Drift Findings → EventBridge Evidence Bus | Drift finding records (including status and remediation state) are published to EventBridge for evidence capture. |
+| 86 | Store Event → EventBridge Evidence Bus | Drift finding records and remediation-state updates are published to EventBridge for audit capture. |
 | 87 | EventBridge Evidence Bus → Evidence Ingestor Lambda | EventBridge routes all evidence events to the Evidence Ingestor Lambda, which validates schema and ingests each record. |
-| 88 | Evidence Ingestor Lambda → S3 Evidence Bucket | The validated evidence record is written to the S3 Evidence Bucket with Object Lock and SSE-KMS to ensure immutability. |
-| 89 | Evidence Ingestor Lambda → DynamoDB Evidence Index | A metadata index entry for each evidence record is written to DynamoDB to enable fast querying and cross-referencing. |
+| 88 | Evidence Ingestor Lambda → S3 Evidence Bucket | The validated evidence record is written to the immutable S3 evidence bucket with Object Lock and SSE-KMS. |
+| 89 | Evidence Ingestor Lambda → Audit Database | A queryable audit-database entry for each event is written to DynamoDB to support fast operational reporting. |
 | 90 | S3 Evidence Bucket → Integrity Verifier Lambda | A daily scheduled check triggers the Integrity Verifier Lambda to re-validate stored evidence records for tampering. |
 | 91 | Integrity Verifier Lambda → CloudTrail | If the Integrity Verifier detects a tampered record, it raises a tamper alert that is logged to CloudTrail for investigation. |
 | 92 | S3 Evidence Bucket → CloudTrail | S3 object-level events on the evidence bucket are automatically captured by CloudTrail for audit of all access and changes. |
@@ -202,11 +202,9 @@ This document explains each numbered integration in the unified component contex
 
 | # | From → To | Explanation |
 |---|-----------|-------------|
-| 93 | S3 Evidence Bucket → Audit Manager | AWS Audit Manager aggregates evidence records from S3 to produce structured compliance assessment reports. |
-| 94 | S3 Evidence Bucket → Athena | Athena is pointed at the S3 Evidence Bucket to enable ad-hoc SQL queries over raw evidence data for custom reporting. |
-| 95 | DynamoDB Evidence Index → Athena | The DynamoDB index metadata is made available to Athena queries, allowing joins between index fields and S3 evidence objects. |
-| 96 | Audit Manager → Cyber Security Operations Analyst Export API | Audit Manager exports structured compliance reports through the Cyber Security Operations Analyst Export API for consumption by cyber security operations analysts or external GRC tools. |
-| 97 | Athena → Cyber Security Operations Analyst Export API | Athena query results are surfaced via the Cyber Security Operations Analyst Export API, providing on-demand evidence exports for audit requests. |
+| 93 | Audit Database → Splunk | Splunk indexes audit, compliance, and remediation events for search, alerting, and operational investigation. |
+| 94 | Audit Database → Grafana | Grafana reads the audit database metrics and status views to present drift and compliance dashboards. |
+| 95 | S3 Evidence Bucket → Splunk | Splunk can drill back to the immutable raw evidence objects when analysts need full-event detail. |
 
 ---
 
@@ -222,8 +220,10 @@ This document explains each numbered integration in the unified component contex
 | CMDB | Configuration Management Database |
 | DynamoDB | Amazon DynamoDB |
 | EC2 | Amazon Elastic Compute Cloud |
+| Grafana | Open source dashboard and visualization platform |
 | ECR | Amazon Elastic Container Registry |
 | GRC | Governance, Risk, and Compliance |
+| Splunk | Search and analytics platform for operational and security events |
 | IaC | Infrastructure as Code |
 | IAM | Identity and Access Management |
 | OIDC | OpenID Connect |
