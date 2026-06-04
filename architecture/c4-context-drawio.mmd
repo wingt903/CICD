@@ -1,30 +1,30 @@
 graph TB
     %% C4 Context (Level 1) - draw.io compatible
     %% People
-    migTeam([App Owner])
-    appTeam([Product Engineer])
-    platformEngineer([Platform Engineer])
+    migTeam([CAR Architecture Team<br/>App Owner])
+    appTeam([TPAM Team<br/>Product Engineer])
+    platformEngineer([Platform Engineer<br/>OS/Image IaC Owner])
     auditor([Cyber Security Operations Analyst])
 
     %% System under design
-    cicd[App as Code CICD Platform]
+    cicd[GitHub Organization-based App as Code CI/CD Platform<br/>GitHub Actions + Environments + Repo Governance]
 
     %% External systems
-    appRepos[Application Repos]
-    infraRepos[Infrastructure Repos]
-    aws[AWS Cloud]
-    sn[ServiceNow]
+    appRepos[Application Repositories<br/>GitHub Repos]
+    infraRepos[Infrastructure Repositories<br/>GitHub Repos]
+    aws[AWS Target Accounts]
+    sn[ServiceNow<br/>Phase 2 Integration]
 
     %% Relationships
-    migTeam -->|approves promotion and remediation| cicd
-    appTeam -->|pushes app code changes| appRepos
+    migTeam -->|approves promotions and remediations in GitHub Environments| cicd
+    appTeam -->|pushes application code and config| appRepos
     platformEngineer -->|pushes OS/image IaC changes| infraRepos
-    appRepos -->|triggers pipeline runs| cicd
-    infraRepos -->|triggers pipeline runs| cicd
+    appRepos -->|triggers GitHub Actions workflows| cicd
+    infraRepos -->|triggers GitHub Actions workflows| cicd
     auditor -->|reads evidence and reports| cicd
-    cicd -->|builds, deploys, stores artifacts| aws
-    cicd -.->|creates change and remediation tickets| sn
-    sn -.->|triggers runs via IntegrationHub| cicd
+    cicd -->|builds, deploys, and stores artifacts via OIDC| aws
+    cicd -.->|optional: creates change/remediation tickets| sn
+    sn -.->|optional: triggers runs via IntegrationHub| cicd
     sn -.->|sends remediation notices| migTeam
 
     %% Styling
