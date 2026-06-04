@@ -25,7 +25,7 @@ graph TB
     cicd -->|builds, deploys, and stores artifacts via OIDC| aws
     cicd -.->|optional: creates change/remediation tickets| sn
     sn -.->|optional: triggers runs via IntegrationHub| cicd
-    sn -.->|sends remediation notices| migTeam
+    sn -.->|sends remediation notices| appTeam
 
     %% Styling
     style cicd fill:#1168BD,color:#ffffff,stroke:#0b4884
