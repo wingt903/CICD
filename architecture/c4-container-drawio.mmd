@@ -9,6 +9,7 @@ graph TB
     %% External systems
     appRepos[Application Repos]
     infraRepos[Infrastructure Repos]
+    sn[ServiceNow - Phase 2]
 
     %% System boundary
     subgraph cicd ["App as Code CICD Platform"]
@@ -43,6 +44,7 @@ Splunk + Grafana + CloudTrail"]
     appOwner -.->|"manual workflow_dispatch approval [HTTPS/GitHub API]"| orch
     appOwner -->|"governed promotion approval [HTTPS/GitHub API]"| remediate
     auditor -->|"read-only dashboard and audit access [HTTPS]"| dashboards
+    sn -.->|"optional phase 2 workflow trigger and CMDB context [HTTPS/API]"| orch
 
     %% Template governance
     templates -->|"supplies governed pipeline definition [HTTPS/Git]"| orch
@@ -58,9 +60,11 @@ Splunk + Grafana + CloudTrail"]
     compare -->|"drift event or compliance result [AWS EventBridge]"| evidence
     compare -->|"triggers restore-to-baseline action [AWS API]"| remediate
     remediate -->|"writes remediation outcome [AWS EventBridge]"| evidence
+    remediate -.->|"optional phase 2 change and remediation updates [HTTPS/API]"| sn
     orch -->|"emits pipeline stage evidence [AWS EventBridge]"| evidence
     evidence -->|"stores and indexes audit records [HTTPS/API]"| dashboards
     evidence -->|"streams compliance events [HTTPS/API]"| dashboards
+    evidence -.->|"optional phase 2 evidence and status updates [HTTPS/API]"| sn
 
     %% Styling - internal containers
     style templates fill:#85BBF0,color:#000000,stroke:#5D82A8
@@ -82,3 +86,4 @@ Splunk + Grafana + CloudTrail"]
     %% Styling - external systems
     style appRepos fill:#999999,color:#ffffff,stroke:#666666
     style infraRepos fill:#999999,color:#ffffff,stroke:#666666
+    style sn fill:#999999,color:#ffffff,stroke:#666666
