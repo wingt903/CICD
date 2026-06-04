@@ -1,30 +1,31 @@
+%%{init: {'themeVariables': {'fontSize': 10}, 'flowchart': {'nodeSpacing': 8, 'rankSpacing': 12, 'diagramPadding': 2, 'curve': 'linear'}}}%%
 graph TB
     %% C4 Context (Level 1) - draw.io compatible
     %% People
-    migTeam([App Owner])
-    appTeam([Product Engineer])
+    migTeam([CAR Architecture Team])
+    appTeam([TPAM Team])
     platformEngineer([Platform Engineer])
     auditor([Cyber Security Operations Analyst])
 
     %% System under design
-    cicd[App as Code CICD Platform]
+    cicd[GitHub Organization App as Code CI/CD Platform]
 
     %% External systems
-    appRepos[Application Repos]
-    infraRepos[Infrastructure Repos]
-    aws[AWS Cloud]
-    sn[ServiceNow]
+    appRepos[Application Repositories - GitHub]
+    infraRepos[Infrastructure Repositories - GitHub]
+    aws[AWS Target Accounts]
+    sn[ServiceNow - Phase 2]
 
     %% Relationships
-    migTeam -->|approves promotion and remediation| cicd
-    appTeam -->|pushes app code changes| appRepos
+    migTeam -->|approves promotions/remediations| cicd
+    appTeam -->|pushes app code/config| appRepos
     platformEngineer -->|pushes OS/image IaC changes| infraRepos
-    appRepos -->|triggers pipeline runs| cicd
-    infraRepos -->|triggers pipeline runs| cicd
+    appRepos -->|triggers GitHub Actions| cicd
+    infraRepos -->|triggers GitHub Actions| cicd
     auditor -->|reads evidence and reports| cicd
-    cicd -->|builds, deploys, stores artifacts| aws
-    cicd -.->|creates change and remediation tickets| sn
-    sn -.->|triggers runs via IntegrationHub| cicd
+    cicd -->|builds/deploys/stores artifacts via OIDC| aws
+    cicd -.->|optional: creates change/remediation tickets| sn
+    sn -.->|optional: triggers runs via IntegrationHub| cicd
     sn -.->|sends remediation notices| migTeam
 
     %% Styling
