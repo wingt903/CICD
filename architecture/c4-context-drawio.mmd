@@ -1,31 +1,32 @@
+%%{init: {'themeVariables': {'fontSize': 10}, 'flowchart': {'nodeSpacing': 8, 'rankSpacing': 12, 'diagramPadding': 2, 'curve': 'linear'}}}%%
 graph TB
     %% C4 Context (Level 1) - draw.io compatible
     %% People
-    migTeam([CAR Architecture Team<br/>App Owner])
-    appTeam([TPAM Team<br/>Product Engineer])
-    platformEngineer([App as Code Platform Engineer])
+    migTeam([CAR Architecture Team])
+    appTeam([TPAM Team])
+    platformEngineer([Platform Engineer])
     auditor([Cyber Security Operations Analyst])
 
     %% System under design
-    cicd[GitHub Organization-based App as Code CI/CD Platform<br/>GitHub Actions + Environments + Repo Governance]
+    cicd[GitHub Organization App as Code CI/CD Platform]
 
     %% External systems
-    appRepos[Application Repositories<br/>GitHub Repos]
-    infraRepos[Infrastructure Repositories<br/>GitHub Repos]
+    appRepos[Application Repositories (GitHub)]
+    infraRepos[Infrastructure Repositories (GitHub)]
     aws[AWS Target Accounts]
-    sn[ServiceNow<br/>Phase 2 Integration]
+    sn[ServiceNow (Phase 2)]
 
     %% Relationships
-    migTeam -->|approves promotions and remediations in GitHub Environments| cicd
-    appTeam -->|pushes application code and config| appRepos
+    migTeam -->|approves promotions/remediations| cicd
+    appTeam -->|pushes app code/config| appRepos
     platformEngineer -->|pushes OS/image IaC changes| infraRepos
-    appRepos -->|triggers GitHub Actions workflows| cicd
-    infraRepos -->|triggers GitHub Actions workflows| cicd
+    appRepos -->|triggers GitHub Actions| cicd
+    infraRepos -->|triggers GitHub Actions| cicd
     auditor -->|reads evidence and reports| cicd
-    cicd -->|builds, deploys, and stores artifacts via OIDC| aws
+    cicd -->|builds/deploys/stores artifacts via OIDC| aws
     cicd -.->|optional: creates change/remediation tickets| sn
-    sn -.->|optional: triggers runs via IntegrationHub| cicd
-    sn -.->|sends remediation notices| appTeam
+    sn -.->|optional: triggers runs (IntegrationHub)| cicd
+    sn -.->|sends remediation notices| migTeam
 
     %% Styling
     style cicd fill:#1168BD,color:#ffffff,stroke:#0b4884
