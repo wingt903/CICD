@@ -1,6 +1,6 @@
 # Compliance Evidence Store — Design and Controls
 
-This document specifies the evidence schema, storage controls, access/change audit trail, and audit reporting layer that close the gaps identified in App_as_Code_004.
+This document specifies the evidence schema, storage controls, access/change audit trail, and audit reporting layer that align App_as_Code_004 to the approved-baseline -> scheduled drift scan -> comparison -> event storage -> auto-remediation -> audit database -> Splunk/Grafana flow.
 
 ## Scope assumptions
 
@@ -39,8 +39,8 @@ All fields are required. Evidence records are immutable once written; correction
 | RTCM Validator | Immediately after source checkout and manifest inspection | Approved/rejected runtime compatibility decision for application, middleware, and database versions, including rejection reason and approved version range |
 | GitHub Actions (build pipeline) | End of each successful / failed build stage | SAST, IaC policy scan, image scan, AMI registration, SSM inventory capture |
 | Ansible / SSM | Post-build SSM document completion | OS hardening result, middleware configuration validation, inventory snapshot |
-| Drift Reconciler | Post-convergence verification | Infrastructure drift detection, baseline enforcement, convergence confirmation |
-| Database Drift Controller | Post-remediation DB validation | Schema/config drift status, migration outcome, rollback events |
+| Drift Reconciler | Scheduled drift scan and post-remediation verification | Infrastructure state collection, baseline comparison, drift event creation, and convergence confirmation |
+| Database Drift Controller | Scheduled DB drift scan and post-remediation validation | Schema/config drift status, migration outcome, rollback events, and compliant-state confirmation |
 | Security Hub / GuardDuty | EventBridge finding event | Runtime threat/posture findings linked to CI asset |
 | ServiceNow (CMDB) | CMDB CI update webhook | **Phase 2 target state:** CMDB change record reference and change closure confirmation. In Phase 1, the same reference is attached through manual / governed ITSM handoff. |
 
@@ -66,7 +66,7 @@ S3 Evidence Bucket (compliance-evidence-<account>)
    │  - S3 Access Logging: enabled → S3 Audit Log Bucket
    │  - Object-level logging: CloudTrail data events (read + write)
    ▼
-Evidence Index (Amazon DynamoDB — GSIs on system_id, control_id, timestamp)
+Audit Database (Amazon DynamoDB — GSIs on system_id, control_id, timestamp)
    │  - TTL disabled (records retained permanently to match 7-year evidence retention)
    │  - Streams → integrity verifier
    ▼
@@ -77,10 +77,9 @@ Integrity Verifier Lambda (scheduled daily via EventBridge)
    │  - Alerts via SNS on any verification failure
    ▼
 Audit Reporting Layer
-   │  - Athena queries over S3 partitioned by env/date
-   │  - AWS Audit Manager (custom framework mapped to App_as_Code controls)
-   │  - Pre-built report templates: point-in-time, historical, per-control, per-asset
-   │  - Export: S3 presigned URL or direct audit manager report PDF
+   │  - Splunk search, alerting, and drift-event correlation
+   │  - Grafana dashboards for compliance posture and remediation trends
+   │  - Raw evidence drill-down from immutable S3 records
 ```
 
 ### S3 Bucket Layout
@@ -142,18 +141,18 @@ A dedicated IAM role (`compliance-evidence-audit-reader`) with read-only permiss
 
 | Report | Scope | Description |
 |---|---|---|
-| Current compliance posture | Per environment, per control, or per asset | Snapshot of the most recent assessment result for every active CI against every in-scope control. |
-| Historical compliance trend | Date range, per control or per asset | Time-series of PASS/FAIL/PARTIAL counts to show compliance progression or regression. |
-| Remediation history | Per asset or per incident | Full lifecycle of a compliance gap from detection through closure with timestamps and actor references. |
+| Current compliance posture | Per environment, per control, or per asset | Snapshot of the most recent approved-baseline comparison result for every active CI against every in-scope control. |
+| Historical compliance trend | Date range, per control or per asset | Time-series of PASS/FAIL/PARTIAL counts built from compliant-state and drift-event records. |
+| Remediation history | Per asset or per incident | Full lifecycle of a drift event from storage through auto-remediation and closure. |
 | Evidence integrity report | All evidence, or targeted range | Output of the Integrity Verifier showing which records passed or failed hash/signature verification, with any anomalies highlighted. |
 | Access/change audit report | Date range | Extract of CloudTrail evidence access and mutation events for a given period for auditor review. |
 
 ### Generation and Export
 
-- **AWS Audit Manager** is configured with a custom framework that maps each App_as_Code control (001–008) to the evidence sources defined in Section 2, including RTCM validation evidence for App_as_Code_008. Audit Manager automatically aggregates evidence and generates assessment reports.
-- **Amazon Athena** queries the partitioned evidence S3 prefix for ad-hoc and scheduled report generation. Results are written to `s3://compliance-evidence-<account>/reports/`.
-- **Export** is available as PDF (via Audit Manager) or CSV/JSON (via Athena query result) through an auditor-facing presigned URL API (API Gateway + Lambda, read-only, authenticated via IAM Identity Center).
-- Report generation events are logged to CloudTrail.
+- **Splunk** ingests audit-database events for search, alerting, and drift/remediation correlation.
+- **Grafana** renders current posture, drift trend, and remediation-duration dashboards from the audit database.
+- **Immutable evidence drill-down** remains available through the S3 evidence bucket when analysts need the full signed event payload or raw execution logs.
+- Report-view and drill-down access events are logged to CloudTrail.
 
 ---
 
@@ -165,5 +164,5 @@ A dedicated IAM role (`compliance-evidence-audit-reader`) with read-only permiss
 | Tamper anomaly alerting | CloudWatch Metric Alarm on `EvidenceIntegrityFailure` count > 0 | Real-time alarm → SNS → PagerDuty / **Phase 2** ServiceNow incident |
 | Unexpected access alerting | CloudWatch Logs Insights rule on CloudTrail — GetObject by non-approved principals | Real-time via CloudWatch Logs subscription filter |
 | Lock override alerting | CloudTrail CloudWatch Logs metric filter on `BypassGovernanceRetention` | Real-time alarm → SNS |
-| Periodic attestation | Integrity Verifier publishes signed attestation JSON to `integrity-results/` prefix | Weekly; summary linked to Audit Manager assessment cycle |
+| Periodic attestation | Integrity Verifier publishes signed attestation JSON to `integrity-results/` prefix | Weekly; summary linked to the operational audit review cycle |
 | Evidence completeness check | Lambda compares expected evidence records (from CMDB CI list × control matrix) against actual records in index | Daily; gaps published as CloudWatch metric and manual / governed ITSM handoff in Phase 1 or ServiceNow incident in Phase 2 |

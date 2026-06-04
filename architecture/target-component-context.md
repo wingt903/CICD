@@ -29,14 +29,11 @@
 
 ## Capability mapping
 
-- Artifact management: ECR + CodeArtifact + release manifest + SBOM/provenance
-- Runtime compatibility governance: versioned RTCM artifact + SSM Parameter Store mirror + pre-install validation gate
-- Infra provisioning: Terraform with isolated backend and environment tfvars
-- Image build and configuration: Ansible-driven EC2 build flow over SSM (no Packer dependency)
-- Security scanning: SAST/dependency/secret + tfsec/Checkov + Inspector/ECR scans
-- Release governance: GitHub Environments with environment protections and approvals
-- Observability: CloudWatch dashboards/logs/alarms + OpenTelemetry/X-Ray traces
-- Rollback: Blue/green or canary rollback + AMI rollback + controlled Terraform revert
+- Approved baseline publication: governed commit approval produces a release manifest and published desired-state baseline.
+- Drift control: EventBridge Scheduler triggers recurring drift scans that collect live state and compare it to the approved baseline.
+- Compliance decisioning: comparison returns either a compliant state or a drift event that must be stored.
+- Auto-remediation: drift events trigger restore-to-baseline automation through Terraform, Ansible, or DB migration controls.
+- Audit persistence and reporting: audit events land in a DynamoDB-backed audit database and are surfaced through Splunk and Grafana dashboards.
 
 ## Diagram
 

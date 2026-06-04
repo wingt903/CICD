@@ -7,71 +7,66 @@ graph TB
     subgraph pipeline ["CI/CD Pipeline - GitHub Actions"]
         trigger[Trigger Handler]
         oidcMod[OIDC Auth]
-        rtcmGate[RTCM Gate]
-        secGate[Security Gate]
-        imgBuild[Image Builder]
-        artMgr[Artifact Manager]
-        deployer[Deployment Controller]
-        govGuard[No-Redeploy Guard]
+        baselinePub[Baseline Publisher]
+        driftSched[Scheduled Drift Scan]
+        stateCollect[State Collector]
+        compareEngine[Comparison Engine]
+        driftDecision{Drift Found?}
+        autoRemed[Auto Remediation]
         evidEmit[Evidence Emitter]
     end
 
     %% External AWS and GitHub systems
     oidcProv[IAM OIDC Provider]
     ssmParam[SSM Parameter Store]
-    ssmDrec[SSM Decision Records]
-    ssmSess[SSM Session Manager]
-    buildHost[Private Builder EC2]
-    ecr[Amazon ECR]
-    ca[AWS CodeArtifact]
-    ghEnv[GitHub Environments]
+    releaseManifest[Release Manifest]
+    runtimeState[AWS Runtime State APIs]
     evtBus[EventBridge Evidence Bus]
-    compStore[Compliance Evidence Store]
+    auditDb[Audit Database
+DynamoDB Evidence Index]
+    splunk[Splunk]
+    grafana[Grafana]
 
     %% Relationships
     appRepos -->|push / workflow_dispatch| trigger
     trigger --> oidcMod
     oidcMod -->|exchanges OIDC for STS| oidcProv
-    trigger --> rtcmGate
-    ssmParam -->|approved baseline| rtcmGate
-    trigger --> secGate
-    rtcmGate -->|gate evidence| secGate
-    secGate -->|passes gate| imgBuild
-    imgBuild --> ssmSess
-    ssmSess --> buildHost
-    imgBuild --> buildHost
-    ssmParam -->|build parameters| buildHost
-    trigger --> artMgr
-    artMgr --> ecr
-    artMgr --> ca
-    artMgr -->|writes params| ssmParam
-    trigger --> govGuard
-    govGuard --> ssmDrec
-    trigger --> deployer
-    deployer -->|promotion approval| ghEnv
-    trigger --> evidEmit
+    trigger --> baselinePub
+    baselinePub -->|writes approved baseline| ssmParam
+    baselinePub -->|stores release manifest| releaseManifest
+    trigger --> driftSched
+    driftSched -->|loads approved baseline| ssmParam
+    driftSched -->|loads approved release| releaseManifest
+    driftSched --> stateCollect
+    runtimeState -->|live state snapshot| stateCollect
+    stateCollect --> compareEngine
+    compareEngine --> driftDecision
+    driftDecision -->|no drift: compliant result| evidEmit
+    driftDecision -->|yes: store event| evidEmit
+    driftDecision -->|yes: restore baseline| autoRemed
+    autoRemed -->|remediation outcome| evidEmit
     evidEmit --> evtBus
-    evtBus --> compStore
+    evtBus --> auditDb
+    auditDb --> splunk
+    auditDb --> grafana
 
     %% Styling - internal components
     style trigger fill:#85BBF0,color:#000000,stroke:#5D82A8
     style oidcMod fill:#85BBF0,color:#000000,stroke:#5D82A8
-    style rtcmGate fill:#85BBF0,color:#000000,stroke:#5D82A8
-    style secGate fill:#85BBF0,color:#000000,stroke:#5D82A8
-    style imgBuild fill:#85BBF0,color:#000000,stroke:#5D82A8
-    style artMgr fill:#85BBF0,color:#000000,stroke:#5D82A8
-    style deployer fill:#85BBF0,color:#000000,stroke:#5D82A8
-    style govGuard fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style baselinePub fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style driftSched fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style stateCollect fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style compareEngine fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style driftDecision fill:#ffffff,color:#000000,stroke:#5D82A8
+    style autoRemed fill:#85BBF0,color:#000000,stroke:#5D82A8
     style evidEmit fill:#85BBF0,color:#000000,stroke:#5D82A8
     %% External systems
     style appRepos fill:#999999,color:#ffffff,stroke:#666666
     style oidcProv fill:#999999,color:#ffffff,stroke:#666666
     style ssmParam fill:#999999,color:#ffffff,stroke:#666666
-    style ssmDrec fill:#999999,color:#ffffff,stroke:#666666
-    style ssmSess fill:#999999,color:#ffffff,stroke:#666666
-    style buildHost fill:#999999,color:#ffffff,stroke:#666666
-    style ecr fill:#999999,color:#ffffff,stroke:#666666
-    style ca fill:#999999,color:#ffffff,stroke:#666666
-    style ghEnv fill:#999999,color:#ffffff,stroke:#666666
+    style releaseManifest fill:#999999,color:#ffffff,stroke:#666666
+    style runtimeState fill:#999999,color:#ffffff,stroke:#666666
     style evtBus fill:#999999,color:#ffffff,stroke:#666666
-    style compStore fill:#999999,color:#ffffff,stroke:#666666
+    style auditDb fill:#999999,color:#ffffff,stroke:#666666
+    style splunk fill:#999999,color:#ffffff,stroke:#666666
+    style grafana fill:#999999,color:#ffffff,stroke:#666666
