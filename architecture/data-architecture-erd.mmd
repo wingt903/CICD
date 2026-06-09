@@ -25,7 +25,7 @@ erDiagram
     }
     COMPLIANCE_EVIDENCE {
         string evidence_id PK
-        string run_id FK nullable
+        string run_id FK "nullable for continuous monitoring records"
         string baseline_id FK
         string app_repo_name
         string app_repo_version
