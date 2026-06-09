@@ -1,7 +1,7 @@
 erDiagram
 
     APPROVED_BASELINE ||--o{ PIPELINE_RUN : "governs runtime baseline for"
-    GOLDEN_AMI o|--|| PIPELINE_RUN : "is produced by"
+    PIPELINE_RUN ||--o| GOLDEN_AMI : "produces for image build runs"
     PIPELINE_RUN ||--o{ GITHUB_LOG : "generates"
     PIPELINE_RUN }o--o{ AWS_LOG : "correlates with"
 
