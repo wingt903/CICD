@@ -1,6 +1,6 @@
 # Data Architecture – Entity-Relationship View
 
-This document provides the data architecture model for the **App as Code CICD Platform**. It covers the key data entities, their relationships, ownership boundaries, and any personal-data (PII) fields.
+This document provides the data architecture model for the **App as Code CICD Platform** at **entity level**. It covers the key entities, their relationships, ownership boundaries, and entity-level PII markers.
 
 > **Diagram source:** `data-architecture-erd.mmd` (draw.io-compatible Mermaid `erDiagram`).
 
@@ -74,20 +74,19 @@ This document provides the data architecture model for the **App as Code CICD Pl
 
 ---
 
-## PII Register
+## PII Register (Entity Level)
 
-The CICD platform does not actively collect personal data as part of its core function. However, the following fields constitute **indirect personal identifiers** inherent to GitHub and AWS operational logs.
+The CICD platform does not actively collect personal data as part of its core function. The following entity-level markers identify where PII or quasi-PII can appear in operational records.
 
-| Entity | Field | Classification | Basis | Mitigation |
-|--------|-------|----------------|-------|------------|
-| `ACTOR` | `github_username` | 🔴 PII | Direct personal identifier (GitHub handle maps to a real person) | Accessed only by authorized platform operators; not exposed in dashboards |
-| `PIPELINE_RUN` | `triggered_by` | 🔴 PII | GitHub username of the person who triggered the run | Retained only in audit-locked evidence; access via IAM-controlled DynamoDB |
-| `APPROVED_BASELINE` | `approved_by` | 🔴 PII | GitHub username of the person who approved the baseline | Same as above |
-| `GITHUB_LOG` | `actor` | 🔴 PII | GitHub username of the job actor | Archived to S3 with SSE-KMS and IAM-scoped access; log retention policy applies |
-| `AWS_LOG` | `principal_arn` | ⚠️ Quasi-PII | IAM principal ARN — typically a service role, but can identify a named IAM user | Service role ARNs preferred; named IAM users avoided in pipeline automation |
-| `AWS_LOG` | `source_ip_address` | ⚠️ Quasi-PII | Source IP address — personal data under GDPR | Retained in CloudTrail with standard AWS log lifecycle; not surfaced in dashboards |
+| Entity | Classification | Basis | Mitigation |
+|--------|----------------|-------|------------|
+| `ACTOR` | 🔴 PII | Represents a human identity from GitHub / IAM context | Accessed only by authorized platform operators; not exposed in broad dashboards |
+| `PIPELINE_RUN` | 🔴 PII | Can include triggering user identity from GitHub events | Retained in audit-controlled stores with IAM-scoped access |
+| `APPROVED_BASELINE` | 🔴 PII | Can include approver identity for governance traceability | Retained in controlled evidence and decision records |
+| `GITHUB_LOG` | 🔴 PII | GitHub Actions logs can include user identifiers and handles | Archived with SSE-KMS and restricted IAM access |
+| `AWS_LOG` | ⚠️ Quasi-PII | CloudTrail/CloudWatch events may include principal ARN or source IP | Service-role-first design, retention controls, and restricted access |
 
-> **Note:** NFR-PRIV-03 and NFR-PRIV-04 are assessed as not applicable because the platform does not process application-level personal data. The PII fields above are operational identifiers incidental to audit logging.
+> **Note:** NFR-PRIV-03 and NFR-PRIV-04 are assessed as not applicable because the platform does not process application-level personal data. The markers above are operational identifiers incidental to audit logging.
 
 ---
 
