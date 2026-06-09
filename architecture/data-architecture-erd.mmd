@@ -3,7 +3,7 @@ erDiagram
     APP_CODE_REPO ||--o{ PIPELINE_RUN : "triggers"
     IAC_REPO ||--o{ PIPELINE_RUN : "triggers"
     PIPELINE_RUN ||--o{ GATE_RESULT : "produces"
-    PIPELINE_RUN ||--o| RELEASE_MANIFEST : "produces when gated pass"
+    PIPELINE_RUN ||--o| RELEASE_MANIFEST : "produces when gates pass"
     PIPELINE_RUN ||--o| GOLDEN_AMI : "builds for image pipeline"
     PIPELINE_RUN ||--o{ GITHUB_LOG : "generates"
     PIPELINE_RUN ||--o{ EVIDENCE_RECORD : "emits"
