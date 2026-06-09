@@ -1,0 +1,211 @@
+%%{init: {'theme': 'default', 'themeVariables': {'fontSize': 10}}}%%
+erDiagram
+
+    %% =============================================================
+    %% CICD Platform – Data Architecture (Entity-Relationship View)
+    %% =============================================================
+    %%
+    %% OWNERSHIP KEY
+    %%   [CICD]    entity stored and managed by the CICD Platform
+    %%   [EXT-APP] entity owned by the Application Team (external)
+    %%   [EXT-IAC] entity owned by the Infrastructure / IaC Team (external)
+    %%   [EXT-IDM] entity mastered in an external identity system
+    %%
+    %% PII KEY
+    %%   comment "PII"       – direct personal identifier (GitHub username, email)
+    %%   comment "QUASI-PII" – indirect identifier (IP address, IAM principal ARN)
+    %%   (no marker)         – no personal data
+    %%
+    %% SCOPE NOTE
+    %%   The CICD platform does NOT store application source code or IaC source
+    %%   code; it stores only the log and audit data it generates or ingests from
+    %%   AWS (CloudTrail / CloudWatch) and GitHub (Actions job logs).
+    %% =============================================================
+
+
+    %% ------------------------------------------------------------------
+    %% EXTERNAL ENTITIES  (referenced by the platform; not owned by it)
+    %% ------------------------------------------------------------------
+
+    ACTOR {
+        string github_username PK "PII – GitHub handle"
+        string iam_arn             "QUASI-PII – maps to a person if IAM user"
+        string role                "App Owner | Platform Engineer | Auditor"
+    }
+
+    APP_CODE_REPO {
+        string repo_id   PK
+        string repo_name
+        string org_name
+    }
+
+    IAC_REPO {
+        string repo_id   PK
+        string repo_name
+        string repo_type "infra | image | ansible"
+    }
+
+
+    %% ------------------------------------------------------------------
+    %% CICD PLATFORM OWNED ENTITIES
+    %% ------------------------------------------------------------------
+
+    GOVERNING_TEMPLATE {
+        string template_id       PK
+        string template_name
+        string pinned_version
+        string codeowners_path
+        timestamp published_at
+    }
+
+    PIPELINE_RUN {
+        string    run_id          PK
+        string    workflow_name
+        string    triggered_by       "PII – GitHub username of actor"
+        string    trigger_event      "push | workflow_dispatch"
+        string    status             "success | failed | cancelled"
+        string    target_environment "dev | test | prod"
+        timestamp started_at
+        timestamp completed_at
+    }
+
+    GATE_RESULT {
+        string    gate_id        PK
+        string    run_id         FK
+        string    gate_type         "RTCM | SAST | IaC | ImageScan | Secret"
+        string    outcome           "pass | fail"
+        string    finding_summary
+        timestamp evaluated_at
+    }
+
+    APPROVED_BASELINE {
+        string    baseline_id    PK
+        string    component
+        string    approved_version
+        string    ssm_parameter_path
+        string    approved_by       "PII – GitHub username of approver"
+        timestamp approved_at
+    }
+
+    GOLDEN_AMI {
+        string    ami_id         PK
+        string    base_image_id
+        string    playbook_version
+        string    scan_status       "pass | fail"
+        string    built_by_run_id   FK
+        timestamp built_at
+    }
+
+    RELEASE_MANIFEST {
+        string    manifest_id    PK
+        string    run_id         FK
+        string    ami_id         FK
+        string    iac_version
+        string    image_digest
+        string    target_environment
+        string    status            "approved | blocked | failed"
+        timestamp created_at
+    }
+
+    SSM_DECISION_RECORD {
+        string    decision_id    PK
+        string    manifest_id    FK
+        string    target_environment
+        string    decision          "approved | blocked | failed"
+        string    reason
+        timestamp decided_at
+    }
+
+    DRIFT_EVENT {
+        string    event_id       PK
+        string    manifest_id    FK
+        string    target_environment
+        string    drift_type        "config | schema | runtime | iac"
+        string    severity          "critical | high | medium | low"
+        string    remediation_status "pending | auto-fixed | manual"
+        timestamp detected_at
+    }
+
+    EVIDENCE_RECORD {
+        string    evidence_id    PK
+        string    source_type       "PipelineRun | GateResult | DriftEvent"
+        string    source_id      FK
+        string    s3_key
+        string    s3_bucket
+        string    kms_key_id
+        string    object_lock_mode  "COMPLIANCE"
+        timestamp ingested_at
+    }
+
+    AUDIT_ENTRY {
+        string    entry_id       PK
+        string    evidence_id    FK
+        string    pipeline_run_id FK
+        string    event_type
+        string    target_environment
+        string    outcome
+        timestamp event_time
+    }
+
+    %% ------------------------------------------------------------------
+    %% CICD PLATFORM OWNED – LOG STORES
+    %% (the only external-origin data the platform stores)
+    %% ------------------------------------------------------------------
+
+    AWS_LOG {
+        string    log_id         PK
+        string    log_source        "CloudTrail | CloudWatch | GuardDuty"
+        string    event_name
+        string    principal_arn     "QUASI-PII – IAM principal; usually service role"
+        string    source_ip_address "QUASI-PII – IP address"
+        string    resource_arn
+        timestamp event_time
+    }
+
+    GITHUB_LOG {
+        string    log_id         PK
+        string    run_id         FK
+        string    job_name
+        string    actor             "PII – GitHub username of job actor"
+        string    conclusion        "success | failure | skipped | cancelled"
+        string    log_archive_s3_key
+        timestamp created_at
+    }
+
+
+    %% ------------------------------------------------------------------
+    %% RELATIONSHIPS
+    %% ------------------------------------------------------------------
+
+    %% Actors and external repos feed into pipeline runs
+    ACTOR          ||--o{ PIPELINE_RUN       : "triggers (workflow_dispatch / push)"
+    ACTOR          ||--o{ APPROVED_BASELINE  : "approves"
+    APP_CODE_REPO  ||--o{ PIPELINE_RUN       : "source for"
+    IAC_REPO       ||--o{ PIPELINE_RUN       : "source for"
+
+    %% Templates govern pipeline runs
+    GOVERNING_TEMPLATE ||--o{ PIPELINE_RUN   : "governs"
+
+    %% A pipeline run produces gates, a manifest, logs, and evidence
+    PIPELINE_RUN   ||--o{ GATE_RESULT        : "produces"
+    PIPELINE_RUN   ||--o| RELEASE_MANIFEST   : "produces"
+    PIPELINE_RUN   ||--o{ EVIDENCE_RECORD    : "emits"
+    PIPELINE_RUN   ||--o{ GITHUB_LOG         : "generates"
+    PIPELINE_RUN   ||--o| GOLDEN_AMI         : "builds"
+
+    %% Baselines validate release manifests
+    APPROVED_BASELINE ||--o{ RELEASE_MANIFEST : "validates"
+
+    %% Release manifests are governed and tracked
+    RELEASE_MANIFEST ||--|| SSM_DECISION_RECORD : "governed by"
+    RELEASE_MANIFEST ||--o{ DRIFT_EVENT          : "baseline for"
+
+    %% Gate results emit evidence
+    GATE_RESULT    ||--o{ EVIDENCE_RECORD    : "emits"
+
+    %% Drift events emit evidence
+    DRIFT_EVENT    ||--o{ EVIDENCE_RECORD    : "emits"
+
+    %% Evidence is indexed into the audit database and captured in AWS logs
+    EVIDENCE_RECORD ||--|| AUDIT_ENTRY       : "indexed as"
+    EVIDENCE_RECORD }o--o{ AWS_LOG           : "cross-referenced in"
