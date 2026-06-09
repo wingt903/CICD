@@ -1,0 +1,58 @@
+erDiagram
+
+    APPROVED_BASELINE ||--o{ PIPELINE_RUN : "governs runtime baseline for"
+    APPROVED_BASELINE ||--o{ COMPLIANCE_EVIDENCE : "referenced by"
+    PIPELINE_RUN ||--o| GOLDEN_AMI : "produces for image build runs"
+    PIPELINE_RUN ||--o{ GITHUB_LOG : "generates"
+    PIPELINE_RUN o|--o{ COMPLIANCE_EVIDENCE : "optionally correlates pipeline evidence for"
+    PIPELINE_RUN }o--o{ AWS_LOG : "correlates with"
+
+    APPROVED_BASELINE {
+        string baseline_id PK
+        string component_name
+        string baseline_version
+        string approved_by
+        datetime approved_at
+    }
+    PIPELINE_RUN {
+        string run_id PK
+        string workflow_name
+        string trigger_event
+        string baseline_id FK
+        string status
+        datetime started_at
+        datetime completed_at
+    }
+    COMPLIANCE_EVIDENCE {
+        string evidence_id PK
+        string run_id FK "nullable for continuous monitoring records"
+        string baseline_id FK
+        string app_repo_name
+        string app_repo_version
+        string check_name
+        string compliance_status
+        string evidence_source
+        datetime checked_at
+    }
+    GOLDEN_AMI {
+        string ami_id PK
+        string run_id FK
+        string image_family
+        string ami_version
+        datetime published_at
+    }
+    GITHUB_LOG {
+        string github_log_id PK
+        string run_id FK
+        string job_name
+        string log_uri
+        datetime captured_at
+    }
+    AWS_LOG {
+        string aws_log_id PK
+        string service_name
+        string event_type
+        string correlation_run_id
+        string source_account
+        datetime observed_at
+    }
