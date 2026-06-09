@@ -3,7 +3,7 @@
 This document defines a focused ERD for five core entities only:
 `PIPELINE_RUN`, `APPROVED_BASELINE`, `GOLDEN_AMI`, `AWS_LOG`, and `GITHUB_LOG`.
 
-> **Diagram source:** `data-architecture-erd.mmd` (draw.io-compatible Mermaid `erDiagram`).
+> **Diagram source:** `data-architecture-erd.mmd` (Mermaid `erDiagram` source used for architecture diagram workflows).
 
 ---
 
@@ -36,7 +36,7 @@ This document defines a focused ERD for five core entities only:
 | Relationship | Cardinality | Notes |
 |---|---|---|
 | `APPROVED_BASELINE` → `PIPELINE_RUN` | 1-to-many | One approved baseline can govern many pipeline runs. |
-| `PIPELINE_RUN` → `GOLDEN_AMI` | 1-to-0-or-1 | A run produces at most one golden AMI when it is an image-build run. |
+| `GOLDEN_AMI` → `PIPELINE_RUN` | 0-or-1-to-1 | Each golden AMI is produced by exactly one pipeline run; most runs produce no AMI. |
 | `PIPELINE_RUN` → `GITHUB_LOG` | 1-to-many | A run generates one or more GitHub job logs. |
 | `PIPELINE_RUN` ↔ `AWS_LOG` | many-to-many | Pipeline activity is correlated with multiple AWS log events, and AWS events can map to multiple runs over time. |
 
