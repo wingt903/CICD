@@ -2,21 +2,21 @@
 graph LR
     %% C4 Context Level 1 - draw.io compatible
     %% People
-    pe[Product Engineer<br/><i>[Person]</i><br/>Approves promotions and baseline updates]
-    pt[Product Team<br/><i>[Person]</i><br/>Maintains application code and runtime config]
-    pfe[Platform Engineer<br/><i>[Person]</i><br/>Maintains OS and image IaC baselines]
-    csoa[Cyber Security Operations Analyst<br/><i>[Person]</i><br/>Monitors security and compliance evidence]
+    pe[Product Engineer<br/><i>Person</i><br/>Approves promotions and baseline updates]
+    pt[Product Team<br/><i>Person</i><br/>Maintains application code and runtime config]
+    pfe[Platform Engineer<br/><i>Person</i><br/>Maintains OS and image IaC baselines]
+    csoa[Cyber Security Operations Analyst<br/><i>Person</i><br/>Monitors security and compliance evidence]
 
     %% System under design
-    cicd[GitHub Organization App as Code CI/CD Platform<br/><i>[Software System]</i><br/>Automates build, policy gates, deployment, and compliance reporting]
+    cicd[GitHub Organization App as Code CI/CD Platform<br/><i>Software System</i><br/>Automates build, policy gates, deployment, and compliance reporting]
 
     %% External systems
-    appRepos[Application Repositories - GitHub<br/><i>[External System]</i><br/>Source repositories for application teams]
-    infraRepos[Infrastructure Repositories - GitHub<br/><i>[External System]</i><br/>Source repositories for platform and IaC changes]
-    aws[AWS Target Accounts<br/><i>[External System]</i><br/>Runtime environment for workload deployment]
-    splunk[Splunk<br/><i>[External System]</i><br/>Central audit and security event platform]
-    grafana[Grafana<br/><i>[External System]</i><br/>Compliance and runtime observability dashboards]
-    sn[ServiceNow - Phase 2<br/><i>[External System]</i><br/>Optional ITSM workflow and ticket integration]
+    appRepos[Application Repositories - GitHub<br/><i>External System</i><br/>Source repositories for application teams]
+    infraRepos[Infrastructure Repositories - GitHub<br/><i>External System</i><br/>Source repositories for platform and IaC changes]
+    aws[AWS Target Accounts<br/><i>External System</i><br/>Runtime environment for workload deployment]
+    splunk[Splunk<br/><i>External System</i><br/>Central audit and security event platform]
+    grafana[Grafana<br/><i>External System</i><br/>Compliance and runtime observability dashboards]
+    sn[ServiceNow - Phase 2<br/><i>External System</i><br/>Optional ITSM workflow and ticket integration]
 
     %% Relationships
     pe -->|Approves promotions and baseline updates| cicd
