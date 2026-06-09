@@ -13,7 +13,7 @@ This document provides the data architecture model for the **App as Code CICD Pl
 | **CICD Platform owned** | Data created, stored, and lifecycle-managed by the CICD platform (AWS-hosted stores: S3, DynamoDB, SSM Parameter Store, CloudTrail, CloudWatch). |
 | **External – App Team** | Application source code repositories. The platform reads webhook events from these repos but stores no copy of the code. |
 | **External – IaC Team** | Infrastructure / IaC / Ansible repositories. Same read-only relationship; no code copy stored. |
-| **External – Identity** | GitHub user identities and IAM principals. Mastered in GitHub and AWS IAM respectively. |
+| **External – Identity** | GitHub user identities and IAM principals. These identities may appear in logs, but are mastered outside the CICD platform. |
 
 > **Key constraint:** The CICD platform does **not** own or store application code or IaC code. The only externally-originated data the platform stores are **AWS logs** (CloudTrail, CloudWatch, GuardDuty) and **GitHub logs** (Actions job logs) that it ingests for audit and compliance purposes.
 
@@ -25,7 +25,6 @@ This document provides the data architecture model for the **App as Code CICD Pl
 
 | Entity | Description | Ownership |
 |--------|-------------|-----------|
-| `ACTOR` | A human user who interacts with the platform — App Owner, Platform Engineer, or Cyber Security Operations Analyst. | External – GitHub / AWS IAM |
 | `APP_CODE_REPO` | A GitHub repository containing application source code managed by the Product Team. | External – App Team |
 | `IAC_REPO` | A GitHub repository containing Terraform, Ansible, or image-build configuration managed by the Platform Engineering team. | External – IaC Team |
 
@@ -35,7 +34,6 @@ This document provides the data architecture model for the **App as Code CICD Pl
 
 | Entity | Store | Description |
 |--------|-------|-------------|
-| `GOVERNING_TEMPLATE` | GitHub Template Repos | A versioned, CODEOWNERS-governed pipeline template that enforces mandatory controls for all pipeline runs. |
 | `PIPELINE_RUN` | GitHub Actions metadata + DynamoDB | A single execution of a GitHub Actions workflow, triggered by a push, PR, or manual dispatch event. |
 | `GATE_RESULT` | DynamoDB / EventBridge | The pass/fail outcome of one security or compliance gate within a pipeline run (RTCM, SAST, IaC scan, image scan, secret scan). |
 | `APPROVED_BASELINE` | SSM Parameter Store | The approved runtime compatibility version for a given component, published after a governed commit is accepted. |
@@ -54,11 +52,8 @@ This document provides the data architecture model for the **App as Code CICD Pl
 
 | Relationship | Cardinality | Notes |
 |---|---|---|
-| `ACTOR` → `PIPELINE_RUN` | 1-to-many | One actor can trigger many pipeline runs over time. |
-| `ACTOR` → `APPROVED_BASELINE` | 1-to-many | One approver can sign off many baseline entries. |
-| `APP_CODE_REPO` → `PIPELINE_RUN` | 1-to-many | Each app repo generates many pipeline runs. |
-| `IAC_REPO` → `PIPELINE_RUN` | 1-to-many | Each IaC repo generates many pipeline runs. |
-| `GOVERNING_TEMPLATE` → `PIPELINE_RUN` | 1-to-many | A single template version governs many pipeline runs. |
+| `APP_CODE_REPO` → `PIPELINE_RUN` | 1-to-many | Each application repository can trigger many workflow runs. |
+| `IAC_REPO` → `PIPELINE_RUN` | 1-to-many | Each infrastructure repository can trigger many workflow runs. |
 | `PIPELINE_RUN` → `GATE_RESULT` | 1-to-many | Each run has one result per gate type (RTCM, SAST, etc.). |
 | `PIPELINE_RUN` → `RELEASE_MANIFEST` | 1-to-0-or-1 | A run produces a manifest only when all gates pass. |
 | `PIPELINE_RUN` → `EVIDENCE_RECORD` | 1-to-many | Each pipeline stage emits one or more evidence records. |
@@ -71,6 +66,7 @@ This document provides the data architecture model for the **App as Code CICD Pl
 | `DRIFT_EVENT` → `EVIDENCE_RECORD` | 1-to-many | Each drift finding and remediation outcome emits evidence records. |
 | `EVIDENCE_RECORD` → `AUDIT_ENTRY` | 1-to-1 | Every immutable S3 record has a corresponding DynamoDB index entry. |
 | `EVIDENCE_RECORD` ↔ `AWS_LOG` | many-to-many | Evidence records cross-reference the AWS log events that corroborate them. |
+| `EVIDENCE_RECORD` ↔ `GITHUB_LOG` | many-to-many | Evidence records can cross-reference archived GitHub Actions logs for traceability. |
 
 ---
 
@@ -80,7 +76,6 @@ The CICD platform does not actively collect personal data as part of its core fu
 
 | Entity | Classification | Basis | Mitigation |
 |--------|----------------|-------|------------|
-| `ACTOR` | 🔴 PII | Represents a human identity from GitHub / IAM context | Accessed only by authorized platform operators; not exposed in broad dashboards |
 | `PIPELINE_RUN` | 🔴 PII | Can include triggering user identity from GitHub events | Retained in audit-controlled stores with IAM-scoped access |
 | `APPROVED_BASELINE` | 🔴 PII | Can include approver identity for governance traceability | Retained in controlled evidence and decision records |
 | `GITHUB_LOG` | 🔴 PII | GitHub Actions logs can include user identifiers and handles | Archived with SSE-KMS and restricted IAM access |
@@ -96,9 +91,9 @@ The CICD platform does not actively collect personal data as part of its core fu
 ┌──────────────────────────────────────────────────────────────────────┐
 │  CICD Platform (data owner)                                          │
 │                                                                      │
-│  GOVERNING_TEMPLATE  PIPELINE_RUN   GATE_RESULT   APPROVED_BASELINE  │
-│  GOLDEN_AMI          RELEASE_MANIFEST              SSM_DECISION_RECORD│
-│  DRIFT_EVENT         EVIDENCE_RECORD  AUDIT_ENTRY                    │
+│  PIPELINE_RUN        GATE_RESULT     APPROVED_BASELINE               │
+│  GOLDEN_AMI          RELEASE_MANIFEST SSM_DECISION_RECORD            │
+│  DRIFT_EVENT         EVIDENCE_RECORD AUDIT_ENTRY                     │
 │  AWS_LOG  ◄── ingested from AWS (platform is custodian)              │
 │  GITHUB_LOG ◄── ingested from GitHub Actions (platform is custodian) │
 └──────────────────────────────────────────────────────────────────────┘
@@ -111,6 +106,6 @@ The CICD platform does not actively collect personal data as part of its core fu
 
 ┌──────────────────────────────┐
 │ Identity Systems (external)  │
-│  ACTOR (GitHub / AWS IAM)    │
+│  GitHub users / AWS IAM      │
 └──────────────────────────────┘
 ```
