@@ -4,7 +4,7 @@ erDiagram
     APPROVED_BASELINE ||--o{ COMPLIANCE_EVIDENCE : "referenced by"
     PIPELINE_RUN ||--o| GOLDEN_AMI : "produces for image build runs"
     PIPELINE_RUN ||--o{ GITHUB_LOG : "generates"
-    PIPELINE_RUN ||--o{ COMPLIANCE_EVIDENCE : "records per-check evidence for"
+    PIPELINE_RUN o|--o{ COMPLIANCE_EVIDENCE : "optionally correlates pipeline evidence for"
     PIPELINE_RUN }o--o{ AWS_LOG : "correlates with"
 
     APPROVED_BASELINE {
@@ -25,12 +25,13 @@ erDiagram
     }
     COMPLIANCE_EVIDENCE {
         string evidence_id PK
-        string run_id FK
+        string run_id FK nullable
         string baseline_id FK
         string app_repo_name
         string app_repo_version
         string check_name
         string compliance_status
+        string evidence_source
         datetime checked_at
     }
     GOLDEN_AMI {
