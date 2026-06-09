@@ -1,43 +1,43 @@
 %%{init: {'themeVariables': {'fontSize': 10}, 'flowchart': {'nodeSpacing': 8, 'rankSpacing': 12, 'diagramPadding': 2, 'curve': 'linear'}}}%%
-graph TB
-    %% C4 Context (Level 1) - draw.io compatible
+graph LR
+    %% C4 Context Level 1 - draw.io compatible
     %% People
-    migTeam([Product Engineer])
-    appTeam([Product Team])
-    platformEngineer([Platform Engineer])
-    auditor([Cyber Security Operations Analyst])
+    pe[Product Engineer<br/><i>[Person]</i><br/>Approves promotions and baseline updates]
+    pt[Product Team<br/><i>[Person]</i><br/>Maintains application code and runtime config]
+    pfe[Platform Engineer<br/><i>[Person]</i><br/>Maintains OS and image IaC baselines]
+    csoa[Cyber Security Operations Analyst<br/><i>[Person]</i><br/>Monitors security and compliance evidence]
 
     %% System under design
-    cicd[GitHub Organization App as Code CI/CD Platform]
+    cicd[GitHub Organization App as Code CI/CD Platform<br/><i>[Software System]</i><br/>Automates build, policy gates, deployment, and compliance reporting]
 
     %% External systems
-    appRepos[Application Repositories - GitHub]
-    infraRepos[Infrastructure Repositories - GitHub]
-    aws[AWS Target Accounts]
-    splunk[Splunk]
-    grafana[Grafana]
-    sn[ServiceNow - Phase 2]
+    appRepos[Application Repositories - GitHub<br/><i>[External System]</i><br/>Source repositories for application teams]
+    infraRepos[Infrastructure Repositories - GitHub<br/><i>[External System]</i><br/>Source repositories for platform and IaC changes]
+    aws[AWS Target Accounts<br/><i>[External System]</i><br/>Runtime environment for workload deployment]
+    splunk[Splunk<br/><i>[External System]</i><br/>Central audit and security event platform]
+    grafana[Grafana<br/><i>[External System]</i><br/>Compliance and runtime observability dashboards]
+    sn[ServiceNow - Phase 2<br/><i>[External System]</i><br/>Optional ITSM workflow and ticket integration]
 
     %% Relationships
-    migTeam -->|approves promotions and baseline updates| cicd
-    appTeam -->|pushes app code and config| appRepos
-    platformEngineer -->|pushes OS/image IaC changes| infraRepos
-    appRepos -->|triggers GitHub Actions| cicd
-    infraRepos -->|triggers GitHub Actions| cicd
-    auditor -->|reviews dashboards and audit events| cicd
-    cicd -->|builds deploys and publishes approved baselines via OIDC| aws
-    cicd -->|streams audit events| splunk
-    cicd -->|publishes compliance dashboards| grafana
-    cicd -.->|optional: creates change and remediation tickets| sn
-    sn -.->|optional: triggers runs via IntegrationHub| cicd
-    sn -.->|sends remediation notices| appTeam
+    pe -->|Approves promotion and baseline change| cicd
+    pt -->|Pushes app code and config| appRepos
+    pfe -->|Pushes OS and image IaC updates| infraRepos
+    csoa -->|Reviews compliance and audit posture| cicd
+    appRepos -->|Webhook trigger for GitHub Actions| cicd
+    infraRepos -->|Webhook trigger for GitHub Actions| cicd
+    cicd -->|OIDC federated deploy and baseline publish| aws
+    cicd -->|Streams audit and security events| splunk
+    cicd -->|Publishes compliance dashboards| grafana
+    cicd -.->|Optional change and remediation ticket sync| sn
+    sn -.->|Optional IntegrationHub run trigger| cicd
+    sn -.->|Optional remediation notice to product teams| pt
 
     %% Styling
     style cicd fill:#1168BD,color:#ffffff,stroke:#0b4884
-    style migTeam fill:#08427B,color:#ffffff,stroke:#052E56
-    style appTeam fill:#08427B,color:#ffffff,stroke:#052E56
-    style platformEngineer fill:#08427B,color:#ffffff,stroke:#052E56
-    style auditor fill:#08427B,color:#ffffff,stroke:#052E56
+    style pe fill:#08427B,color:#ffffff,stroke:#052E56
+    style pt fill:#08427B,color:#ffffff,stroke:#052E56
+    style pfe fill:#08427B,color:#ffffff,stroke:#052E56
+    style csoa fill:#08427B,color:#ffffff,stroke:#052E56
     style appRepos fill:#999999,color:#ffffff,stroke:#666666
     style infraRepos fill:#999999,color:#ffffff,stroke:#666666
     style aws fill:#999999,color:#ffffff,stroke:#666666
