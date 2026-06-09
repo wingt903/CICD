@@ -1,50 +1,33 @@
-# Data Architecture – Entity-Relationship View
+# Data Architecture – Focused Entity-Relationship View
 
-This document provides the data architecture model for the **App as Code CICD Platform** at **entity level**. It covers the key entities, their relationships, ownership boundaries, and entity-level PII markers.
+This document defines a focused ERD for five core entities only:
+`PIPELINE_RUN`, `APPROVED_BASELINE`, `GOLDEN_AMI`, `AWS_LOG`, and `GITHUB_LOG`.
 
 > **Diagram source:** `data-architecture-erd.mmd` (draw.io-compatible Mermaid `erDiagram`).
 
 ---
 
-## Scope and Ownership Boundaries
+## Scope and Ownership
 
-| Boundary | What it means |
-|----------|---------------|
-| **CICD Platform owned** | Data created, stored, and lifecycle-managed by the CICD platform (AWS-hosted stores: S3, DynamoDB, SSM Parameter Store, CloudTrail, CloudWatch). |
-| **External – App Team** | Application source code repositories. The platform reads webhook events from these repos but stores no copy of the code. |
-| **External – IaC Team** | Infrastructure / IaC / Ansible repositories. Same read-only relationship; no code copy stored. |
-| **External – Identity** | GitHub user identities and IAM principals. These identities may appear in logs, but are mastered outside the CICD platform. |
+| Scope | Definition |
+|---|---|
+| **In scope** | Pipeline execution, approved runtime baseline, produced AMI metadata, AWS audit/security logs, and GitHub Actions logs. |
+| **Ownership** | These records are platform-owned or platform-custodied operational/audit data. |
+| **Out of scope** | Application source code and IaC source code entities are intentionally excluded from this focused model. |
 
-> **Key constraint:** The CICD platform does **not** own or store application code or IaC code. The only externally-originated data the platform stores are **AWS logs** (CloudTrail, CloudWatch, GuardDuty) and **GitHub logs** (Actions job logs) that it ingests for audit and compliance purposes.
+> **Key constraint:** The platform does not own application source code; this focused ERD models only platform operational/governance and log-custody entities.
 
 ---
 
 ## Entity Catalogue
 
-### External Entities (not owned by CICD platform)
-
-| Entity | Description | Ownership |
-|--------|-------------|-----------|
-| `APP_CODE_REPO` | A GitHub repository containing application source code managed by the Product Team. | External – App Team |
-| `IAC_REPO` | A GitHub repository containing Terraform, Ansible, or image-build configuration managed by the Platform Engineering team. | External – IaC Team |
-
----
-
-### CICD Platform Owned Entities
-
 | Entity | Store | Description |
-|--------|-------|-------------|
-| `PIPELINE_RUN` | GitHub Actions metadata + DynamoDB | A single execution of a GitHub Actions workflow, triggered by a push, PR, or manual dispatch event. |
-| `GATE_RESULT` | DynamoDB / EventBridge | The pass/fail outcome of one security or compliance gate within a pipeline run (RTCM, SAST, IaC scan, image scan, secret scan). |
-| `APPROVED_BASELINE` | SSM Parameter Store | The approved runtime compatibility version for a given component, published after a governed commit is accepted. |
-| `GOLDEN_AMI` | EC2 AMI Registry (AWS) | A hardened Amazon Machine Image produced by the Ansible build pipeline and verified by AWS Inspector. |
-| `RELEASE_MANIFEST` | SSM Parameter Store + DynamoDB | The authoritative record of an approved release: AMI ID, IaC version, image digest, and target environment. |
-| `SSM_DECISION_RECORD` | SSM Parameter Store | A no-redeploy governance record for a release identity and environment. Enforces fail-closed: a blocked release cannot be re-deployed. |
-| `DRIFT_EVENT` | DynamoDB + EventBridge | A detected deviation between the live environment state and the approved baseline, raised by the scheduled drift scan. |
-| `EVIDENCE_RECORD` | S3 (Object Lock, SSE-KMS) | An immutable, tamper-evident record of a pipeline or compliance event written to the evidence bucket. |
-| `AUDIT_ENTRY` | DynamoDB | A queryable index record derived from an `EVIDENCE_RECORD`, used by Splunk and Grafana for reporting. |
-| `AWS_LOG` | CloudTrail / CloudWatch / GuardDuty | AWS-platform-generated log events ingested by the CICD platform for audit and security posture evidence. |
-| `GITHUB_LOG` | S3 (archived from GitHub Actions) | Job-level execution logs from GitHub Actions, archived to S3 for long-term audit retention. |
+|---|---|---|
+| `PIPELINE_RUN` | GitHub Actions metadata + DynamoDB | Execution record for one workflow run and its lifecycle status. |
+| `APPROVED_BASELINE` | SSM Parameter Store | Approved runtime compatibility baseline used for governance and policy enforcement. |
+| `GOLDEN_AMI` | EC2 AMI Registry | Hardened machine image metadata produced by image-build workflows. |
+| `GITHUB_LOG` | S3 archive of GitHub Actions logs | Job-level GitHub workflow logs retained for audit and troubleshooting. |
+| `AWS_LOG` | CloudTrail / CloudWatch / GuardDuty | AWS-native operational and security logs correlated to pipeline activities. |
 
 ---
 
@@ -52,36 +35,22 @@ This document provides the data architecture model for the **App as Code CICD Pl
 
 | Relationship | Cardinality | Notes |
 |---|---|---|
-| `APP_CODE_REPO` → `PIPELINE_RUN` | 1-to-many | Each application repository can trigger many workflow runs. |
-| `IAC_REPO` → `PIPELINE_RUN` | 1-to-many | Each infrastructure repository can trigger many workflow runs. |
-| `PIPELINE_RUN` → `GATE_RESULT` | 1-to-many | Each run has one result per gate type (RTCM, SAST, etc.). |
-| `PIPELINE_RUN` → `RELEASE_MANIFEST` | 1-to-0-or-1 | A run produces a manifest only when all gates pass. |
-| `PIPELINE_RUN` → `EVIDENCE_RECORD` | 1-to-many | Each pipeline stage emits one or more evidence records. |
-| `PIPELINE_RUN` → `GITHUB_LOG` | 1-to-many | Each job within a run generates a log entry. |
-| `PIPELINE_RUN` → `GOLDEN_AMI` | 1-to-0-or-1 | An image-build run produces at most one AMI. |
-| `APPROVED_BASELINE` → `RELEASE_MANIFEST` | 1-to-many | A baseline version is referenced by all manifests it validates. |
-| `RELEASE_MANIFEST` → `SSM_DECISION_RECORD` | 1-to-1 | Each manifest has exactly one governance decision record per environment. |
-| `RELEASE_MANIFEST` → `DRIFT_EVENT` | 1-to-many | A baseline manifest can be the reference for many drift scans over time. |
-| `GATE_RESULT` → `EVIDENCE_RECORD` | 1-to-many | Each gate result emits an evidence record to the audit store. |
-| `DRIFT_EVENT` → `EVIDENCE_RECORD` | 1-to-many | Each drift finding and remediation outcome emits evidence records. |
-| `EVIDENCE_RECORD` → `AUDIT_ENTRY` | 1-to-1 | Every immutable S3 record has a corresponding DynamoDB index entry. |
-| `EVIDENCE_RECORD` ↔ `AWS_LOG` | many-to-many | Evidence records cross-reference the AWS log events that corroborate them. |
-| `EVIDENCE_RECORD` ↔ `GITHUB_LOG` | many-to-many | Evidence records can cross-reference archived GitHub Actions logs for traceability. |
+| `APPROVED_BASELINE` → `PIPELINE_RUN` | 1-to-many | One approved baseline can govern many pipeline runs. |
+| `PIPELINE_RUN` → `GOLDEN_AMI` | 1-to-0-or-1 | A run produces at most one golden AMI when it is an image-build run. |
+| `PIPELINE_RUN` → `GITHUB_LOG` | 1-to-many | A run generates one or more GitHub job logs. |
+| `PIPELINE_RUN` ↔ `AWS_LOG` | many-to-many | Pipeline activity is correlated with multiple AWS log events, and AWS events can map to multiple runs over time. |
 
 ---
 
 ## PII Register (Entity Level)
 
-The CICD platform does not actively collect personal data as part of its core function. The following entity-level markers identify where PII or quasi-PII can appear in operational records.
-
 | Entity | Classification | Basis | Mitigation |
-|--------|----------------|-------|------------|
-| `PIPELINE_RUN` | 🔴 PII | Can include triggering user identity from GitHub events | Retained in audit-controlled stores with IAM-scoped access |
-| `APPROVED_BASELINE` | 🔴 PII | Can include approver identity for governance traceability | Retained in controlled evidence and decision records |
-| `GITHUB_LOG` | 🔴 PII | GitHub Actions logs can include user identifiers and handles | Archived with SSE-KMS and restricted IAM access |
-| `AWS_LOG` | ⚠️ Quasi-PII | CloudTrail/CloudWatch events may include principal ARN or source IP | Service-role-first design, retention controls, and restricted access |
-
-> **Note:** NFR-PRIV-03 and NFR-PRIV-04 are assessed as not applicable because the platform does not process application-level personal data. The markers above are operational identifiers incidental to audit logging.
+|---|---|---|---|
+| `PIPELINE_RUN` | 🔴 PII | May include triggering user identity from GitHub events | IAM-scoped access and controlled retention |
+| `APPROVED_BASELINE` | 🔴 PII | May include approver identity | Restricted governance access |
+| `GITHUB_LOG` | 🔴 PII | May contain user handles and usernames | Encrypted archival and least-privilege access |
+| `AWS_LOG` | ⚠️ Quasi-PII | May contain source IP and principal ARN | Role-based access controls and retention policies |
+| `GOLDEN_AMI` | 🟢 Non-PII | Image and build metadata only | Standard configuration governance |
 
 ---
 
@@ -89,23 +58,11 @@ The CICD platform does not actively collect personal data as part of its core fu
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│  CICD Platform (data owner)                                          │
+│ CICD Platform data scope                                             │
 │                                                                      │
-│  PIPELINE_RUN        GATE_RESULT     APPROVED_BASELINE               │
-│  GOLDEN_AMI          RELEASE_MANIFEST SSM_DECISION_RECORD            │
-│  DRIFT_EVENT         EVIDENCE_RECORD AUDIT_ENTRY                     │
-│  AWS_LOG  ◄── ingested from AWS (platform is custodian)              │
-│  GITHUB_LOG ◄── ingested from GitHub Actions (platform is custodian) │
+│ APPROVED_BASELINE  PIPELINE_RUN  GOLDEN_AMI                          │
+│ AWS_LOG            GITHUB_LOG                                        │
 └──────────────────────────────────────────────────────────────────────┘
 
-┌──────────────────────────┐   ┌──────────────────────────┐
-│ App Team (external owner)│   │ IaC Team (external owner) │
-│  APP_CODE_REPO           │   │  IAC_REPO                 │
-│  (code not stored by CI) │   │  (code not stored by CI)  │
-└──────────────────────────┘   └──────────────────────────┘
-
-┌──────────────────────────────┐
-│ Identity Systems (external)  │
-│  GitHub users / AWS IAM      │
-└──────────────────────────────┘
+Out of scope for this focused ERD: app source code and IaC source code.
 ```

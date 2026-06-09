@@ -1,95 +1,32 @@
 erDiagram
 
-    APP_CODE_REPO ||--o{ PIPELINE_RUN : "triggers"
-    IAC_REPO ||--o{ PIPELINE_RUN : "triggers"
-    PIPELINE_RUN ||--o{ GATE_RESULT : "produces"
-    PIPELINE_RUN ||--o| RELEASE_MANIFEST : "produces when gates pass"
-    PIPELINE_RUN ||--o| GOLDEN_AMI : "builds for image pipeline"
+    APPROVED_BASELINE ||--o{ PIPELINE_RUN : "governs runtime baseline for"
+    PIPELINE_RUN ||--o| GOLDEN_AMI : "produces for image build runs"
     PIPELINE_RUN ||--o{ GITHUB_LOG : "generates"
-    PIPELINE_RUN ||--o{ EVIDENCE_RECORD : "emits"
-    APPROVED_BASELINE ||--o{ RELEASE_MANIFEST : "validates"
-    RELEASE_MANIFEST ||--|| SSM_DECISION_RECORD : "governed by"
-    RELEASE_MANIFEST ||--o{ DRIFT_EVENT : "baseline for"
-    GATE_RESULT ||--o{ EVIDENCE_RECORD : "emits"
-    DRIFT_EVENT ||--o{ EVIDENCE_RECORD : "emits"
-    EVIDENCE_RECORD ||--|| AUDIT_ENTRY : "indexed as"
-    EVIDENCE_RECORD }o--o{ AWS_LOG : "cross-referenced in"
-    EVIDENCE_RECORD }o--o{ GITHUB_LOG : "cross-referenced in"
+    PIPELINE_RUN }o--o{ AWS_LOG : "correlates with"
 
-    APP_CODE_REPO {
-        string repo_id PK
-        string github_org
-        string repo_name
-        string owner_team
-    }
-    IAC_REPO {
-        string repo_id PK
-        string github_org
-        string repo_name
-        string owner_team
+    APPROVED_BASELINE {
+        string baseline_id PK
+        string component_name
+        string baseline_version
+        string approved_by
+        datetime approved_at
     }
     PIPELINE_RUN {
         string run_id PK
         string workflow_name
         string trigger_event
-        string source_repo_id FK
+        string baseline_id FK
         string status
         datetime started_at
         datetime completed_at
-    }
-    GATE_RESULT {
-        string gate_result_id PK
-        string run_id FK
-        string gate_type
-        string outcome
-        datetime evaluated_at
-    }
-    APPROVED_BASELINE {
-        string baseline_id PK
-        string component_name
-        string baseline_version
-        datetime approved_at
     }
     GOLDEN_AMI {
         string ami_id PK
         string run_id FK
         string image_family
-        string hardened_version
+        string ami_version
         datetime published_at
-    }
-    RELEASE_MANIFEST {
-        string release_id PK
-        string run_id FK
-        string baseline_id FK
-        string target_environment
-        string release_status
-        datetime created_at
-    }
-    SSM_DECISION_RECORD {
-        string decision_id PK
-        string release_id FK
-        string decision
-        datetime decided_at
-    }
-    DRIFT_EVENT {
-        string drift_event_id PK
-        string release_id FK
-        string severity
-        string remediation_status
-        datetime detected_at
-    }
-    EVIDENCE_RECORD {
-        string evidence_id PK
-        string run_id FK
-        string evidence_type
-        string storage_uri
-        datetime captured_at
-    }
-    AUDIT_ENTRY {
-        string audit_entry_id PK
-        string evidence_id FK
-        string index_key
-        datetime indexed_at
     }
     GITHUB_LOG {
         string github_log_id PK
@@ -102,6 +39,7 @@ erDiagram
         string aws_log_id PK
         string service_name
         string event_type
+        string correlation_run_id
         string source_account
         datetime observed_at
     }
