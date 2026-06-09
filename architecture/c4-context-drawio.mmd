@@ -19,7 +19,7 @@ graph LR
     sn[ServiceNow - Phase 2<br/><i>[External System]</i><br/>Optional ITSM workflow and ticket integration]
 
     %% Relationships
-    pe -->|Approves promotion and baseline change| cicd
+    pe -->|Approves promotions and baseline updates| cicd
     pt -->|Pushes app code and config| appRepos
     pfe -->|Pushes OS and image IaC updates| infraRepos
     csoa -->|Reviews compliance and audit posture| cicd
