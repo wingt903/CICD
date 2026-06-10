@@ -23,9 +23,9 @@ This document defines a focused ERD for six core entities only:
 
 | Entity | Store | Description |
 |---|---|---|
-| `PIPELINE_RUN` | GitHub Actions metadata + DynamoDB | Execution record for one workflow run and its lifecycle status. |
+| `PIPELINE_RUN` | GitHub Actions metadata + S3 archive | Execution record for one workflow run and its lifecycle status. |
 | `APPROVED_BASELINE` | SSM Parameter Store | Approved runtime compatibility baseline used for governance and policy enforcement. |
-| `COMPLIANCE_EVIDENCE` | DynamoDB + S3 evidence archive | Per-check auditable evidence records from both pipeline and continuous monitoring activities, with app repository identity/version, baseline reference, timestamp, and compliance result. |
+| `COMPLIANCE_EVIDENCE` | S3 evidence archive | Per-check auditable evidence records from both pipeline and continuous monitoring activities, with app repository identity/version, baseline reference, timestamp, and compliance result. |
 | `GOLDEN_AMI` | EC2 AMI Registry | Hardened machine image metadata produced by image-build workflows. |
 | `GITHUB_LOG` | S3 archive of GitHub Actions logs | Job-level GitHub workflow logs retained for audit and troubleshooting. |
 | `AWS_LOG` | CloudTrail / CloudWatch / GuardDuty | AWS-native operational and security logs correlated to pipeline activities. |

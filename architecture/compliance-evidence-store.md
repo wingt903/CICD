@@ -1,6 +1,6 @@
 # Compliance Evidence Store — Design and Controls
 
-This document specifies the evidence schema, storage controls, access/change audit trail, and audit reporting layer that align App_as_Code_004 to the approved-baseline -> scheduled drift scan -> comparison -> event storage -> auto-remediation -> audit database -> Splunk/Grafana flow.
+This document specifies the evidence schema, storage controls, access/change audit trail, and audit reporting layer that align App_as_Code_004 to the approved-baseline -> scheduled drift scan -> comparison -> event storage -> auto-remediation -> S3 audit store -> Datadog dashboard flow.
 
 ## Scope assumptions
 
@@ -66,9 +66,9 @@ S3 Evidence Bucket (compliance-evidence-<account>)
    │  - S3 Access Logging: enabled → S3 Audit Log Bucket
    │  - Object-level logging: CloudTrail data events (read + write)
    ▼
-Audit Database (Amazon DynamoDB — GSIs on system_id, control_id, timestamp)
-   │  - TTL disabled (records retained permanently to match 7-year evidence retention)
-   │  - Streams → integrity verifier
+S3 Audit and Evidence Store (Amazon S3 — Object Lock + SSE-KMS)
+   │  - 7-year immutable retention for evidence and audit records
+   │  - S3 Inventory manifest used for reporting input
    ▼
 Integrity Verifier Lambda (scheduled daily via EventBridge)
    │  - Re-derives SHA-256 hash of each record
@@ -77,8 +77,8 @@ Integrity Verifier Lambda (scheduled daily via EventBridge)
    │  - Alerts via SNS on any verification failure
    ▼
 Audit Reporting Layer
-   │  - Splunk search, alerting, and drift-event correlation
-   │  - Grafana dashboards for compliance posture and remediation trends
+   │  - Datadog search, alerting, and drift-event correlation
+   │  - Datadog dashboards for compliance posture and remediation trends
    │  - Raw evidence drill-down from immutable S3 records
 ```
 
@@ -126,7 +126,7 @@ s3://compliance-evidence-<account>/
 | Evidence delete attempt | CloudTrail S3 data event (DeleteObject) | `actor`, `timestamp`, `key`, `errorCode` (blocked by Object Lock) |
 | Object Lock override attempt | CloudTrail management event (BypassGovernanceRetention) | `actor`, `timestamp`, `key`, `result` (denied unless break-glass role) |
 | KMS key usage | CloudTrail KMS data event (Sign, Verify, Decrypt) | `actor`, `key ARN`, `timestamp`, `requestId` |
-| Index mutation | DynamoDB Streams → audit Lambda | `actor` (Lambda execution role), `before`/`after` state, `timestamp` |
+| Audit record ingestion | CloudTrail S3 data event (PutObject) | `actor` (Lambda execution role), `bucket`, `key`, `timestamp` |
 | Integrity check failure | CloudWatch metric alarm → SNS | `evidence_id`, `expected_hash`, `actual_hash`, `timestamp` |
 
 All CloudTrail logs are delivered to the audit log S3 bucket with Object Lock (Compliance mode, 7-year retention) and cannot be modified after delivery.
@@ -149,8 +149,8 @@ A dedicated IAM role (`compliance-evidence-audit-reader`) with read-only permiss
 
 ### Generation and Export
 
-- **Splunk** ingests audit-database events for search, alerting, and drift/remediation correlation.
-- **Grafana** renders current posture, drift trend, and remediation-duration dashboards from the audit database.
+- **Datadog** ingests S3-backed audit and evidence events for search, alerting, and drift/remediation correlation.
+- **Datadog dashboards** render current posture, drift trend, and remediation-duration views from S3-backed audit and evidence records.
 - **Immutable evidence drill-down** remains available through the S3 evidence bucket when analysts need the full signed event payload or raw execution logs.
 - Report-view and drill-down access events are logged to CloudTrail.
 
@@ -165,4 +165,4 @@ A dedicated IAM role (`compliance-evidence-audit-reader`) with read-only permiss
 | Unexpected access alerting | CloudWatch Logs Insights rule on CloudTrail — GetObject by non-approved principals | Real-time via CloudWatch Logs subscription filter |
 | Lock override alerting | CloudTrail CloudWatch Logs metric filter on `BypassGovernanceRetention` | Real-time alarm → SNS |
 | Periodic attestation | Integrity Verifier publishes signed attestation JSON to `integrity-results/` prefix | Weekly; summary linked to the operational audit review cycle |
-| Evidence completeness check | Lambda compares expected evidence records (from CMDB CI list × control matrix) against actual records in index | Daily; gaps published as CloudWatch metric and manual / governed ITSM handoff in Phase 1 or ServiceNow incident in Phase 2 |
+| Evidence completeness check | Lambda compares expected evidence records (from CMDB CI list × control matrix) against actual records in S3 inventory manifests | Daily; gaps published as CloudWatch metric and manual / governed ITSM handoff in Phase 1 or ServiceNow incident in Phase 2 |

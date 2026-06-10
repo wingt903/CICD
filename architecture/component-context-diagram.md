@@ -171,7 +171,7 @@ This document explains each numbered integration in the unified component contex
 | 73 | Migration Orchestrator → Post-Remediation DB Validation | After migration execution, the Post-Remediation Validator checks that the database schema matches the target baseline. |
 | 74 | Migration Orchestrator → DB Rollback Path | If migration validation fails, the Migration Orchestrator invokes the Rollback Path (snapshot restore or previous migration). |
 | 75 | DB Rollback Path → Post-Remediation DB Validation | After rollback, the validator re-checks database state to confirm successful restoration. |
-| 76 | Post-Remediation DB Validation → Store Event | DB remediation results are reported back into the same stored-event path so they reach the audit database and dashboards. |
+| 76 | Post-Remediation DB Validation → Store Event | DB remediation results are reported back into the same stored-event path so they reach the S3-backed audit store and dashboards. |
 
 ---
 
@@ -191,7 +191,7 @@ This document explains each numbered integration in the unified component contex
 | 86 | Store Event → EventBridge Evidence Bus | Drift finding records and remediation-state updates are published to EventBridge for audit capture. |
 | 87 | EventBridge Evidence Bus → Evidence Ingestor Lambda | EventBridge routes all evidence events to the Evidence Ingestor Lambda, which validates schema and ingests each record. |
 | 88 | Evidence Ingestor Lambda → S3 Evidence Bucket | The validated evidence record is written to the immutable S3 evidence bucket with Object Lock and SSE-KMS. |
-| 89 | Evidence Ingestor Lambda → Audit Database | A queryable audit-database entry for each event is written to DynamoDB to support fast operational reporting. |
+| 89 | Evidence Ingestor Lambda → S3 Audit and Evidence Store | An immutable audit and evidence record for each event is written to S3 for operational reporting and retention. |
 | 90 | S3 Evidence Bucket → Integrity Verifier Lambda | A daily scheduled check triggers the Integrity Verifier Lambda to re-validate stored evidence records for tampering. |
 | 91 | Integrity Verifier Lambda → CloudTrail | If the Integrity Verifier detects a tampered record, it raises a tamper alert that is logged to CloudTrail for investigation. |
 | 92 | S3 Evidence Bucket → CloudTrail | S3 object-level events on the evidence bucket are automatically captured by CloudTrail for audit of all access and changes. |
@@ -202,9 +202,9 @@ This document explains each numbered integration in the unified component contex
 
 | # | From → To | Explanation |
 |---|-----------|-------------|
-| 93 | Audit Database → Splunk | Splunk indexes audit, compliance, and remediation events for search, alerting, and operational investigation. |
-| 94 | Audit Database → Grafana | Grafana reads the audit database metrics and status views to present drift and compliance dashboards. |
-| 95 | S3 Evidence Bucket → Splunk | Splunk can drill back to the immutable raw evidence objects when analysts need full-event detail. |
+| 93 | S3 Audit and Evidence Store → Datadog | Datadog ingests audit, compliance, and remediation events for search, alerting, and operational investigation. |
+| 94 | S3 Audit and Evidence Store → Datadog | Datadog dashboards present drift and compliance views from S3-backed audit and evidence data. |
+| 95 | S3 Evidence Bucket → Datadog | Datadog dashboards can drill back to immutable raw evidence objects when analysts need full-event detail. |
 
 ---
 
@@ -218,12 +218,10 @@ This document explains each numbered integration in the unified component contex
 | AWS | Amazon Web Services |
 | CI/CD | Continuous Integration / Continuous Delivery |
 | CMDB | Configuration Management Database |
-| DynamoDB | Amazon DynamoDB |
 | EC2 | Amazon Elastic Compute Cloud |
-| Grafana | Open source dashboard and visualization platform |
+| Datadog | Observability and dashboard platform for operational and security events |
 | ECR | Amazon Elastic Container Registry |
 | GRC | Governance, Risk, and Compliance |
-| Splunk | Search and analytics platform for operational and security events |
 | IaC | Infrastructure as Code |
 | IAM | Identity and Access Management |
 | OIDC | OpenID Connect |

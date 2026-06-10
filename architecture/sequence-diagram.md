@@ -13,16 +13,16 @@ sequenceDiagram
     participant Compare as Comparison Engine
     participant Remediate as Auto Remediation
     participant EvidenceBus as EventBridge Evidence Bus
-    participant AuditDB as Audit Database
-    participant Splunk as Splunk
-    participant Grafana as Grafana
+    participant AuditS3 as S3 Audit and Evidence Store
+    participant Datadog as Datadog
+    
 
     %% Phase 1: Commit Approval and Baseline Publication
     activate GH
     GH->>GH: Git commit approved through governed workflow
     GH->>Baseline: Publish approved baseline
 [release manifest, AMI, IaC, runtime versions]
-    Baseline->>AuditDB: Record baseline publication event
+    Baseline->>AuditS3: Record baseline publication event
 
     %% Phase 2: Scheduled Drift Scan
     Scheduler->>Collector: Start scheduled drift scan
@@ -34,24 +34,24 @@ sequenceDiagram
     alt No drift found
         Compare->>EvidenceBus: Publish compliant state event
 [result=PASS, remediation_state=NOT_REQUIRED]
-        EvidenceBus->>AuditDB: Store compliance event
+        EvidenceBus->>AuditS3: Store compliance event
     else Drift found
         Compare->>EvidenceBus: Publish drift event
 [result=FAIL, remediation_state=PENDING]
-        EvidenceBus->>AuditDB: Store drift event
-        AuditDB->>Remediate: Trigger auto-remediation workflow
+        EvidenceBus->>AuditS3: Store drift event
+        EvidenceBus->>Remediate: Trigger auto-remediation workflow
         Remediate->>Remediate: Restore approved baseline
 [terraform apply, config rerun, DB migration]
         Remediate->>Collector: Re-collect post-remediation state
         Collector->>Compare: Submit post-remediation snapshot
         Compare->>EvidenceBus: Publish remediation outcome
 [result=PASS|FAIL, remediation_state=COMPLETE|FAILED]
-        EvidenceBus->>AuditDB: Store remediation event
+        EvidenceBus->>AuditS3: Store remediation event
     end
 
     %% Phase 3: Reporting
-    AuditDB->>Splunk: Forward audit and drift events
-    AuditDB->>Grafana: Refresh compliance dashboards
+    AuditS3->>Datadog: Refresh audit and compliance dashboards
+    
     deactivate GH
 ```
 
@@ -67,6 +67,5 @@ sequenceDiagram
 | 6 | **Comparison Engine** | The evaluator that compares collected state with the approved baseline and decides whether drift exists. |
 | 7 | **Auto Remediation** | The restore-to-baseline automation that runs Terraform, configuration re-runs, or database migrations after a drift event is stored. |
 | 8 | **EventBridge Evidence Bus** | The evidence routing layer that carries compliant, drift, and remediation events to the audit data store. |
-| 9 | **Audit Database** | The indexed audit repository that stores baseline publication, compliance, drift, and remediation events for reporting. |
-| 10 | **Splunk** | The SIEM/reporting sink that receives audit and drift events for operational analysis. |
-| 11 | **Grafana** | The dashboard sink that visualizes drift posture, remediation results, and compliance state over time. |
+| 9 | **S3 Audit and Evidence Store** | The immutable audit repository that stores baseline publication, compliance, drift, and remediation events for reporting. |
+| 10 | **Datadog** | The observability/reporting sink that receives audit and drift events for operational analysis. |

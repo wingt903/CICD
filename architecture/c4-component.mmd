@@ -18,9 +18,9 @@ C4Component
     Container_Ext(releaseManifest, "Release Manifest", "GitHub Artifact", "Captures the approved release baseline")
     Container_Ext(runtimeState, "Runtime State APIs", "AWS Config / SSM / DB Metadata", "Returns live state snapshots for comparison")
     Container_Ext(evtBus, "EventBridge Evidence Bus", "AWS EventBridge", "Routes compliance events")
-    Container_Ext(auditDb, "Audit Database", "DynamoDB", "Stores indexed audit events for reporting")
-    Container_Ext(splunk, "Splunk", "Observability / SIEM", "Consumes audit events and remediation outcomes")
-    Container_Ext(grafana, "Grafana", "Dashboards", "Visualizes compliance and drift posture")
+    Container_Ext(auditS3, "S3 Audit and Evidence Store", "Amazon S3", "Stores immutable audit events and evidence for reporting")
+    Container_Ext(datadog, "Datadog", "Observability / Dashboards", "Consumes audit events and remediation outcomes")
+    
 
     Rel(appRepos, trigger, "push / workflow_dispatch")
     Rel(trigger, oidcMod, "requests AWS credentials")
@@ -38,8 +38,8 @@ C4Component
     Rel(compareEngine, autoRemed, "starts restore-to-baseline")
     Rel(autoRemed, evidEmit, "writes remediation outcome")
     Rel(evidEmit, evtBus, "publishes compliance events")
-    Rel(evtBus, auditDb, "routes events for indexing")
-    Rel(auditDb, splunk, "streams audit events")
-    Rel(auditDb, grafana, "feeds dashboards")
+    Rel(evtBus, auditS3, "routes events for immutable storage")
+    Rel(auditS3, datadog, "streams audit events")
+    
 
     UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")

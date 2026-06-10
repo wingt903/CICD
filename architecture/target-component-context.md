@@ -33,7 +33,7 @@
 - Drift control: EventBridge Scheduler triggers recurring drift scans that collect live state and compare it to the approved baseline.
 - Compliance decisioning: comparison returns either a compliant state or a drift event that must be stored.
 - Auto-remediation: drift events trigger restore-to-baseline automation through Terraform, Ansible, or DB migration controls.
-- Audit persistence and reporting: audit events land in a DynamoDB-backed audit database and are surfaced through Splunk and Grafana dashboards.
+- Audit persistence and reporting: audit events land in S3 audit/evidence storage and are surfaced through Datadog dashboards.
 
 ## Diagram
 
