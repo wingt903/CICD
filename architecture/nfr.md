@@ -84,6 +84,27 @@ Operational monitoring is standardised by application criticality:
 | Artifact Stores (ECR, CodeArtifact) — SL3 | CloudWatch Alarms + SNS | Phase 1: ServiceNow AIOps alert routing deferred to Phase 2; SNS provides interim operational notification to distribution lists. |
 | Observability Infrastructure (CloudWatch, X-Ray, OpenTelemetry) — SL4 | CloudWatch Alarms + SNS | Phase 1: ServiceNow AIOps alert routing deferred to Phase 2; CloudWatch self-monitors with SNS alert routing. |
 
+#### Coverage Strategy
+
+Summarises the alarms and signals collected for operational monitoring. The LLD will capture the individual configuration of each alarm.
+
+| Resource Type | Primary Signals (SLI) | Target Thresholds |
+|---|---|---|
+| **GitHub Actions** (CI/CD Orchestration) | Pipeline success rate; Pipeline execution duration (p95); Workflow queue wait time | Success rate ≥ 99% (rolling 24 h); p95 execution duration ≤ 30 min; Queue wait ≤ 5 min |
+| **AWS EventBridge** (Compliance Evidence Bus) | Failed event delivery rate; Dead-letter queue (DLQ) depth; Rule invocation count | Failed delivery rate < 0.1%; DLQ depth = 0 (alert on any message) |
+| **AWS Lambda — Evidence Ingestor** | Error rate; Throttle count; Duration (p95); Concurrent executions | Error rate < 1%; Throttles = 0; p95 duration ≤ 10 s; Concurrent executions ≤ 80% of account limit |
+| **AWS Lambda — Integrity Verifier** | `EvidenceIntegrityFailure` metric count; Error rate; Duration (p95) | `EvidenceIntegrityFailure` count = 0 (alert on any failure); Error rate < 1%; p95 duration ≤ 60 s |
+| **Amazon S3** (Evidence & Audit Buckets) | 4xx/5xx error rate; Object Lock override attempts (CloudTrail); Replication lag | 4xx/5xx error rate < 0.1%; Override attempts = 0 (alert on any attempt); Replication lag ≤ 15 min |
+| **AWS KMS** (Evidence Signing CMK) | Request error count; Key usage throttle count | Request errors = 0; Throttles = 0 (alert on any event) |
+| **Amazon ECR** (Container Registry) | Image push/pull failure rate; Critical/High vulnerability finding count (Inspector) | Push/pull failure rate < 0.5%; Critical CVE findings = 0 (alert immediately); High CVE findings remediated within 24 h |
+| **AWS CodeArtifact** (Package Repository) | Package download failure rate; Package publish failure rate | Download failure rate < 0.5%; Publish failure rate < 0.5% |
+| **AWS SSM Parameter Store** (Config & Deployment Decisions) | Read/write error rate; RTCM parameter age (staleness) | Error rate < 0.1%; RTCM not refreshed within 24 h triggers alert |
+| **Amazon GuardDuty** (Threat Detection) | High/Critical finding count; Time-to-alert | Critical findings = 0 (alert ≤ 5 min); High findings alerted ≤ 15 min |
+| **AWS Security Hub** (Security Posture) | Critical/High control finding count; Mean time to remediation (MTTR) | Critical findings = 0 (alert immediately); High findings remediated ≤ 7 days; MTTR ≤ 4 h for Critical |
+| **AWS CloudTrail** (Audit Logging) | Log delivery failure count; CloudTrail-to-S3 delivery latency | Delivery failures = 0; Delivery latency ≤ 15 min |
+| **Datadog** (Observability Platform) | Log ingestion lag; Dashboard availability; Monitor flap rate | Log ingestion lag ≤ 60 s; Dashboard availability ≥ 99.9%; Flapping monitors < 5% of total |
+| **AWS CloudWatch** (Self-Monitoring) | Active ALARM state count; Metric publication failure rate | Any transition to ALARM state triggers P2 incident review; Publication failure rate = 0 |
+
 ---
 
 ## 2.2 Security
