@@ -97,6 +97,45 @@ Exceptions do not create permanent entitlements. All exceptions expire at the da
 
 ---
 
+## Secrets Controls and Assurance
+
+State rotation requirements by secret category and service tier. Cadence bands are enforced through the mechanisms noted below. Evidence of rotation enablement and last-rotated status is captured in LLI. Rotation procedures and failure handling are documented in LLO.
+
+### Service Tier Definitions
+
+| Tier | Description | Examples |
+|---|---|---|
+| **T1 — Production** | Live customer-facing or business-critical workloads | `prod` environment application, DB, API endpoints |
+| **T2 — Non-Production** | Test, staging, and integration environments | `test` environment secrets, integration tokens |
+| **T3 — Build / CI** | Pipeline and image build toolchain only | AMI build credentials, CI bootstrap values |
+| **T4 — Platform** | Cross-cutting platform controls (KMS, OIDC) | CMKs, IAM OIDC trust |
+
+### Rotation Requirements by Secret Category and Service Tier
+
+| Secret Category | T1 — Production | T2 — Non-Production | T3 — Build / CI | T4 — Platform | Rotation Mechanism | Failure Handling Principle |
+|---|---|---|---|---|---|---|
+| **Pipeline Identity Credentials** (OIDC STS tokens) | Per-job ephemeral — auto-expires within job session (≤ 1 hr) | Per-job ephemeral — same policy | Per-job ephemeral — same policy | IAM role trust policy and OIDC conditions reviewed annually | AWS STS automatic expiry; no rotation action required by custodian | Job fails immediately if OIDC token exchange fails; pipeline blocked. Investigated and resolved before re-run. Detailed procedure in LLO. |
+| **Runtime Database Credentials** (passwords, connection strings) | **90 days** — mandatory automated rotation | **90 days** — mandatory automated rotation | Not applicable | Not applicable | AWS Secrets Manager rotation with Lambda; new version validated before old version is decommissioned | CloudWatch alarm on rotation failure; Datadog alert to Product Team; deployment blocked until rotation is confirmed healthy. Procedure in LLO. |
+| **Third-Party API Tokens** (integration credentials, external service tokens) | **90 days** where provider supports programmatic rotation; **manual 90-day** review where not | **180 days** | **180 days** | Not applicable | Secrets Manager automatic rotation (where supported by provider API); manual rotation with provider access log review for exceptions | Rotation failure triggers CloudWatch alarm and Datadog alert; access restricted at IAM level until credential is replaced. Exception register in LLI; procedure in LLO. |
+| **Infrastructure Config SecureString Parameters** (credential-equivalent values in SSM) | **90 days** | **90 days** | **90 days** | Not applicable | Pipeline-enforced policy check; parameter version history retained in SSM for audit | Parameter update failure triggers pipeline block; version rollback via SSM version history. Procedure in LLO. |
+| **CI/CD Platform Bootstrap Secrets** (GitHub Actions Encrypted Secrets — minimum justified set) | Annual review; remove immediately when no longer required | Annual review | Annual review | Not applicable | Manual review using GitHub audit log as evidence; automated GitHub Advanced Security secret scanning detects accidental exposure | Secret exposure detected by secret scanning triggers immediate revocation and re-issue. Review cadence enforced by quarterly security review gate. Procedure in LLO. |
+| **Hardened Image Build Credentials** (package repository tokens, OS vendor credentials for AMI builds) | **90 days** | **90 days** | **90 days** | Not applicable | AWS Secrets Manager rotation aligned with runtime application secrets cadence; Inspector + ECR scanning confirms no credentials baked into produced AMI | Rotation failure blocks AMI build pipeline; CloudWatch alarm and Datadog alert to Platform Engineering. Credential re-issue and rescan required before image build resumes. Procedure in LLO. |
+| **Encryption Keys** (KMS CMKs — data at rest, evidence signing, SSM SecureString) | Annual automatic key material rotation | Annual automatic key material rotation | Annual automatic key material rotation | Annual automatic key material rotation | AWS KMS automatic key rotation enabled per CMK; key policy and grants reviewed annually and after any permission-model change | KMS key rotation failure triggers CloudWatch alarm and CISO-notified SNS alert; encryption-dependent services are not degraded (KMS maintains old key material for decryption). Investigation and remediation required before next rotation window. Procedure in LLO. |
+
+### Cadence Band Summary
+
+| Cadence Band | Applies To | Enforcement |
+|---|---|---|
+| **Per-job ephemeral** | Pipeline Identity Credentials (all tiers) | AWS STS automatic expiry — no custodian action |
+| **90 days** | Runtime DB credentials (T1, T2); API tokens where provider supports rotation (T1); build credentials (T1–T3); SSM SecureString credential-equivalent parameters (T1–T3) | Secrets Manager rotation Lambda (automated); pipeline policy gate |
+| **180 days** | API tokens without programmatic rotation support (T2, T3) | Manual rotation with documented compensating controls; exception registered in LLI |
+| **Annual** | GitHub Actions bootstrap secrets (all tiers); KMS CMK key material (T4); IAM OIDC trust policy (T4) | KMS automatic rotation; GitHub audit log-evidenced manual review |
+
+> Evidence of rotation enablement (e.g., Secrets Manager rotation configuration, KMS auto-rotation flag) and last-rotated timestamps are captured in **LLI**.
+> Rotation procedures, pre-rotation validation steps, and failure-handling runbooks are documented in **LLO**.
+
+---
+
 ## Related Documents
 
 | Document | Purpose |
@@ -105,4 +144,5 @@ Exceptions do not create permanent entitlements. All exceptions expire at the da
 | `architecture/nfr.md` | NFR-SEC-03 (encryption), NFR-SEC-06 (secrets management) non-functional requirements |
 | `architecture/compliance-evidence-store.md` | Evidence store design including KMS signing CMK usage |
 | `architecture/requirement-traceability.md` | Requirement-to-architecture mapping (App_as_Code_003, App_as_Code_004, App_as_Code_007) |
-| LLD / LLI (forthcoming) | Individual secret enumeration, rotation runbooks, and implementation inventory |
+| LLI (forthcoming) | Individual secret enumeration, rotation enablement evidence, and last-rotated status inventory |
+| LLO (forthcoming) | Rotation procedures, pre-rotation validation steps, and failure-handling runbooks |
