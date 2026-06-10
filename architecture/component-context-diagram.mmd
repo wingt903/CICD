@@ -102,15 +102,15 @@ graph TB
         EVTBUS[EventBridge\nEvidence Bus]
         INGESTOR[Evidence Ingestor\nLambda]
         EVIDENCES3[S3 Evidence Bucket\nObject Lock + SSE-KMS]
-        AUDITDB[Audit Database\nDynamoDB Evidence Index]
+        AUDITS3[S3 Audit and Evidence Store\nObject Lock + SSE-KMS]
         INTVERIFY[Integrity Verifier\nLambda]
         CLOUDTRAIL[CloudTrail\nEvidence Audit]
     end
 
     subgraph Audit["Audit Reporting"]
         direction LR
-        SPLUNK[Splunk\nAudit Event Search]
-        GRAFANA[Grafana\nCompliance Dashboards]
+        DATADOG[Datadog\nAudit Search + Compliance Dashboards]
+        
     end
 
     %% Governance & Request (Phase 2)
@@ -229,15 +229,16 @@ graph TB
     DRIFTEVENT -->|86. drift evidence| EVTBUS
     EVTBUS -->|87. validate + ingest| INGESTOR
     INGESTOR -->|88. write record| EVIDENCES3
-    INGESTOR -->|89. update audit db| AUDITDB
+    INGESTOR -->|89. write audit record| AUDITS3
     EVIDENCES3 -->|90. daily check| INTVERIFY
     INTVERIFY -->|91. tamper alert| CLOUDTRAIL
     EVIDENCES3 -->|92. S3 events| CLOUDTRAIL
 
     %% Audit Reporting
-    AUDITDB -->|93. search audit events| SPLUNK
-    AUDITDB -->|94. feed compliance views| GRAFANA
-    EVIDENCES3 -->|95. immutable evidence drill-down| SPLUNK
+    AUDITS3 -->|93. stream audit and compliance data| DATADOG
+    AUDITS3 -->|94. refresh compliance dashboards| DATADOG
+    
+    EVIDENCES3 -->|95. immutable evidence drill-down| DATADOG
 
     %% Styling
     %% actor
@@ -306,9 +307,9 @@ graph TB
     style EVTBUS fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
     style INGESTOR fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
     style EVIDENCES3 fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
-    style AUDITDB fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
+    style AUDITS3 fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
     style INTVERIFY fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
     style CLOUDTRAIL fill:#FCE4EC,stroke:#880E4F,stroke-width:2px,color:#000
     %% audit
-    style SPLUNK fill:#EDE7F6,stroke:#4A148C,stroke-width:2px,color:#000
-    style GRAFANA fill:#EDE7F6,stroke:#4A148C,stroke-width:2px,color:#000
+    style DATADOG fill:#EDE7F6,stroke:#4A148C,stroke-width:2px,color:#000
+    

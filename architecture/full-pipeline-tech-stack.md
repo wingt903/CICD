@@ -36,8 +36,8 @@
 | Evidence Ingest | Evidence Normalization Pipeline | EventBridge + AWS Lambda (Evidence Ingestor) | Receives normalized evidence events from GitHub Actions, RTCM Validator, SSM, Security Hub, Drift Reconciler, and DB Drift Controller; validates schema, signs records with KMS, and writes to the evidence store. |
 | Evidence Integrity | Cryptographic Verification | AWS KMS (Sign/Verify) + AWS Lambda (Integrity Verifier) | Daily scheduled Lambda re-derives SHA-256 hashes and validates KMS signatures for every evidence record; publishes pass/fail metrics and alerts via CloudWatch and SNS on any anomaly. |
 | Evidence Audit Trail | Access and Change Logging | AWS CloudTrail (S3 data events + management events) | Captures every evidence read, write, delete attempt, and lock override as immutable CloudTrail records delivered to a separate write-once audit log bucket. |
-| Compliance Index | Evidence Query Layer | Amazon DynamoDB (GSIs on system_id, control_id, timestamp) | Maintains a queryable index of all evidence records to support point-in-time and historical reporting without scanning S3 directly. |
-| Audit Reporting | Compliance Dashboards and Search | Splunk + Grafana + Amazon S3 | Splunk indexes audit and remediation events for search and alerting, while Grafana visualizes drift posture and compliance trends using the audit database with immutable S3 drill-down. |
+| Compliance Reporting Dataset | Evidence Query Layer | Amazon S3 (partitioned evidence and audit records) | Maintains immutable evidence and audit records in S3 partitions to support point-in-time and historical reporting. |
+| Audit Reporting | Compliance Dashboards and Search | Datadog + Amazon S3 | Datadog ingests audit and remediation events for search/alerting and visualizes drift posture and compliance trends using immutable S3 evidence drill-down. |
 
 ## Detailed Technology Stack
 
@@ -111,14 +111,12 @@
 - **Evidence Ingestor Lambda**
   - Validates incoming evidence against the canonical schema (see `architecture/compliance-evidence-store.md`).
   - Signs each record with KMS (`kms:Sign`) before writing to S3.
-  - Writes the record to S3 and inserts the index entry into DynamoDB.
+  - Writes the record to S3 and updates the S3-backed audit/reporting dataset.
 - **Amazon S3 — Compliance Evidence Bucket**
   - Object Lock enabled in Governance mode with a minimum 7-year retention period.
   - Versioning enabled; SSE-KMS encryption with a dedicated Customer Managed Key.
   - S3 server access logging and CloudTrail S3 data events (read + write) enabled for all objects.
   - Partitioned by `year/month/day/env` for efficient audit drill-down and evidence retention management.
-- **Amazon DynamoDB — Audit Database**
-  - Global Secondary Indexes on `system_id`, `control_id`, and `timestamp` allow point-in-time and historical queries without S3 scans.
 - **AWS KMS — Evidence Signing CMK**
   - Customer Managed Key used exclusively for evidence signing and verification.
   - Key policy restricts usage to the Ingestor Lambda role and the Integrity Verifier Lambda role.
@@ -131,12 +129,9 @@
   - Org-level trail with S3 data events enabled for the evidence bucket.
   - Captures every read, write, delete attempt, and Object Lock override attempt with full actor, timestamp, and request metadata.
   - Logs delivered to a separate write-once audit log bucket (Object Lock, Compliance mode, 7-year retention).
-- **Splunk**
-  - Indexes drift events, compliant-state events, and remediation outcomes from the audit database.
-  - Supports search, alerting, and operational triage against the approved-baseline control flow.
-- **Grafana**
-  - Visualizes compliance posture, drift trends, and remediation outcomes from the audit database.
-  - Presents the recommended requirement 004 reporting path from approved baseline through drift decision to audit outcome.
+- **Datadog**
+  - Ingests drift events, compliant-state events, and remediation outcomes from S3-backed audit records.
+  - Supports search, alerting, and dashboard visualization for compliance posture and remediation outcomes.
 - **Amazon S3 — Immutable Evidence Drill-down**
-  - Retains the signed source evidence objects that back each Splunk and Grafana view.
+  - Retains the signed source evidence objects that back each Datadog dashboard view.
   - Access to drill-down records remains logged to CloudTrail.

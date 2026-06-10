@@ -26,9 +26,9 @@ See: architecture/component-context-diagram.mmd"]
     end
 
     subgraph Audit and Reporting
-      D1[Audit Database<br/>DynamoDB Evidence Index]
-      D2[Splunk]
-      D3[Grafana]
+      D1[S3 Audit and Evidence Store<br/>Object Lock + SSE-KMS]
+      D2[Datadog]
+      
     end
 
     A1 -->|1. code repo trigger| B1
@@ -47,11 +47,11 @@ See: architecture/component-context-diagram.mmd"]
     C5 -->|14. record compliant state| D1
     C7 -->|15. write remediation outcome| D1
     C6 -->|16. write drift event| D1
-    D1 -->|17. forward audit events| D2
-    D1 -->|18. dashboard metrics| D3
+    D1 -->|17. forward audit events and metrics| D2
+    
 
     class A1,A2,A3 source;
     class B1,B2,B3 delivery;
     class C1,C2,C3,C5,C6,C7 runtime;
     class C4 decision;
-    class D1,D2,D3 security;
+    class D1,D2 security;

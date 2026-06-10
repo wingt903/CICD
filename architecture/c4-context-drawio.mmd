@@ -14,8 +14,8 @@ graph LR
     appRepos[Application Repositories - GitHub<br/><i>External System</i><br/>Source repositories for application teams]
     infraRepos[Infrastructure Repositories - GitHub<br/><i>External System</i><br/>Source repositories for platform and IaC changes]
     aws[AWS Target Accounts<br/><i>External System</i><br/>Runtime environment for workload deployment]
-    splunk[Splunk<br/><i>External System</i><br/>Central audit and security event platform]
-    grafana[Grafana<br/><i>External System</i><br/>Compliance and runtime observability dashboards]
+    datadog[Datadog<br/><i>External System</i><br/>Central audit, security event, and dashboard platform]
+    
     sn[ServiceNow - Phase 2<br/><i>External System</i><br/>Optional ITSM workflow and ticket integration]
 
     %% Relationships
@@ -26,8 +26,8 @@ graph LR
     appRepos -->|Webhook trigger for GitHub Actions| cicd
     infraRepos -->|Webhook trigger for GitHub Actions| cicd
     cicd -->|OIDC federated deploy and baseline publish| aws
-    cicd -->|Streams audit and security events| splunk
-    cicd -->|Publishes compliance dashboards| grafana
+    cicd -->|Streams audit and security events| datadog
+    
     cicd -.->|Optional change and remediation ticket sync| sn
     sn -.->|Optional IntegrationHub run trigger| cicd
     sn -.->|Optional remediation notice to product teams| productTeam
@@ -41,6 +41,6 @@ graph LR
     style appRepos fill:#999999,color:#ffffff,stroke:#666666
     style infraRepos fill:#999999,color:#ffffff,stroke:#666666
     style aws fill:#999999,color:#ffffff,stroke:#666666
-    style splunk fill:#999999,color:#ffffff,stroke:#666666
-    style grafana fill:#999999,color:#ffffff,stroke:#666666
+    style datadog fill:#999999,color:#ffffff,stroke:#666666
+    
     style sn fill:#999999,color:#ffffff,stroke:#666666
