@@ -8,6 +8,29 @@ This document operates at High-Level Design (HLD) scope. It does **not** enumera
 
 ---
 
+## Security Controls Requirements
+
+The table below maps each control area to its HLD-level requirement statement. Detailed implementation controls, configurations, and acceptance criteria are specified in LLD and LLI.
+
+| Control Area | HLD Requirement Statement |
+|---|---|
+| **Credential Storage — No Hardcoded Secrets** | No secret, credential, API token, or private key may be stored in source code, workflow YAML, Dockerfile, Ansible playbook variable file, or any repository artefact. All secrets must reside exclusively in an approved secrets store. |
+| **Approved Secrets Store** | Each secret category must use its single designated approved store (AWS Secrets Manager for runtime application secrets and build credentials; AWS SSM Parameter Store for configuration parameters; GitHub Actions Encrypted Secrets for CI bootstrap values; AWS KMS for encryption keys). Shadow copies or unofficial stores are prohibited. |
+| **Federated Identity — No Long-Lived Pipeline Keys** | GitHub Actions pipeline jobs must authenticate to AWS using OIDC federation, receiving short-lived STS credentials scoped to a least-privilege IAM role. Static long-lived AWS access keys for pipeline use are prohibited. |
+| **Least-Privilege Access Control** | Every IAM role, instance profile, and Lambda execution role must be granted the minimum permissions required to retrieve only the secrets it needs, scoped to specific Secrets Manager ARNs or SSM parameter paths. Wildcard resource policies on secret stores are prohibited. |
+| **Environment Segregation** | Secrets must be segregated by environment using path-based or tag-based isolation (e.g., `/dev/`, `/test/`, `/prod/` path prefixes in Secrets Manager and SSM Parameter Store). A credential valid in one environment must not grant access to secrets in another. |
+| **Rotation — Automated Enforcement** | All credential-class secrets must be subject to automated rotation aligned to the cadence bands defined in this document. Rotation must be validated (new credential tested) before the previous version is decommissioned. Manual-only rotation is an exception requiring documented compensating controls and CISO approval. |
+| **Rotation — Failure Closed** | A rotation failure must not leave the platform in a degraded or insecure state. CloudWatch alarms and Datadog alerts must fire immediately on any rotation failure. Affected workloads must not silently fall back to expired or revoked credentials; the failure must surface and be resolved before the workload resumes. |
+| **Secret Scanning — Shift Left** | GitHub Advanced Security secret scanning must be enabled on all repositories (CICD repository and application code repositories) and must block merge of pull requests containing detected secrets. Secret scanning results are published as compliance evidence to the EventBridge evidence bus. |
+| **Encryption at Rest** | All secrets at rest must be encrypted using AWS KMS Customer Managed Keys (CMKs). AWS-managed keys are not permitted for secret store encryption. Separate CMKs are used per functional domain (secrets at rest, evidence signing, SSM SecureString). |
+| **Encryption in Transit** | All secret retrieval calls must occur exclusively over TLS-encrypted channels. Unencrypted retrieval paths are prohibited. SSM Session Manager is used as the control channel for build-time secret access, eliminating SSH exposure. |
+| **Audit and Attribution — Full Coverage** | Every secret read, write, rotation, creation, and deletion event must be logged in AWS CloudTrail and the GitHub audit log (as applicable). Logs must be tamper-evident and delivered to an immutable S3 audit bucket. Every access event must carry a principal identity, timestamp, and resource identifier. |
+| **Anomaly Detection and Alerting** | Datadog must ingest audit log events from CloudTrail and the GitHub audit log and raise alerts on: (a) anomalous retrieval volume, (b) retrieval by unexpected principals, (c) access outside pipeline context hours, (d) bulk parameter reads, and (e) organisation-scoped secret changes. |
+| **Break-Glass Access Control** | Emergency human access to secrets must use a dedicated named break-glass IAM role requiring MFA, with real-time alerting to Platform Engineering and the security team. All break-glass access must be linked to an incident record, and any accessed secret must be rotated upon incident resolution. |
+| **Exception Governance** | Any deviation from the above controls must follow the formal exception process defined in this document: documented justification, compensating controls, Platform Engineering lead review, CISO approval, and a mandatory expiry date. No permanent exceptions are permitted. |
+
+---
+
 ## Guiding Principles
 
 | # | Principle | Rationale |
