@@ -68,6 +68,18 @@ For guidance, worked examples, and tier-specific targets for each section, see t
 | NFR-OE-04 | Change Management — Small, reversible changes with a defined rollback strategy. | Changes are delivered via pull requests and reusable workflows, approvals are enforced before promotion, deployment decisions are recorded, and rollback/remediation procedures are defined for failed or non-compliant releases. | Not Started |
 | NFR-OE-05 | Support & Incident Response — Support hours, on-call ownership, escalation paths, and MTTA/MTTR targets defined per tier. | A documented support model defines service hours, ownership by Product Team and Platform Engineering, incident severity classification, escalation paths, and target MTTA/MTTR values for operational incidents. | Not Started |
 
+### Observability Strategy
+
+Operational monitoring is standardised by application criticality:
+
+- **SL1/SL2:** Datadog for logs, metrics, and traces, with SLO-based alerting, dashboards, and synthetic tests.
+- **SL3/SL4:** CloudWatch alarms with events routed to a ServiceNow AIOps endpoint for enrichment and ticketing.
+
+| Application criticality | Operational Monitoring Tool | Reason is different from the standard |
+|---|---|---|
+| SL1 / SL2 | Datadog (logs, metrics, traces, SLO alerting, dashboards, synthetic tests) | Standard baseline for critical services requiring full-stack observability and proactive detection. |
+| SL3 / SL4 | CloudWatch Alarms + ServiceNow AIOps event routing | Lower-criticality services use a lighter AWS-native monitoring pattern while still enabling centralized enrichment and ticketing through ServiceNow AIOps. |
+
 ---
 
 ## 2.2 Security
