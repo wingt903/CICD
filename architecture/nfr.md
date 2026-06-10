@@ -77,13 +77,12 @@ Operational monitoring is standardised by application criticality:
 
 | Application criticality | Operational Monitoring Tool | Reason is different from the standard |
 |---|---|---|
-| **SL1/SL2** — CI/CD Orchestration Platform (GitHub Actions workflows, environment protection gates, OIDC trust layer) | Datadog — logs, metrics, SLO-based alerting, dashboards, synthetic tests | N/A — follows standard. |
-| **SL1/SL2** — Compliance & Audit Evidence Platform (EventBridge evidence bus, Evidence Ingestor Lambda, Integrity Verifier Lambda, S3 Object Lock evidence bucket, AWS CloudTrail audit log bucket) | Datadog — audit event ingestion, compliance dashboards, drift posture alerting; backed by immutable S3 evidence for drill-down | N/A — follows standard. Datadog serves as the compliance reporting layer; immutable S3 records provide the forensic drill-down source. |
-| **SL1/SL2** — Security Detection & Response (Amazon GuardDuty, AWS Security Hub, IAM Access Analyzer) | Datadog — security event streaming, SOC alerting, security posture dashboards | N/A — follows standard. Security findings are forwarded to Datadog per NFR-SEC-08. |
-| **SL2/SL3** — Runtime Configuration & Deployment Governance (AWS SSM Parameter Store, AWS Secrets Manager, RTCM baseline) | Datadog — parameter change events and RTCM validation alerts ingested and surfaced in compliance dashboards | Deviation: SL2/SL3 boundary component monitored via Datadog (same as SL1/SL2) because parameter changes and RTCM decisions are treated as compliance-significant events requiring full audit trail. |
-| **SL3/SL4** — Artifact Stores (Amazon ECR, AWS CodeArtifact) | CloudWatch Alarms + SNS | Phase 1 deviation: ServiceNow AIOps alert routing is deferred to Phase 2. Events are currently routed via SNS to operational distribution lists instead of the ServiceNow AIOps endpoint. |
-| **SL3/SL4** — Observability Infrastructure (CloudWatch Metrics/Logs, AWS X-Ray, OpenTelemetry collector) | CloudWatch Alarms + SNS | Phase 1 deviation: ServiceNow AIOps routing deferred to Phase 2. Self-monitored via CloudWatch; alarms route to SNS for operational notification. |
-| **SL3/SL4** — Alert Routing Infrastructure (CloudWatch Alarms topics, SNS topics) | CloudWatch Alarms (self-monitoring) + SNS | Phase 1 deviation: ServiceNow AIOps routing deferred to Phase 2. SNS delivers notifications to operational distribution lists; ServiceNow incident creation is a Phase 2 target state. |
+| App as Code CI/CD Platform — SL1 | Datadog (logs, metrics, traces, SLO-based alerting, dashboards, synthetic tests) | — |
+| Compliance Evidence Platform — SL1 | Datadog (audit event ingestion, compliance dashboards, drift posture alerting) | — |
+| Security Detection & Response — SL2 | Datadog (security event streaming, SOC alerting, security posture dashboards) | — |
+| Runtime Configuration & Deployment Governance — SL2 | Datadog (parameter change events, RTCM validation alerts) | Monitored at SL2/Datadog level rather than SL3/CloudWatch because RTCM and deployment-gate decisions are compliance-critical events that require full audit trail and SLO-aligned alerting. |
+| Artifact Stores (ECR, CodeArtifact) — SL3 | CloudWatch Alarms + SNS | Phase 1: ServiceNow AIOps alert routing deferred to Phase 2; SNS provides interim operational notification to distribution lists. |
+| Observability Infrastructure (CloudWatch, X-Ray, OpenTelemetry) — SL4 | CloudWatch Alarms + SNS | Phase 1: ServiceNow AIOps alert routing deferred to Phase 2; CloudWatch self-monitors with SNS alert routing. |
 
 ---
 
