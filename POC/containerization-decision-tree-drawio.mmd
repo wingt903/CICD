@@ -1,0 +1,169 @@
+%%{init: {'themeVariables': {'fontSize': 11}, 'flowchart': {'nodeSpacing': 10, 'rankSpacing': 20, 'curve': 'linear'}}}%%
+flowchart TD
+
+    %% ── START ─────────────────────────────────────────────────────────────────
+    START(["Begin Application Assessment\nInternal / External"])
+
+    %% ── CROSS-CUTTING: Static IP / Host-based Licensing ──────────────────────
+    START --> STATICIP{"Static IP or\nhost-based licensing?"}
+    STATICIP -->|Yes| R_STATIC["RETAIN\nLicensing incompatible with containers\nContainers are not bound to a specific IP"]
+    STATICIP -->|No| OS_LBL
+
+    %% ── OPERATING SYSTEM ──────────────────────────────────────────────────────
+    OS_LBL["Operating System"]
+    OS_LBL --> WIN_Q{"Windows OS?"}
+
+    WIN_Q -->|Yes| WIN_SIMPLE{"Simple lightweight\nWindows app?"}
+    WIN_SIMPLE -->|No - AD / Tableau / WebLogic etc| R_WIN["RETAIN\nWindows image size and complexity\nmake containerization impractical\nRetain existing"]
+    WIN_SIMPLE -->|Yes - Simple app| GR_WIN["REHOST\nContainerize and move to ECS\nApply agreed hardening process"]
+
+    WIN_Q -->|No - Linux| LINUX_PKG{"App uses UBI or\nAmazon Linux packages only?"}
+    LINUX_PKG -->|Yes| GR_AL["REHOST\nUse Amazon Linux 2023 base image\nContainerize and move to ECS"]
+    LINUX_PKG -->|No - needs RHEL RPM packages| RHEL_LIC{"RHEL support and\nlicense available?"}
+    RHEL_LIC -->|Yes| GR_RHEL["REHOST\nRHEL Container Base Image\nAssess and address licensing impact\nContainerize and move to ECS"]
+    RHEL_LIC -->|No| R_RHEL["RETAIN / REFACTOR\nRHEL packages unavailable in UBI\nRetain existing or refactor"]
+
+    GR_AL   --> SLOW_Q
+    GR_RHEL --> SLOW_Q
+    GR_WIN  --> SLOW_Q
+
+    %% ── CROSS-CUTTING: Slow Startup ───────────────────────────────────────────
+    SLOW_Q{"Application startup\ntakes more than 2 minutes?"}
+    SLOW_Q -->|Yes| R_SLOW["REFACTOR\nIncompatible with Fargate health checks\nRefactor startup process before containerizing"]
+    SLOW_Q -->|No| WEB_LBL
+
+    %% ── WEB LAYER ─────────────────────────────────────────────────────────────
+    WEB_LBL["Web Layer"]
+    WEB_LBL --> APACHE_Q{"Is Apache\nthe web server?"}
+    APACHE_Q -->|No - not applicable| APP_LBL
+    APACHE_Q -->|Yes| IDP_Q{"Is Apache integrated\nwith an IdP?"}
+    IDP_Q -->|No| GR_APACHE["REHOST\nInstall required httpd version\non Linux base image\nContainerize and move to ECS"]
+    IDP_Q -->|Yes| WEBIDP_LBL
+
+    %% ── WEB LAYER + IdP ───────────────────────────────────────────────────────
+    WEBIDP_LBL["Web Layer + IdP"]
+    WEBIDP_LBL --> ENTRA_Q{"Is Apache integrated\nwith Entra ID?"}
+
+    ENTRA_Q -->|Yes| RC_ENTRA["RECONFIGURE\nConnect with Entra team\nConfigure Entra connectivity\nContainerize and move to ECS"]
+
+    ENTRA_Q -->|No| PING_Q{"Is Apache with\nPing configuration?"}
+    PING_Q -->|Yes| PING_ONBOARD{"Can the application\nbe onboarded to Entra ID?"}
+    PING_ONBOARD -->|Yes| RC_PING["RECONFIGURE\nMigrate Ping to Entra ID\nContainerize and move to ECS"]
+    PING_ONBOARD -->|No| R_PING["RETAIN / REFACTOR\nPing is not a strategic IdP\nMigrate to Entra ID first\nNo need for Containerization - Retain existing"]
+
+    PING_Q -->|No| OAM_Q{"Is Apache with\nOAM Webgate?"}
+    OAM_Q -->|Yes| R_OAM["REFACTOR\nOAM is not a strategic IdP\nAll OAM-authenticated apps must migrate\nto Entra ID before containerization\nRetain existing"]
+    OAM_Q -->|No| GR_NOIDP["REHOST\nNo blocking IdP dependency\nContainerize and move to ECS"]
+
+    GR_APACHE --> APP_LBL
+    RC_ENTRA  --> APP_LBL
+    RC_PING   --> APP_LBL
+    GR_NOIDP  --> APP_LBL
+
+    %% ── APP LAYER / APP SERVER ────────────────────────────────────────────────
+    APP_LBL["App Layer / App Server"]
+    APP_LBL --> WL_Q{"Is the app\nrunning on WebLogic?"}
+
+    WL_Q -->|Yes| WL_MIGRATE{"Can the WebLogic app\nbe migrated to Tomcat?"}
+    WL_MIGRATE -->|No| R_WL["RETAIN / REFACTOR\nFargate does not support multicast\nused by WebLogic clusters\nMigrate to Tomcat first\nRetain existing"]
+    WL_MIGRATE -->|Yes| TC_CLUSTER
+
+    WL_Q -->|No - Tomcat or other| TC_CLUSTER
+
+    TC_CLUSTER{"Is Tomcat running\nin cluster mode?"}
+    TC_CLUSTER -->|No| GR_TC["REHOST\nInstall Tomcat on Linux base image\nUse AWS Cloud Map for service discovery\nContainerize and move to ECS"]
+    TC_CLUSTER -->|Yes| TC_APACHE{"Is Tomcat using\nApache clustering?"}
+    TC_APACHE -->|Yes| RF_TCCL["REFACTOR\nApache -> ALB -> Tomcat tasks\nElastiCache Redis for session persistence\nALB target stickiness enabled\nContainerize and move to ECS"]
+    TC_APACHE -->|No| RF_TCST["REFACTOR\nElastiCache Redis for session persistence\nALB with sticky sessions enabled\nContainerize and move to ECS"]
+
+    GR_TC    --> REDIS_Q
+    RF_TCCL  --> REDIS_Q
+    RF_TCST  --> REDIS_Q
+
+    %% ── CROSS-CUTTING: Self-managed Redis ────────────────────────────────────
+    REDIS_Q{"App uses\nself-managed Redis?"}
+    REDIS_Q -->|Yes| RF_REDIS["REFACTOR\nReplace self-managed Redis with\nAmazon ElastiCache for Redis\nThen containerize"]
+    REDIS_Q -->|No| BATCH_LBL
+    RF_REDIS --> BATCH_LBL
+
+    %% ── JOBS / BATCH SCRIPT ───────────────────────────────────────────────────
+    BATCH_LBL["Jobs / Batch Script"]
+    BATCH_LBL --> CTRLM_Q{"Job scheduled via\nControl-M?"}
+    CTRLM_Q -->|Yes| R_CTRLM["RETAIN / REFACTOR\nNo need to containerize\nTransition to cloud-native\nAWS Step Functions + Lambda"]
+    CTRLM_Q -->|No| MANUAL_Q{"Batch script\nrun manually?"}
+
+    MANUAL_Q -->|Yes| XCOM_Q{"Is there an XCOM\njob for file transfer?"}
+    XCOM_Q -->|Yes| R_XCOM["RETAIN / REFACTOR\nNo need to containerize\nMigrate to cloud-native\nAWS DataSync"]
+    XCOM_Q -->|No| FTP_Q{"Is there an FTP\njob for file transfer?"}
+    FTP_Q -->|Yes| R_FTP["RETAIN / REFACTOR\nNo need to containerize\nMigrate to cloud-native\nAWS Transfer Family"]
+    FTP_Q -->|No| R_BATCH["RETAIN\nNo batch job containerization needed\nRetain existing"]
+
+    MANUAL_Q  -->|No - no batch dependency| COTS_LBL
+    R_CTRLM   --> COTS_LBL
+    R_XCOM    --> COTS_LBL
+    R_FTP     --> COTS_LBL
+    R_BATCH   --> COTS_LBL
+
+    %% ── COTS / EXTERNAL THIRD-PARTY PRODUCT ──────────────────────────────────
+    COTS_LBL["COTS / External Third-Party Product"]
+    COTS_LBL --> COTS_TECH{"Does the current product version\nsupport container technology?"}
+
+    COTS_TECH -->|Yes| COTS_VEND{"Is vendor support available\nfor this version?"}
+    COTS_TECH -->|No| COTS_BIZ{"Business agrees to upgrade\nto a version that supports containerization?"}
+    COTS_BIZ -->|Yes| COTS_VEND
+    COTS_BIZ -->|No| R_COTS2["RETAIN\nNo need for Containerization\nRetain existing"]
+
+    COTS_VEND -->|Yes| GR_COTS["REHOST\nContainerize and move to ECS\nVendor support confirmed"]
+    COTS_VEND -->|No| R_COTS1["RETAIN\nVendor support unavailable\nNo need for Containerization\nRetain existing"]
+
+    GR_COTS  --> MQ_LBL
+    R_COTS1  --> MQ_LBL
+    R_COTS2  --> MQ_LBL
+
+    %% ── APP WITH MQ ───────────────────────────────────────────────────────────
+    MQ_LBL["App with MQ"]
+    MQ_LBL --> MQMGR_Q{"App uses MQ Manager\nin DRBD setup?"}
+    MQMGR_Q -->|Yes| R_MQMGR["RETAIN / REFACTOR\nDRBD uses EBS mount points\nnot supported in containers\nMigrate to Amazon MQ or Apache ActiveMQ"]
+    MQMGR_Q -->|No| MQCLI_Q{"App is an MQ Client\nconnecting to MQ Manager?"}
+    MQCLI_Q -->|Yes| R_MQCLI["RETAIN / REFACTOR\nModernize MQ Manager dependency\nAdopt cloud-native Amazon MQ"]
+    MQCLI_Q -->|No| ORA_LBL
+    R_MQMGR --> ORA_LBL
+    R_MQCLI --> ORA_LBL
+
+    %% ── ORACLE / SQL ETC. ─────────────────────────────────────────────────────
+    ORA_LBL["Oracle / SQL Etc."]
+    ORA_LBL --> ORA_Q{"App has Oracle client\ndependency?"}
+    ORA_Q -->|Yes| R_ORA["RETAIN / REFACTOR\nModernize to AWS-native DB connectivity\nEliminate Oracle client dependency"]
+    ORA_Q -->|No| DAEMON_LBL
+    R_ORA --> DAEMON_LBL
+
+    %% ── SYSTEM DAEMONS ────────────────────────────────────────────────────────
+    DAEMON_LBL["System Daemons\nsyslog / cron / sshd / systemd"]
+    DAEMON_LBL --> DAEMON_Q{"App relies on\nsystem-level daemons?"}
+    DAEMON_Q -->|Yes| R_DAEMON["REFACTOR\nSystem daemons not supported in Fargate\nScheduled tasks must be modernized\ne.g. EventBridge Scheduler"]
+    DAEMON_Q -->|No| OTHER_LBL
+    R_DAEMON --> OTHER_LBL
+
+    %% ── OTHER / UNKNOWN ───────────────────────────────────────────────────────
+    OTHER_LBL["Other / Unknown"]
+    OTHER_LBL --> OTHER_Q{"Other unknown constraints\nor blockers identified?"}
+    OTHER_Q -->|Yes| R_OTHER["RETAIN\nFurther assessment required\nDo not containerize without full assessment"]
+    OTHER_Q -->|No| FINAL
+
+    %% ── FINAL OUTCOME ─────────────────────────────────────────────────────────
+    FINAL(["CONTAINERIZE\nDeploy to Amazon ECS Fargate\nApply agreed hardening and image management process\nConfigure log routing via FireLens / awslogs to Datadog"])
+
+    %% ── STYLES ────────────────────────────────────────────────────────────────
+    classDef green    fill:#90EE90,stroke:#228B22,color:#000000
+    classDef red      fill:#FFB6B6,stroke:#CC0000,color:#000000
+    classDef orange   fill:#FFD580,stroke:#CC8800,color:#000000
+    classDef category fill:#DDA0DD,stroke:#7B2D8B,color:#000000,font-weight:bold
+    classDef start    fill:#F5DEB3,stroke:#8B6914,color:#000000,font-weight:bold
+    classDef final    fill:#87CEEB,stroke:#1E5799,color:#000000,font-weight:bold
+
+    class GR_AL,GR_RHEL,GR_WIN,GR_APACHE,RC_ENTRA,RC_PING,GR_NOIDP,GR_TC,RF_TCCL,RF_TCST,GR_COTS green
+    class R_STATIC,R_WIN,R_RHEL,R_OAM,R_PING,R_WL,R_CTRLM,R_XCOM,R_FTP,R_BATCH,R_COTS1,R_COTS2,R_MQMGR,R_MQCLI,R_ORA,R_OTHER red
+    class R_SLOW,RF_REDIS,R_DAEMON orange
+    class OS_LBL,WEB_LBL,WEBIDP_LBL,APP_LBL,BATCH_LBL,COTS_LBL,MQ_LBL,ORA_LBL,DAEMON_LBL,OTHER_LBL category
+    class START start
+    class FINAL final
