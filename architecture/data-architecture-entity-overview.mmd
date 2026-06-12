@@ -3,13 +3,13 @@ flowchart TD
     subgraph GITHUB["GitHub Organisation"]
         PIPELINE_RUN["PIPELINE_RUN"]
         GITHUB_LOG["GITHUB_LOG"]
+        COMPLIANCE_EVIDENCE["COMPLIANCE_EVIDENCE"]
     end
 
     subgraph AWS["AWS"]
         APPROVED_BASELINE["APPROVED_BASELINE"]
         GOLDEN_AMI["GOLDEN_AMI"]
         AWS_LOG["AWS_LOG"]
-        COMPLIANCE_EVIDENCE["COMPLIANCE_EVIDENCE"]
     end
 
     APPROVED_BASELINE -- "governs" --> PIPELINE_RUN
