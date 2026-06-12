@@ -1,0 +1,8 @@
+erDiagram
+
+    APPROVED_BASELINE ||--o{ PIPELINE_RUN : "governs"
+    APPROVED_BASELINE ||--o{ COMPLIANCE_EVIDENCE : "referenced by"
+    PIPELINE_RUN ||--o| GOLDEN_AMI : "produces"
+    PIPELINE_RUN ||--o{ GITHUB_LOG : "generates"
+    PIPELINE_RUN o|--o{ COMPLIANCE_EVIDENCE : "optionally correlates"
+    PIPELINE_RUN }o--o{ AWS_LOG : "correlates with"
