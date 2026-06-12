@@ -1,8 +1,20 @@
-erDiagram
+flowchart TD
 
-    APPROVED_BASELINE ||--o{ PIPELINE_RUN : "governs"
-    APPROVED_BASELINE ||--o{ COMPLIANCE_EVIDENCE : "referenced by"
-    PIPELINE_RUN ||--o| GOLDEN_AMI : "produces"
-    PIPELINE_RUN ||--o{ GITHUB_LOG : "generates"
-    PIPELINE_RUN o|--o{ COMPLIANCE_EVIDENCE : "optionally correlates"
-    PIPELINE_RUN }o--o{ AWS_LOG : "correlates with"
+    subgraph GITHUB["GitHub Organisation"]
+        PIPELINE_RUN["PIPELINE_RUN"]
+        GITHUB_LOG["GITHUB_LOG"]
+    end
+
+    subgraph AWS["AWS"]
+        APPROVED_BASELINE["APPROVED_BASELINE"]
+        GOLDEN_AMI["GOLDEN_AMI"]
+        AWS_LOG["AWS_LOG"]
+        COMPLIANCE_EVIDENCE["COMPLIANCE_EVIDENCE"]
+    end
+
+    APPROVED_BASELINE -- "governs" --> PIPELINE_RUN
+    APPROVED_BASELINE -- "referenced by" --> COMPLIANCE_EVIDENCE
+    PIPELINE_RUN -- "produces" --> GOLDEN_AMI
+    PIPELINE_RUN -- "generates" --> GITHUB_LOG
+    PIPELINE_RUN -- "optionally correlates" --> COMPLIANCE_EVIDENCE
+    PIPELINE_RUN <-- "correlates with" --> AWS_LOG
