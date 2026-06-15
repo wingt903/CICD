@@ -15,6 +15,8 @@
       ansible.builtin.command: >
         aws ssm get-parameter
         --name "{{ storage_mount_config_ssm_path }}"
+        --query Parameter.Value
+        --output text
         --region "{{ storage_mount_region }}"
       register: storage_mount_ssm_config
       changed_when: false
@@ -23,14 +25,16 @@
       ansible.builtin.command: >
         aws ssm get-parameter
         --name "{{ storage_mount_volume_id_ssm_path }}"
+        --query Parameter.Value
+        --output text
         --region "{{ storage_mount_region }}"
       register: storage_mount_ssm_volume_id
       changed_when: false
 
     - name: "Apply mount contract values from SSM"
       ansible.builtin.set_fact:
-        storage_mount_config: "{{ (storage_mount_ssm_config.stdout | from_json).Parameter.Value | from_json }}"
-        storage_mount_volume_id: "{{ (storage_mount_ssm_volume_id.stdout | from_json).Parameter.Value }}"
+        storage_mount_config: "{{ storage_mount_ssm_config.stdout | from_json }}"
+        storage_mount_volume_id: "{{ storage_mount_ssm_volume_id.stdout }}"
 
 - name: "Resolve effective mount settings"
   ansible.builtin.set_fact:
@@ -146,6 +150,6 @@
     path: "{{ storage_mount_point_effective }}"
     src: "UUID={{ storage_mount_uuid_result.stdout }}"
     fstype: "{{ storage_mount_filesystem_type_effective }}"
-    opts: defaults,nofail
+    opts: defaults,nofail,_netdev
     state: mounted
   when: storage_mount_enabled | bool
