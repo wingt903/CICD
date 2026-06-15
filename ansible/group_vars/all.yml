@@ -21,3 +21,4 @@ app_mount_read_from_ssm: true
 app_mount_point: /webserver
 app_filesystem_type: xfs
 app_filesystem_label: WEBAPPDATA
+app_data_allow_format: true

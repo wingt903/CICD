@@ -44,6 +44,10 @@ variable "app_volume_type" {
   type        = string
   description = "EBS volume type for the mandatory application data volume"
   default     = "gp3"
+  validation {
+    condition     = contains(["gp3", "io1", "io2"], var.app_volume_type)
+    error_message = "app_volume_type must be one of: gp3, io1, io2."
+  }
 }
 
 variable "app_volume_iops" {
@@ -53,8 +57,7 @@ variable "app_volume_iops" {
   validation {
     condition = (
       (var.app_volume_type == "gp3" && var.app_volume_iops >= 3000) ||
-      (contains(["io1", "io2"], var.app_volume_type) && var.app_volume_iops >= 100) ||
-      (!contains(["gp3", "io1", "io2"], var.app_volume_type))
+      (contains(["io1", "io2"], var.app_volume_type) && var.app_volume_iops >= 100)
     )
     error_message = "app_volume_iops must be >=3000 for gp3 and >=100 for io1/io2 volume types."
   }

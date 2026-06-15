@@ -114,6 +114,17 @@
   failed_when: false
   when: storage_mount_enabled | bool
 
+- name: "Require explicit allow_format when creating a new filesystem"
+  ansible.builtin.assert:
+    that:
+      - storage_mount_allow_format | bool
+    fail_msg: >
+      Refusing to format {{ storage_mount_device_path }} because
+      storage_mount_allow_format=false.
+  when:
+    - storage_mount_enabled | bool
+    - storage_mount_existing_fs.rc != 0 or storage_mount_existing_fs.stdout | length == 0
+
 - name: "Create filesystem with label when missing"
   community.general.filesystem:
     dev: "{{ storage_mount_device_path }}"
@@ -150,6 +161,6 @@
     path: "{{ storage_mount_point_effective }}"
     src: "UUID={{ storage_mount_uuid_result.stdout }}"
     fstype: "{{ storage_mount_filesystem_type_effective }}"
-    opts: defaults,nofail,_netdev
+    opts: defaults,nofail
     state: mounted
   when: storage_mount_enabled | bool
