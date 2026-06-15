@@ -2,7 +2,7 @@
 
 ## Summary
 
-This test case document is based on the POC summary in `POC/poc-containerize-legacy-ba-opco-applications.md`.
+This test case document captures the POC summary and validation scenarios for containerizing legacy BA Opco applications.
 
 | Area | Summary |
 |------|---------|
