@@ -139,7 +139,7 @@ jobs:
         working-directory: ${{ github.workspace }}
 
       - name: Run ansible-lint on roles
-        run: ansible-lint roles/apache roles/tomcat
+        run: ansible-lint roles/apache roles/tomcat roles/storage_mount
         working-directory: ansible
 
       - name: Run Molecule test scenario – ${{ matrix.scenario }}

@@ -32,6 +32,7 @@
       tags: [always]
 
   roles:
+    - role: storage_mount
     - role: tomcat
 
   post_tasks:

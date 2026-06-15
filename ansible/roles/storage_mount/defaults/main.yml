@@ -1,0 +1,11 @@
+---
+storage_mount_enabled: "{{ app_data_mount_enabled | default(true) }}"
+storage_mount_read_from_ssm: "{{ app_mount_read_from_ssm | default(true) }}"
+storage_mount_config_ssm_path: "{{ app_mount_config_ssm_path | default('') }}"
+storage_mount_volume_id_ssm_path: "{{ app_data_volume_id_ssm_path | default('') }}"
+storage_mount_volume_id: "{{ app_data_volume_id | default('') }}"
+storage_mount_point: "{{ app_mount_point | default('/webserver') }}"
+storage_mount_filesystem_type: "{{ app_filesystem_type | default('xfs') }}"
+storage_mount_filesystem_label: "{{ app_filesystem_label | default('WEBAPPDATA') }}"
+storage_mount_region: "{{ aws_region }}"
+storage_mount_skip_aws_calls: "{{ skip_aws_calls | default(false) }}"

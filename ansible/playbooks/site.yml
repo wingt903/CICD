@@ -23,6 +23,7 @@
         fail_msg: "release_sha, tomcat_image, and env are required."
       tags: [always]
   roles:
+    - role: storage_mount
     - role: tomcat
 
 - name: "Deploy Apache httpd frontend"
@@ -39,4 +40,5 @@
         fail_msg: "release_sha, apache_image, and env are required."
       tags: [always]
   roles:
+    - role: storage_mount
     - role: apache

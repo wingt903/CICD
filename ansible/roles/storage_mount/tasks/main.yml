@@ -1,0 +1,167 @@
+---
+- name: "Skip storage mount workflow when disabled"
+  ansible.builtin.debug:
+    msg: "storage_mount_enabled=false, skipping secondary volume mount workflow."
+  when: not storage_mount_enabled | bool
+  tags: [storage]
+
+- name: "Load storage contract from SSM Parameter Store"
+  when:
+    - storage_mount_enabled | bool
+    - storage_mount_read_from_ssm | bool
+    - not storage_mount_skip_aws_calls | bool
+  block:
+    - name: "Read mount contract JSON from SSM"
+      ansible.builtin.command: >
+        aws ssm get-parameter
+        --name "{{ storage_mount_config_ssm_path }}"
+        --region "{{ storage_mount_region }}"
+      register: storage_mount_ssm_config
+      changed_when: false
+
+    - name: "Read application volume ID from SSM"
+      ansible.builtin.command: >
+        aws ssm get-parameter
+        --name "{{ storage_mount_volume_id_ssm_path }}"
+        --region "{{ storage_mount_region }}"
+      register: storage_mount_ssm_volume_id
+      changed_when: false
+
+    - name: "Apply mount contract values from SSM"
+      ansible.builtin.set_fact:
+        storage_mount_config: "{{ (storage_mount_ssm_config.stdout | from_json).Parameter.Value | from_json }}"
+        storage_mount_volume_id: "{{ (storage_mount_ssm_volume_id.stdout | from_json).Parameter.Value }}"
+
+- name: "Resolve effective mount settings"
+  ansible.builtin.set_fact:
+    storage_mount_point_effective: "{{ storage_mount_config.mount_point | default(storage_mount_point) }}"
+    storage_mount_filesystem_type_effective: "{{ storage_mount_config.filesystem_type | default(storage_mount_filesystem_type) }}"
+    storage_mount_filesystem_label_effective: "{{ storage_mount_config.filesystem_label | default(storage_mount_filesystem_label) }}"
+  when: storage_mount_enabled | bool
+
+- name: "Assert storage mount prerequisites"
+  ansible.builtin.assert:
+    that:
+      - storage_mount_volume_id is string
+      - storage_mount_volume_id | length > 0
+      - storage_mount_point_effective != "/"
+      - storage_mount_filesystem_type_effective | length > 0
+      - storage_mount_filesystem_label_effective | length > 0
+    fail_msg: >
+      Missing storage contract values. Ensure APP_DATA_VOLUME_ID is supplied or
+      SSM parameters {{ storage_mount_config_ssm_path }} and
+      {{ storage_mount_volume_id_ssm_path }} are populated.
+  when: storage_mount_enabled | bool
+
+- name: "Derive compact EBS volume ID for NVMe symlink lookup"
+  ansible.builtin.set_fact:
+    storage_mount_volume_id_compact: "{{ storage_mount_volume_id | replace('-', '') }}"
+  when: storage_mount_enabled | bool
+
+- name: "Locate attached EBS device symlink by volume ID"
+  ansible.builtin.find:
+    paths: /dev/disk/by-id
+    file_type: link
+    patterns:
+      - "*{{ storage_mount_volume_id_compact }}"
+      - "*{{ storage_mount_volume_id_compact }}*"
+  register: storage_mount_device_links
+  when: storage_mount_enabled | bool
+
+- name: "Select base EBS symlink candidate"
+  ansible.builtin.set_fact:
+    storage_mount_device_link: >-
+      {{
+        (
+          storage_mount_device_links.files
+          | map(attribute='path')
+          | reject('search', '-part')
+          | list
+          | first
+        )
+        | default('')
+      }}
+  when: storage_mount_enabled | bool
+
+- name: "Assert volume symlink was discovered"
+  ansible.builtin.assert:
+    that:
+      - storage_mount_device_link | length > 0
+    fail_msg: >
+      Unable to map EBS volume {{ storage_mount_volume_id }} to a local device
+      under /dev/disk/by-id.
+  when: storage_mount_enabled | bool
+
+- name: "Resolve real block device path from symlink"
+  ansible.builtin.command: "readlink -f {{ storage_mount_device_link }}"
+  register: storage_mount_device_realpath
+  changed_when: false
+  when: storage_mount_enabled | bool
+
+- name: "Capture target block device path"
+  ansible.builtin.set_fact:
+    storage_mount_device_path: "{{ storage_mount_device_realpath.stdout }}"
+  when: storage_mount_enabled | bool
+
+- name: "Check existing filesystem type on target block device"
+  ansible.builtin.command: "blkid -o value -s TYPE {{ storage_mount_device_path }}"
+  register: storage_mount_existing_fs
+  changed_when: false
+  failed_when: false
+  when: storage_mount_enabled | bool
+
+- name: "Create filesystem with label when missing"
+  ansible.builtin.command: >
+    mkfs -t {{ storage_mount_filesystem_type_effective }}
+    -L {{ storage_mount_filesystem_label_effective }}
+    {{ storage_mount_device_path }}
+  changed_when: true
+  when:
+    - storage_mount_enabled | bool
+    - storage_mount_existing_fs.rc != 0 or storage_mount_existing_fs.stdout | length == 0
+
+- name: "Read filesystem UUID for persistent mount"
+  ansible.builtin.command: "blkid -o value -s UUID {{ storage_mount_device_path }}"
+  register: storage_mount_uuid_result
+  changed_when: false
+  when: storage_mount_enabled | bool
+
+- name: "Assert filesystem UUID is present"
+  ansible.builtin.assert:
+    that:
+      - storage_mount_uuid_result.stdout | length > 0
+    fail_msg: "Unable to determine filesystem UUID for {{ storage_mount_device_path }}."
+  when: storage_mount_enabled | bool
+
+- name: "Ensure application data mount point exists"
+  ansible.builtin.file:
+    path: "{{ storage_mount_point_effective }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: storage_mount_enabled | bool
+
+- name: "Persist UUID-based mount entry in fstab"
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: "^UUID={{ storage_mount_uuid_result.stdout }}\\s+"
+    line: "UUID={{ storage_mount_uuid_result.stdout }} {{ storage_mount_point_effective }} {{ storage_mount_filesystem_type_effective }} defaults,nofail 0 2"
+    state: present
+    create: false
+    backup: false
+  when: storage_mount_enabled | bool
+
+- name: "Check whether application data mount point is already mounted"
+  ansible.builtin.command: "mountpoint -q {{ storage_mount_point_effective }}"
+  register: storage_mount_mountpoint_check
+  changed_when: false
+  failed_when: false
+  when: storage_mount_enabled | bool
+
+- name: "Mount application data volume from fstab" # noqa: command-instead-of-module
+  ansible.builtin.command: "mount {{ storage_mount_point_effective }}"
+  changed_when: true
+  when:
+    - storage_mount_enabled | bool
+    - storage_mount_mountpoint_check.rc != 0
