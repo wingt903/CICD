@@ -50,7 +50,7 @@
       - storage_mount_volume_id | length > 0
       - storage_mount_point_effective != "/"
       - storage_mount_filesystem_type_effective | length > 0
-      - storage_mount_filesystem_type_effective in ['xfs', 'ext4', 'ext3', 'ext2']
+      - storage_mount_filesystem_type_effective in ['xfs', 'ext4']
       - storage_mount_filesystem_label_effective | length > 0
     fail_msg: >
       Missing storage contract values. Ensure APP_DATA_VOLUME_ID is supplied or
@@ -97,7 +97,11 @@
   when: storage_mount_enabled | bool
 
 - name: "Resolve real block device path from symlink"
-  ansible.builtin.command: "readlink -f {{ storage_mount_device_link }}"
+  ansible.builtin.command:
+    argv:
+      - readlink
+      - -f
+      - "{{ storage_mount_device_link }}"
   register: storage_mount_device_realpath
   changed_when: false
   when: storage_mount_enabled | bool
@@ -108,7 +112,14 @@
   when: storage_mount_enabled | bool
 
 - name: "Check existing filesystem type on target block device"
-  ansible.builtin.command: "blkid -o value -s TYPE {{ storage_mount_device_path }}"
+  ansible.builtin.command:
+    argv:
+      - blkid
+      - -o
+      - value
+      - -s
+      - TYPE
+      - "{{ storage_mount_device_path }}"
   register: storage_mount_existing_fs
   changed_when: false
   failed_when: false
@@ -135,7 +146,14 @@
     - storage_mount_existing_fs.rc != 0 or storage_mount_existing_fs.stdout | length == 0
 
 - name: "Read filesystem UUID for persistent mount"
-  ansible.builtin.command: "blkid -o value -s UUID {{ storage_mount_device_path }}"
+  ansible.builtin.command:
+    argv:
+      - blkid
+      - -o
+      - value
+      - -s
+      - UUID
+      - "{{ storage_mount_device_path }}"
   register: storage_mount_uuid_result
   changed_when: false
   when: storage_mount_enabled | bool

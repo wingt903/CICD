@@ -55,11 +55,8 @@ variable "app_volume_iops" {
   description = "Provisioned IOPS for the application data volume when supported by the selected volume type"
   default     = 3000
   validation {
-    condition = (
-      (var.app_volume_type == "gp3" && var.app_volume_iops >= 3000) ||
-      (contains(["io1", "io2"], var.app_volume_type) && var.app_volume_iops >= 100)
-    )
-    error_message = "app_volume_iops must be >=3000 for gp3 and >=100 for io1/io2 volume types."
+    condition     = var.app_volume_iops >= 100
+    error_message = "app_volume_iops must be at least 100."
   }
 }
 
@@ -68,8 +65,8 @@ variable "app_volume_throughput" {
   description = "Provisioned throughput (MiB/s) for the application data volume when supported by the selected volume type"
   default     = 125
   validation {
-    condition     = var.app_volume_type != "gp3" || (var.app_volume_throughput >= 125 && var.app_volume_throughput <= 1000)
-    error_message = "app_volume_throughput must be between 125 and 1000 MiB/s for gp3 volume type."
+    condition     = var.app_volume_throughput >= 125 && var.app_volume_throughput <= 1000
+    error_message = "app_volume_throughput must be between 125 and 1000 MiB/s."
   }
 }
 
