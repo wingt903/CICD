@@ -64,7 +64,6 @@
     file_type: link
     patterns:
       - "*{{ storage_mount_volume_id_compact }}"
-      - "*{{ storage_mount_volume_id_compact }}*"
   register: storage_mount_device_links
   when: storage_mount_enabled | bool
 
@@ -144,10 +143,10 @@
 - name: "Persist UUID-based mount entry in fstab"
   ansible.builtin.lineinfile:
     path: /etc/fstab
-    regexp: "^UUID={{ storage_mount_uuid_result.stdout }}\\s+"
+    regexp: '^UUID={{ storage_mount_uuid_result.stdout }}\s+'
     line: "UUID={{ storage_mount_uuid_result.stdout }} {{ storage_mount_point_effective }} {{ storage_mount_filesystem_type_effective }} defaults,nofail 0 2"
     state: present
-    create: false
+    create: true
     backup: false
   when: storage_mount_enabled | bool
 
