@@ -1,0 +1,397 @@
+name: POC – ECS Tomcat Deployment
+
+# Implements the POC defined in poc.md:
+#   Developer pushes code → GitHub Actions builds image, pushes to ECR,
+#   applies Terraform for ECS infrastructure, updates ECS service,
+#   runs smoke validation, and publishes deployment summary.
+#   No developer AWS Console login is required.
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "sample-code/tomcat/**"
+      - "infrastructure/terraform/**"
+      - ".github/workflows/poc-ecs-tomcat-deploy.yml"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: dev
+        type: choice
+        options:
+          - dev
+      force_deploy:
+        description: Force deploy even if no code changes (re-deploy same SHA)
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write        # Required for OIDC token to assume AWS IAM role
+  security-events: write # Required for SARIF upload
+
+env:
+  AWS_REGION: ap-southeast-1
+  IMAGE_NAME: poc-tomcat
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Job 1: Build image and run security scan
+  # ─────────────────────────────────────────────
+  build-and-scan:
+    name: Build and security scan
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Tomcat image
+        run: |
+          docker build \
+            -t local/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            ./sample-code/tomcat
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: image
+          image-ref: local/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-poc-tomcat.sarif
+
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-poc-tomcat.sarif
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: local/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          artifact-name: sbom-poc-tomcat
+
+  # ─────────────────────────────────────────────
+  # Job 2: IaC policy checks (Terraform)
+  # ─────────────────────────────────────────────
+  iac-policy-check:
+    name: IaC policy checks
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('infrastructure/terraform/**/*.tf') != '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform format check
+        run: terraform -chdir=infrastructure/terraform fmt -check -recursive
+
+      - name: Terraform init (no backend – syntax validation only)
+        run: terraform -chdir=infrastructure/terraform init -backend=false
+
+      - name: Terraform validate
+        run: terraform -chdir=infrastructure/terraform validate
+
+      - name: tfsec
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: infrastructure/terraform
+
+      - name: Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infrastructure/terraform
+
+  # ─────────────────────────────────────────────
+  # Job 3: Deploy to dev (real deployment)
+  # ─────────────────────────────────────────────
+  deploy-dev:
+    name: Deploy to dev (ECS Fargate)
+    runs-on: ubuntu-latest
+    needs: [build-and-scan, iac-policy-check]
+    if: |
+      always() &&
+      needs.build-and-scan.result == 'success' &&
+      (needs.iac-policy-check.result == 'success' || needs.iac-policy-check.result == 'skipped') &&
+      vars.AWS_DEV_ROLE_ARN != ''
+    environment: dev
+    env:
+      TF_VAR_environment: dev
+      TF_VAR_aws_region: ${{ vars.AWS_REGION || 'ap-southeast-1' }}
+      TF_VAR_alarm_email: ${{ vars.DEV_ALARM_EMAIL || 'devops-dev@example.com' }}
+      TF_VAR_vpc_id: ${{ vars.DEV_VPC_ID }}
+      TF_VAR_public_subnet_ids: ${{ vars.DEV_PUBLIC_SUBNET_IDS }}
+      TF_VAR_private_subnet_ids: ${{ vars.DEV_PRIVATE_SUBNET_IDS }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Step 1: Authenticate to AWS via OIDC (no static credentials) ──
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEV_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || env.AWS_REGION }}
+
+      # ── Step 2: Log in to ECR ──
+      - name: Log in to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ── Step 3: Build and push image to ECR with immutable SHA tag ──
+      - name: Build and push Tomcat image to ECR
+        id: push-image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          ECR_REPOSITORY: ${{ vars.POC_ECR_REPOSITORY || 'poc-tomcat' }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          FULL_IMAGE="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+
+          docker build \
+            -t "${FULL_IMAGE}" \
+            ./sample-code/tomcat
+
+          docker push "${FULL_IMAGE}"
+
+          echo "image_uri=${FULL_IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "ecr_registry=${ECR_REGISTRY}" >> "$GITHUB_OUTPUT"
+          echo "Image pushed: ${FULL_IMAGE}"
+
+      # ── Step 4: Terraform apply – provision / update ECS infrastructure ──
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform init
+        working-directory: infrastructure/terraform
+        env:
+          TF_BACKEND_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          TF_BACKEND_KEY: poc/dev/terraform.tfstate
+          TF_BACKEND_REGION: ${{ vars.AWS_REGION || env.AWS_REGION }}
+        run: |
+          # If a remote state bucket is configured use it; otherwise use local state.
+          if [ -n "${TF_BACKEND_BUCKET:-}" ]; then
+            terraform init \
+              -backend-config="bucket=${TF_BACKEND_BUCKET}" \
+              -backend-config="key=${TF_BACKEND_KEY}" \
+              -backend-config="region=${TF_BACKEND_REGION}"
+          else
+            echo "No TF_STATE_BUCKET variable set — using local state (not recommended for shared teams)."
+            terraform init -backend=false
+          fi
+
+      - name: Terraform plan
+        working-directory: infrastructure/terraform
+        run: |
+          terraform plan \
+            -var-file=environments/dev.tfvars \
+            -out=tfplan-dev.bin \
+            -no-color
+
+      - name: Terraform apply
+        id: tf-apply
+        working-directory: infrastructure/terraform
+        run: |
+          set -euo pipefail
+          terraform apply -auto-approve tfplan-dev.bin -no-color
+
+          # Capture outputs for subsequent steps
+          ecr_url="$(terraform output -raw ecr_repository_url 2>/dev/null || echo '')"
+          ecs_cluster="$(terraform output -raw ecs_cluster_name 2>/dev/null || echo '')"
+          ecs_service="$(terraform output -raw ecs_service_name 2>/dev/null || echo '')"
+          task_family="$(terraform output -raw ecs_task_definition_family 2>/dev/null || echo '')"
+          alb_dns="$(terraform output -raw alb_dns_name 2>/dev/null || echo '')"
+
+          echo "ecr_url=${ecr_url}" >> "$GITHUB_OUTPUT"
+          echo "ecs_cluster=${ecs_cluster}" >> "$GITHUB_OUTPUT"
+          echo "ecs_service=${ecs_service}" >> "$GITHUB_OUTPUT"
+          echo "task_family=${task_family}" >> "$GITHUB_OUTPUT"
+          echo "alb_dns=${alb_dns}" >> "$GITHUB_OUTPUT"
+
+      # ── Step 5: Resolve ECS cluster and service (from Terraform or env vars) ──
+      - name: Resolve ECS deployment targets
+        id: ecs-targets
+        run: |
+          set -euo pipefail
+
+          # Prefer Terraform outputs; fall back to GitHub environment variables.
+          ecs_cluster="${{ steps.tf-apply.outputs.ecs_cluster }}"
+          ecs_service="${{ steps.tf-apply.outputs.ecs_service }}"
+          task_family="${{ steps.tf-apply.outputs.task_family }}"
+          alb_dns="${{ steps.tf-apply.outputs.alb_dns }}"
+
+          [ -n "$ecs_cluster" ] || ecs_cluster="${{ vars.POC_ECS_CLUSTER }}"
+          [ -n "$ecs_service" ] || ecs_service="${{ vars.POC_ECS_SERVICE }}"
+          [ -n "$alb_dns" ]    || alb_dns="${{ vars.POC_ALB_DNS }}"
+
+          if [ -z "$ecs_cluster" ] || [ -z "$ecs_service" ]; then
+            echo "::error::ECS cluster or service name could not be resolved. Set POC_ECS_CLUSTER and POC_ECS_SERVICE environment variables, or ensure Terraform outputs ecs_cluster_name and ecs_service_name."
+            exit 1
+          fi
+
+          echo "ecs_cluster=${ecs_cluster}" >> "$GITHUB_OUTPUT"
+          echo "ecs_service=${ecs_service}" >> "$GITHUB_OUTPUT"
+          echo "task_family=${task_family}" >> "$GITHUB_OUTPUT"
+          echo "alb_dns=${alb_dns}" >> "$GITHUB_OUTPUT"
+          echo "app_url=http://${alb_dns}" >> "$GITHUB_OUTPUT"
+
+      # ── Step 6: Register new ECS task definition with the pushed image ──
+      - name: Register new ECS task definition
+        id: register-task
+        env:
+          IMAGE_URI: ${{ steps.push-image.outputs.image_uri }}
+          TASK_FAMILY: ${{ steps.ecs-targets.outputs.task_family }}
+          ECS_CLUSTER: ${{ steps.ecs-targets.outputs.ecs_cluster }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${TASK_FAMILY}" ]; then
+            echo "task_definition_arn=skip" >> "$GITHUB_OUTPUT"
+            echo "No task family from Terraform; ECS service will be force-deployed with existing task definition."
+            exit 0
+          fi
+
+          # Fetch current task definition and replace the image URI
+          CURRENT_TASK_DEF="$(aws ecs describe-task-definition \
+            --task-definition "${TASK_FAMILY}" \
+            --query 'taskDefinition' \
+            --output json)"
+
+          # Update the container image (first container in the definition)
+          NEW_TASK_DEF="$(echo "${CURRENT_TASK_DEF}" | \
+            jq --arg IMG "${IMAGE_URI}" \
+            '.containerDefinitions[0].image = $IMG |
+             del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                 .compatibilities, .registeredAt, .registeredBy)')"
+
+          # Register the updated task definition
+          TASK_DEF_ARN="$(aws ecs register-task-definition \
+            --cli-input-json "${NEW_TASK_DEF}" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)"
+
+          echo "task_definition_arn=${TASK_DEF_ARN}" >> "$GITHUB_OUTPUT"
+          echo "Registered new task definition: ${TASK_DEF_ARN}"
+
+      # ── Step 7: Update ECS service to new task definition and wait ──
+      - name: Update ECS service and wait for steady state
+        id: ecs-deploy
+        env:
+          ECS_CLUSTER: ${{ steps.ecs-targets.outputs.ecs_cluster }}
+          ECS_SERVICE: ${{ steps.ecs-targets.outputs.ecs_service }}
+          TASK_DEF_ARN: ${{ steps.register-task.outputs.task_definition_arn }}
+        run: |
+          set -euo pipefail
+
+          if [ "${TASK_DEF_ARN}" = "skip" ]; then
+            # No task definition update; force a new deployment to pull latest config
+            aws ecs update-service \
+              --cluster "${ECS_CLUSTER}" \
+              --service "${ECS_SERVICE}" \
+              --force-new-deployment \
+              --no-cli-pager
+          else
+            # Update service to the newly registered task definition
+            aws ecs update-service \
+              --cluster "${ECS_CLUSTER}" \
+              --service "${ECS_SERVICE}" \
+              --task-definition "${TASK_DEF_ARN}" \
+              --force-new-deployment \
+              --no-cli-pager
+          fi
+
+          echo "Waiting for ECS service to reach steady state (up to 10 minutes)..."
+          aws ecs wait services-stable \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${ECS_SERVICE}"
+
+          echo "ECS service is stable."
+
+      # ── Step 8: Smoke validation – confirm ALB returns expected page ──
+      - name: Smoke test – HTTP validation
+        id: smoke-test
+        env:
+          APP_URL: ${{ steps.ecs-targets.outputs.app_url }}
+          EXPECTED_TEXT: ${{ vars.POC_EXPECTED_TEXT || 'Tomcat CI/CD Migration Sample' }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${APP_URL}" ] || [ "${APP_URL}" = "http://" ]; then
+            echo "::warning::ALB DNS not resolved — skipping HTTP smoke test."
+            echo "smoke_result=skipped" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Smoke testing: ${APP_URL}"
+
+          max_attempts=10
+          attempt=0
+          http_status=0
+          while [ "$attempt" -lt "$max_attempts" ]; do
+            attempt=$((attempt + 1))
+            http_status="$(curl -o /tmp/smoke_body.txt -w "%{http_code}" \
+              --silent --max-time 10 --retry 3 "${APP_URL}" || echo 000)"
+            if [ "$http_status" = "200" ]; then
+              break
+            fi
+            echo "Attempt ${attempt}/${max_attempts}: HTTP ${http_status} — retrying in 15 s"
+            sleep 15
+          done
+
+          if [ "$http_status" != "200" ]; then
+            echo "::error::Smoke test failed — HTTP ${http_status} after ${max_attempts} attempts."
+            echo "smoke_result=failed" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          if [ -n "${EXPECTED_TEXT}" ]; then
+            if grep -q "${EXPECTED_TEXT}" /tmp/smoke_body.txt; then
+              echo "Expected text found in response."
+            else
+              echo "::error::Smoke test failed — expected text '${EXPECTED_TEXT}' not found in response body."
+              echo "smoke_result=failed" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+          fi
+
+          echo "Smoke test passed — HTTP ${http_status}."
+          echo "smoke_result=passed" >> "$GITHUB_OUTPUT"
+
+      # ── Step 9: Publish deployment summary ──
+      - name: Publish deployment summary
+        if: always()
+        env:
+          IMAGE_URI: ${{ steps.push-image.outputs.image_uri }}
+          ECS_CLUSTER: ${{ steps.ecs-targets.outputs.ecs_cluster }}
+          ECS_SERVICE: ${{ steps.ecs-targets.outputs.ecs_service }}
+          APP_URL: ${{ steps.ecs-targets.outputs.app_url }}
+          SMOKE_RESULT: ${{ steps.smoke-test.outputs.smoke_result }}
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<SUMMARY
+          ## POC Deployment Summary – dev
+
+          | Field              | Value |
+          |--------------------|-------|
+          | Commit SHA         | \`${{ github.sha }}\` |
+          | Workflow run       | [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+          | Image URI          | \`${IMAGE_URI}\` |
+          | ECS Cluster        | \`${ECS_CLUSTER}\` |
+          | ECS Service        | \`${ECS_SERVICE}\` |
+          | Application URL    | ${APP_URL} |
+          | Smoke test         | ${SMOKE_RESULT} |
+
+          > Deployment driven entirely by GitHub Actions. No developer AWS Console access required.
+          SUMMARY
