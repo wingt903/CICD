@@ -46,6 +46,7 @@
       - storage_mount_volume_id | length > 0
       - storage_mount_point_effective != "/"
       - storage_mount_filesystem_type_effective | length > 0
+      - storage_mount_filesystem_type_effective in ['xfs', 'ext4', 'ext3', 'ext2']
       - storage_mount_filesystem_label_effective | length > 0
     fail_msg: >
       Missing storage contract values. Ensure APP_DATA_VOLUME_ID is supplied or
@@ -140,17 +141,7 @@
     mode: "0755"
   when: storage_mount_enabled | bool
 
-- name: "Persist UUID-based mount entry in fstab"
-  ansible.builtin.lineinfile:
-    path: /etc/fstab
-    regexp: '^UUID={{ storage_mount_uuid_result.stdout }}\s+'
-    line: "UUID={{ storage_mount_uuid_result.stdout }} {{ storage_mount_point_effective }} {{ storage_mount_filesystem_type_effective }} defaults,nofail 0 2"
-    state: present
-    create: true
-    backup: false
-  when: storage_mount_enabled | bool
-
-- name: "Mount application data volume by UUID"
+- name: "Mount application data volume by UUID and persist in fstab"
   ansible.posix.mount:
     path: "{{ storage_mount_point_effective }}"
     src: "UUID={{ storage_mount_uuid_result.stdout }}"
