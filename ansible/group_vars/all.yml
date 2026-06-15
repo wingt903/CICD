@@ -1,0 +1,15 @@
+---
+env: "{{ lookup('env', 'ENVIRONMENT') | default('dev', true) }}"
+aws_region: ap-southeast-1
+ecr_repository_prefix: cicd-sample
+release_sha: "{{ lookup('env', 'RELEASE_SHA') }}"
+ecr_registry: "{{ lookup('env', 'AWS_ACCOUNT_ID') }}.dkr.ecr.{{ aws_region }}.amazonaws.com"
+apache_image: "{{ ecr_registry }}/{{ ecr_repository_prefix }}/apache:{{ release_sha }}"
+tomcat_image: "{{ ecr_registry }}/{{ ecr_repository_prefix }}/tomcat:{{ release_sha }}"
+rtcm_ssm_path: /cicd/rtcm/approved/current
+deployment_decision_prefix: /cicd/deployment-decisions
+datadog_api_key_ssm: /cicd/datadog/api-key
+datadog_enabled: true
+container_run_as_root: false
+container_read_only_rootfs: true
+container_drop_all_caps: true

@@ -34,7 +34,7 @@ The workflow validates live AWS resources. Before running it, the following must
 | CloudWatch log group | Receiving ECS task logs |
 | ElastiCache for Redis (optional) | Required only if running TC-POC-003 session test |
 
-Refer to `poc.md` for the Terraform structure guidance under `infrastructure/terraform/`.
+Refer to `poc.md` for the Terraform structure guidance under `terraform/`.
 
 ---
 

@@ -1,0 +1,18 @@
+---
+plugin: amazon.aws.aws_ec2
+regions:
+  - ap-southeast-1
+keyed_groups:
+  - prefix: env
+    key: tags.Environment
+  - prefix: role
+    key: tags.Role
+hostnames:
+  - private-ip-address
+  - public-ip-address
+compose:
+  ansible_host: public_ip_address | default(private_ip_address)
+groups:
+  apache: tags.Role is defined and tags.Role == 'apache'
+  tomcat: tags.Role is defined and tags.Role == 'tomcat'
+  app: tags.Role is defined and tags.Role in ['apache', 'tomcat']

@@ -265,4 +265,4 @@ The POC covers the following in-scope items to validate the containerization app
 
 ---
 
-*For related pipeline implementation details, refer to [`poc.md`](../poc.md) and the CI/CD pipeline in [`cicd/github-actions/aws-migration-pipeline.yml`](../cicd/github-actions/aws-migration-pipeline.yml).*
+*For related pipeline implementation details, refer to [`poc.md`](../poc.md) and the CI/CD pipeline in [`.github/workflows/infra-app.yml`](../.github/workflows/infra-app.yml).*

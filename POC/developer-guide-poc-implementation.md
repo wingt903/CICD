@@ -33,9 +33,9 @@ This guide walks you through implementing the POC end-to-end so that a developer
 
 ## Step 1 – Write Terraform ECS Resources
 
-The existing `infrastructure/terraform/main.tf` only defines CloudWatch logs, SNS, and SSM parameters. You must add ECS/ECR/ALB resources for the POC.
+The existing `terraform/main.tf` only defines CloudWatch logs, SNS, and SSM parameters. You must add ECS/ECR/ALB resources for the POC.
 
-Create a new file `infrastructure/terraform/ecs-poc.tf` with the following resources:
+Create a new file `terraform/ecs-poc.tf` with the following resources:
 
 ### 1.1 ECR Repository
 
@@ -301,7 +301,7 @@ output "alb_dns_name" {
 
 ### 1.8 Add Variables for Networking
 
-Add the following to `infrastructure/terraform/variables.tf`:
+Add the following to `terraform/variables.tf`:
 
 ```hcl
 variable "vpc_id" {
@@ -321,7 +321,7 @@ variable "private_subnet_ids" {
 }
 ```
 
-### 1.9 Update `environments/dev.tfvars`
+### 1.9 Update `envs/dev.tfvars`
 
 ```hcl
 environment        = "dev"
@@ -697,5 +697,5 @@ See `POC/developer-guide-github-secrets-to-kms.md` for the full approved secrets
 | `POC/test_case.md` | Test case definitions and pass/fail criteria |
 | `POC/poc-workflow-setup-guide.md` | Setup guide for the test validation workflow |
 | `POC/developer-guide-github-secrets-to-kms.md` | Secrets and credentials approved store guide |
-| `infrastructure/terraform/` | Terraform root module (add `ecs-poc.tf` as described in Step 1) |
+| `terraform/` | Terraform root module (add `ecs-poc.tf` as described in Step 1) |
 | `sample-code/tomcat/` | Tomcat sample application and Dockerfile |

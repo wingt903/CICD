@@ -11,7 +11,7 @@ on:
     branches: ["main"]
     paths:
       - "sample-code/tomcat/**"
-      - "infrastructure/terraform/**"
+      - "terraform/**"
       - ".github/workflows/poc-ecs-tomcat-deploy.yml"
   workflow_dispatch:
     inputs:
@@ -83,7 +83,7 @@ jobs:
   iac-policy-check:
     name: IaC policy checks
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('infrastructure/terraform/**/*.tf') != '' }}
+    if: ${{ hashFiles('terraform/**/*.tf') != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -92,23 +92,23 @@ jobs:
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform format check
-        run: terraform -chdir=infrastructure/terraform fmt -check -recursive
+        run: terraform -chdir=terraform fmt -check -recursive
 
       - name: Terraform init (no backend – syntax validation only)
-        run: terraform -chdir=infrastructure/terraform init -backend=false
+        run: terraform -chdir=terraform init -backend=false
 
       - name: Terraform validate
-        run: terraform -chdir=infrastructure/terraform validate
+        run: terraform -chdir=terraform validate
 
       - name: tfsec
         uses: aquasecurity/tfsec-action@v1.0.3
         with:
-          working_directory: infrastructure/terraform
+          working_directory: terraform
 
       - name: Checkov
         uses: bridgecrewio/checkov-action@v12
         with:
-          directory: infrastructure/terraform
+          directory: terraform
 
   # ─────────────────────────────────────────────
   # Job 3: Deploy to dev (real deployment)
@@ -176,7 +176,7 @@ jobs:
           terraform_wrapper: false
 
       - name: Terraform init
-        working-directory: infrastructure/terraform
+        working-directory: terraform
         env:
           TF_BACKEND_BUCKET: ${{ vars.TF_STATE_BUCKET }}
           TF_BACKEND_KEY: poc/dev/terraform.tfstate
@@ -194,16 +194,16 @@ jobs:
           fi
 
       - name: Terraform plan
-        working-directory: infrastructure/terraform
+        working-directory: terraform
         run: |
           terraform plan \
-            -var-file=environments/dev.tfvars \
+            -var-file=envs/dev.tfvars \
             -out=tfplan-dev.bin \
             -no-color
 
       - name: Terraform apply
         id: tf-apply
-        working-directory: infrastructure/terraform
+        working-directory: terraform
         run: |
           set -euo pipefail
           terraform apply -auto-approve tfplan-dev.bin -no-color

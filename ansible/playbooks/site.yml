@@ -4,7 +4,7 @@
 #
 # Usage:
 #   ansible-playbook playbooks/site.yml \
-#     -i inventories/dev/hosts.ini \
+#     -i inventories/aws_ec2.yml \
 #     -e "release_sha={{ RELEASE_SHA }}" \
 #     -e "apache_image=<ECR_URI>/apache:{{ RELEASE_SHA }}" \
 #     -e "tomcat_image=<ECR_URI>/tomcat:{{ RELEASE_SHA }}"
