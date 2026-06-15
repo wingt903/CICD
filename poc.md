@@ -26,8 +26,8 @@ After completing this POC:
 Already present:
 
 - App sample: `sample-code/tomcat`
-- Pipeline scaffold: `cicd/github-actions/aws-migration-pipeline.yml`
-- Terraform scaffold: `infrastructure/terraform`
+- Pipeline scaffold: `.github/workflows/infra-app.yml`
+- Terraform scaffold: `terraform`
 
 Gap to close for this POC:
 
@@ -90,7 +90,7 @@ Store role ARNs in GitHub environment/repo variables used by pipeline, e.g.:
 
 ### Step 2 — Define Terraform for ECS Tomcat runtime
 
-Under `infrastructure/terraform`, add ECS POC resources (or module):
+Under `terraform`, add ECS POC resources (or module):
 
 1. ECR repository for Tomcat image
 2. ECS cluster
@@ -113,7 +113,7 @@ Required Terraform outputs for pipeline handoff:
 
 ### Step 3 — Add environment variable files for dev
 
-Create environment-specific tfvars under `infrastructure/terraform/environments`, for example:
+Create environment-specific tfvars under `terraform/envs`, for example:
 
 - `dev.tfvars`
 
@@ -130,12 +130,12 @@ Keep sensitive values in GitHub Secrets, not plaintext files.
 
 ### Step 4 — Update pipeline: build, push, deploy (fully automated)
 
-Use `cicd/github-actions/aws-migration-pipeline.yml` as your source workflow and implement these concrete deploy actions (replace placeholders):
+Use `.github/workflows/infra-app.yml` as your source workflow and implement these concrete deploy actions (replace placeholders):
 
 1. **Authenticate to AWS** with `aws-actions/configure-aws-credentials@v4` via OIDC role.
 2. **Build Tomcat image** from `sample-code/tomcat`.
 3. **Log in to ECR** and push image with immutable tag (`${{ github.sha }}`).
-4. **Terraform apply (dev)** using `infrastructure/terraform` + `environments/dev.tfvars`.
+4. **Terraform apply (dev)** using `terraform` + `envs/dev.tfvars`.
 5. **Render/register ECS task definition** using new image tag.
 6. **Update ECS service** and wait for steady state.
 7. **Smoke test** `http://<alb_dns_name>/` (HTTP for POC only; use HTTPS in non-POC environments).

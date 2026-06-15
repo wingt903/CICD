@@ -412,7 +412,7 @@ molecule verify -s tomcat
 ### CI (GitHub Actions)
 Tests are executed automatically in the `ansible-validate` job on every pull
 request and push to `main`. See
-`cicd/github-actions/aws-migration-pipeline.yml` – job `ansible-validate`.
+`.github/workflows/infra-app.yml` – job `ansible-validate`.
 
 ---
 

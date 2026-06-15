@@ -15,8 +15,8 @@ It now includes an AWS-only target design for full automated CI/CD with dev/test
 - `architecture/full-pipeline-tech-stack.md` - technology stack mapping
 - `architecture/target-component-context.mmd` - target component context diagram (artifact, IaC, security, governance, observability, rollback)
 - `architecture/target-component-context.md` - target design notes and capability mapping
-- `cicd/github-actions/aws-migration-pipeline.yml` - multi-stage CI/CD workflow with security, IaC checks, release manifest, and environment promotion
-- `infrastructure/terraform/` - Terraform scaffolding for environment-isolated provisioning and approved AMI parameter paths
+- `.github/workflows/infra-app.yml` - multi-stage CI/CD workflow with security, IaC checks, release manifest, and environment promotion
+- `terraform/` - Terraform scaffolding for environment-isolated provisioning and approved AMI parameter paths
 - `sample-code/weblogic/` - WebLogic sample deployment artifact and Dockerfile
 - `sample-code/tomcat/` - Tomcat sample web app and Dockerfile
 - `sample-code/python/` - Python Flask sample app and Dockerfile
@@ -47,9 +47,9 @@ It now includes an AWS-only target design for full automated CI/CD with dev/test
   - `BREAK_GLASS_APPROVED` (`true`/`false`)
   - `BREAK_GLASS_APPROVED_UNTIL` (UTC timestamp)
 - Configure Terraform backend resources per environment as defined in:
-  - `infrastructure/terraform/backend/dev.hcl`
-  - `infrastructure/terraform/backend/test.hcl`
-  - `infrastructure/terraform/backend/prod.hcl`
+  - `terraform/backend/dev.hcl`
+  - `terraform/backend/test.hcl`
+  - `terraform/backend/prod.hcl`
 - Ensure IAM role permissions allow SSM Parameter Store read/write on
   `/cicd/deployment-decisions/*` for deployment decision enforcement.
 

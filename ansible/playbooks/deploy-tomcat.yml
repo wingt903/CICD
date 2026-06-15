@@ -3,7 +3,7 @@
 #
 # Usage:
 #   ansible-playbook playbooks/deploy-tomcat.yml \
-#     -i inventories/{{ env }}/hosts.ini \
+#     -i inventories/aws_ec2.yml \
 #     -e "release_sha={{ RELEASE_SHA }}" \
 #     -e "tomcat_image={{ ECR_URI }}/tomcat:{{ RELEASE_SHA }}"
 

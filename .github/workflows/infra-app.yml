@@ -81,7 +81,7 @@ jobs:
   iac-validate:
     name: Terraform and IaC policy checks
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('infrastructure/terraform/**/*.tf') != '' }}
+    if: ${{ hashFiles('terraform/**/*.tf') != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -90,23 +90,23 @@ jobs:
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform format check
-        run: terraform -chdir=infrastructure/terraform fmt -check -recursive
+        run: terraform -chdir=terraform fmt -check -recursive
 
       - name: Terraform init (no backend)
-        run: terraform -chdir=infrastructure/terraform init -backend=false
+        run: terraform -chdir=terraform init -backend=false
 
       - name: Terraform validate
-        run: terraform -chdir=infrastructure/terraform validate
+        run: terraform -chdir=terraform validate
 
       - name: tfsec
         uses: aquasecurity/tfsec-action@v1.0.3
         with:
-          working_directory: infrastructure/terraform
+          working_directory: terraform
 
       - name: Checkov
         uses: bridgecrewio/checkov-action@v12
         with:
-          directory: infrastructure/terraform
+          directory: terraform
 
   ansible-validate:
     name: Ansible lint and Molecule tests
@@ -191,7 +191,7 @@ jobs:
               "noRedeployAfterFailure": "required"
             },
             "iac": {
-              "path": "infrastructure/terraform",
+              "path": "terraform",
               "version": "${GITHUB_SHA}"
             },
             "governance": {
