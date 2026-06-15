@@ -325,12 +325,14 @@ variable "private_subnet_ids" {
 
 ```hcl
 environment        = "dev"
-alarm_email        = "devops-dev@example.com"
+alarm_email        = "your-team@example.com"  # Replace with a real email — SNS alarm notifications will be sent here
 vpc_id             = "vpc-0123456789abcdef0"
 public_subnet_ids  = ["subnet-aaaa0001", "subnet-aaaa0002"]
 private_subnet_ids = ["subnet-bbbb0001", "subnet-bbbb0002"]
 ```
 
+> **Replace `alarm_email` with a real team email address.** The placeholder value will not deliver SNS notifications.
+>
 > **Do not commit real VPC or subnet IDs if this repository is public.** Store sensitive network IDs as GitHub environment variables (`DEV_VPC_ID`, `DEV_PUBLIC_SUBNET_IDS`, etc.) and reference them as `TF_VAR_*` in the workflow.
 
 ---
@@ -501,6 +503,8 @@ Attach the following inline policy (or use managed policies):
   ]
 }
 ```
+
+> Replace `<tf-state-bucket>` with the actual S3 bucket name you set in the `TF_STATE_BUCKET` GitHub environment variable (see Step 3.4). Replace `<dev-account-id>` with your 12-digit AWS account ID.
 
 Note down the role ARN: `arn:aws:iam::<dev-account-id>:role/github-actions-poc-dev`
 
