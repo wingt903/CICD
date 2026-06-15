@@ -123,7 +123,7 @@ This test case document captures the POC summary and validation scenarios for co
 
 ## GitHub Actions Executable Procedure
 
-The executable workflow is defined in `/home/runner/work/CICD/CICD/wingt903/CICD/.github/workflows/poc-executable-tests.yml`.
+The executable workflow is defined in `.github/workflows/poc-executable-tests.yml`.
 
 ### How to run
 

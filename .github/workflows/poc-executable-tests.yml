@@ -184,11 +184,17 @@ jobs:
           reason="Application URL did not return the expected content."
 
           for attempt in $(seq 1 10); do
-            http_code="$(curl -fsS -o poc-test-artifacts/tc002-body.html -D poc-test-artifacts/tc002-headers.txt -w '%{http_code}' "$APP_URL" || true)"
+            curl_stderr="poc-test-artifacts/tc002-curl-stderr.txt"
+            http_code="$(curl -fsS -o poc-test-artifacts/tc002-body.html -D poc-test-artifacts/tc002-headers.txt -w '%{http_code}' "$APP_URL" 2>"$curl_stderr" || true)"
             if [ "$http_code" = "200" ] && grep -Fq "$EXPECTED_TEXT" poc-test-artifacts/tc002-body.html; then
               status="passed"
               reason="Application returned HTTP 200 and contained the expected smoke-test text."
               break
+            fi
+            if [ -s "$curl_stderr" ]; then
+              reason="Smoke test request failed: $(tail -n 1 "$curl_stderr")"
+            else
+              reason="Application returned HTTP status '${http_code:-unknown}' without the expected response text."
             fi
             sleep 10
           done
@@ -251,12 +257,17 @@ jobs:
             status="failed"
             reason="Authentication response did not match the expected redirect behavior."
 
-            http_code="$(curl -fsS -I -o /dev/null -D poc-test-artifacts/tc004-headers.txt -w '%{http_code}' "$AUTH_PROBE_URL" || true)"
+            curl_stderr="poc-test-artifacts/tc004-curl-stderr.txt"
+            http_code="$(curl -fsS -I -o /dev/null -D poc-test-artifacts/tc004-headers.txt -w '%{http_code}' "$AUTH_PROBE_URL" 2>"$curl_stderr" || true)"
             location_header="$(awk 'tolower($1) == "location:" {print $2}' poc-test-artifacts/tc004-headers.txt | tr -d '\r' | tail -n 1)"
 
             if [ "$http_code" = "$AUTH_EXPECT_STATUS" ] && [ -n "$location_header" ] && echo "$location_header" | grep -Eq "$AUTH_EXPECT_LOCATION_REGEX"; then
               status="passed"
               reason="Authentication probe returned the expected status and redirect target."
+            elif [ -s "$curl_stderr" ]; then
+              reason="Authentication probe failed: $(tail -n 1 "$curl_stderr")"
+            else
+              reason="Authentication probe returned HTTP status '${http_code:-unknown}' and redirect '${location_header:-none}'."
             fi
           fi
 
