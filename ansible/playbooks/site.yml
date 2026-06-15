@@ -1,0 +1,42 @@
+---
+# site.yml – Full-stack App as Code deployment: Apache + Tomcat.
+# Runs both roles in order: Tomcat first (backend), then Apache (frontend proxy).
+#
+# Usage:
+#   ansible-playbook playbooks/site.yml \
+#     -i inventories/dev/hosts.ini \
+#     -e "release_sha={{ RELEASE_SHA }}" \
+#     -e "apache_image=<ECR_URI>/apache:{{ RELEASE_SHA }}" \
+#     -e "tomcat_image=<ECR_URI>/tomcat:{{ RELEASE_SHA }}"
+
+- name: "Deploy Tomcat backend"
+  hosts: tomcat
+  become: true
+  gather_facts: true
+  pre_tasks:
+    - name: "Assert required variables"
+      ansible.builtin.assert:
+        that:
+          - release_sha is defined and release_sha | length > 0
+          - tomcat_image is defined
+          - env is defined and env in ['dev', 'test', 'prod']
+        fail_msg: "release_sha, tomcat_image, and env are required."
+      tags: [always]
+  roles:
+    - role: tomcat
+
+- name: "Deploy Apache httpd frontend"
+  hosts: apache
+  become: true
+  gather_facts: true
+  pre_tasks:
+    - name: "Assert required variables"
+      ansible.builtin.assert:
+        that:
+          - release_sha is defined and release_sha | length > 0
+          - apache_image is defined
+          - env is defined and env in ['dev', 'test', 'prod']
+        fail_msg: "release_sha, apache_image, and env are required."
+      tags: [always]
+  roles:
+    - role: apache

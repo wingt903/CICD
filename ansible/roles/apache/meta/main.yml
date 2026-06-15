@@ -1,0 +1,21 @@
+---
+galaxy_info:
+  role_name: apache
+  author: platform-engineering
+  description: >
+    Deploy a hardened Apache httpd container aligned to the App as Code
+    CI/CD pipeline. Implements RTCM guardrail, drift control, security
+    hardening, and audit evidence requirements.
+  license: proprietary
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+
+dependencies: []

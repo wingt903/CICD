@@ -1,0 +1,152 @@
+---
+# molecule/tomcat/verify.yml
+# Post-convergence verification tests for the Tomcat role.
+
+- name: "Verify Tomcat role – post-convergence assertions"
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    # ── TC-ANS-002: Idempotency – directories created once ───────────────────
+    - name: "TC-ANS-002 | Verify /etc/tomcat-container directory exists"
+      ansible.builtin.stat:
+        path: /etc/tomcat-container
+      register: tomcat_conf_dir
+      tags: [tc_ans_002]
+
+    - name: "TC-ANS-002 | Assert directory is present"
+      ansible.builtin.assert:
+        that: tomcat_conf_dir.stat.exists and tomcat_conf_dir.stat.isdir
+        fail_msg: "TC-ANS-002 FAILED: /etc/tomcat-container does not exist."
+        success_msg: "TC-ANS-002 PASSED: /etc/tomcat-container exists."
+      tags: [tc_ans_002]
+
+    # ── TC-ANS-003: server.xml rendered ──────────────────────────────────────
+    - name: "TC-ANS-003 | Slurp rendered server.xml"
+      ansible.builtin.slurp:
+        src: /etc/tomcat-container/server.xml
+      register: server_xml
+      tags: [tc_ans_003]
+
+    - name: "TC-ANS-003 | Assert shutdown port is -1 (disabled)"
+      ansible.builtin.assert:
+        that: "'-1' in (server_xml.content | b64decode)"
+        fail_msg: "TC-ANS-003 FAILED: Tomcat shutdown port is not disabled (-1)."
+        success_msg: "TC-ANS-003 PASSED: Shutdown port is disabled."
+      tags: [tc_ans_003]
+
+    - name: "TC-ANS-003a | Assert xpoweredBy=false in server.xml"
+      ansible.builtin.assert:
+        that: "'xpoweredBy=\"false\"' in (server_xml.content | b64decode)"
+        fail_msg: "TC-ANS-003a FAILED: xpoweredBy must be false in server.xml."
+        success_msg: "TC-ANS-003a PASSED: xpoweredBy=false is set."
+      tags: [tc_ans_003a]
+
+    - name: "TC-ANS-003b | Assert allowTrace=false in server.xml"
+      ansible.builtin.assert:
+        that: "'allowTrace=\"false\"' in (server_xml.content | b64decode)"
+        fail_msg: "TC-ANS-003b FAILED: allowTrace must be false in server.xml."
+        success_msg: "TC-ANS-003b PASSED: allowTrace=false is set."
+      tags: [tc_ans_003b]
+
+    # ── TC-ANS-005: Tomcat container running ──────────────────────────────────
+    - name: "TC-ANS-005 | Get Tomcat container info"
+      community.docker.docker_container_info:
+        name: tomcat-app-test
+      register: tomcat_container_info
+      tags: [tc_ans_005]
+
+    - name: "TC-ANS-005 | Assert container is running"
+      ansible.builtin.assert:
+        that:
+          - tomcat_container_info.exists
+          - tomcat_container_info.container.State.Running == true
+        fail_msg: "TC-ANS-005 FAILED: Tomcat container is not running."
+        success_msg: "TC-ANS-005 PASSED: Tomcat container is running."
+      tags: [tc_ans_005]
+
+    # ── TC-ANS-005a: Tomcat HTTP health check ─────────────────────────────────
+    - name: "TC-ANS-005a | HTTP check on Tomcat host port"
+      ansible.builtin.uri:
+        url: "http://localhost:8082/"
+        method: GET
+        status_code: 200
+        timeout: 30
+      register: tomcat_http
+      retries: 6
+      delay: 10
+      until: tomcat_http.status == 200
+      tags: [tc_ans_005a]
+
+    - name: "TC-ANS-005a | Assert HTTP 200 from Tomcat"
+      ansible.builtin.assert:
+        that: tomcat_http.status == 200
+        fail_msg: "TC-ANS-005a FAILED: Tomcat did not respond with HTTP 200."
+        success_msg: "TC-ANS-005a PASSED: Tomcat responded with HTTP 200."
+      tags: [tc_ans_005a]
+
+    # ── TC-ANS-006: RTCM – image version check ────────────────────────────────
+    - name: "TC-ANS-006 | Assert Tomcat image contains approved version strings"
+      ansible.builtin.assert:
+        that:
+          - "'10.1' in tomcat_container_info.container.Config.Image"
+          - "'17' in tomcat_container_info.container.Config.Image"
+        fail_msg: >
+          TC-ANS-006 FAILED: Tomcat container image
+          '{{ tomcat_container_info.container.Config.Image }}' does not contain
+          approved tomcat=10.1 and java=17 versions (RTCM violation).
+        success_msg: "TC-ANS-006 PASSED: Approved Tomcat 10.1/JDK17 confirmed."
+      tags: [tc_ans_006]
+
+    # ── TC-ANS-007: Hardening – no-new-privileges ─────────────────────────────
+    - name: "TC-ANS-007 | Assert no-new-privileges security option"
+      ansible.builtin.assert:
+        that: "'no-new-privileges:true' in tomcat_container_info.container.HostConfig.SecurityOpt"
+        fail_msg: "TC-ANS-007 FAILED: no-new-privileges is not set on Tomcat container."
+        success_msg: "TC-ANS-007 PASSED: no-new-privileges is enforced."
+      tags: [tc_ans_007]
+
+    # ── TC-ANS-008: Drift – release SHA label ────────────────────────────────
+    - name: "TC-ANS-008 | Assert release SHA label"
+      ansible.builtin.assert:
+        that: tomcat_container_info.container.Config.Labels['app.release_sha'] == release_sha
+        fail_msg: "TC-ANS-008 FAILED: Container release SHA label mismatch."
+        success_msg: "TC-ANS-008 PASSED: Release SHA label matches."
+      tags: [tc_ans_008]
+
+    # ── TC-ANS-009: JAVA_OPTS injected ───────────────────────────────────────
+    - name: "TC-ANS-009 | Assert JAVA_OPTS environment variable is set"
+      ansible.builtin.assert:
+        that: >
+          tomcat_container_info.container.Config.Env |
+          select('match', 'JAVA_OPTS=.*') | list | length > 0
+        fail_msg: "TC-ANS-009 FAILED: JAVA_OPTS is not set in Tomcat container."
+        success_msg: "TC-ANS-009 PASSED: JAVA_OPTS is injected into container."
+      tags: [tc_ans_009]
+
+    # ── TC-ANS-010: Restart policy ───────────────────────────────────────────
+    - name: "TC-ANS-010 | Assert restart policy is unless-stopped"
+      ansible.builtin.assert:
+        that: tomcat_container_info.container.HostConfig.RestartPolicy.Name == "unless-stopped"
+        fail_msg: "TC-ANS-010 FAILED: Restart policy is not 'unless-stopped'."
+        success_msg: "TC-ANS-010 PASSED: Restart policy is 'unless-stopped'."
+      tags: [tc_ans_010]
+
+    # ── TC-ANS-011: webapps volume mounted ───────────────────────────────────
+    - name: "TC-ANS-011 | Assert webapps volume is mounted"
+      ansible.builtin.assert:
+        that: >
+          tomcat_container_info.container.HostConfig.Binds |
+          select('match', '.*/usr/local/tomcat/webapps.*') | list | length > 0
+        fail_msg: "TC-ANS-011 FAILED: webapps volume is not mounted."
+        success_msg: "TC-ANS-011 PASSED: webapps volume is mounted."
+      tags: [tc_ans_011]
+
+    # ── TC-ANS-012: Datadog log label present ────────────────────────────────
+    - name: "TC-ANS-012 | Assert Datadog log label is set"
+      ansible.builtin.assert:
+        that: "'com.datadog.logs' in tomcat_container_info.container.Config.Labels"
+        fail_msg: "TC-ANS-012 FAILED: Datadog log label is missing from Tomcat container."
+        success_msg: "TC-ANS-012 PASSED: Datadog log label is present."
+      tags: [tc_ans_012]

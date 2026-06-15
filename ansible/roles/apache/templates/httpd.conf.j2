@@ -1,0 +1,53 @@
+# Apache httpd.conf – rendered by Ansible template for containerised deployment.
+# Managed by App as Code platform. Do NOT edit manually.
+
+ServerRoot "/usr/local/apache2"
+Listen {{ apache_container_port }}
+
+# Security: minimal module set.
+LoadModule mpm_event_module modules/mod_mpm_event.so
+LoadModule authz_core_module modules/mod_authz_core.so
+LoadModule dir_module modules/mod_dir.so
+LoadModule log_config_module modules/mod_log_config.so
+LoadModule unixd_module modules/mod_unixd.so
+LoadModule status_module modules/mod_status.so
+LoadModule headers_module modules/mod_headers.so
+LoadModule proxy_module modules/mod_proxy.so
+LoadModule proxy_http_module modules/mod_proxy_http.so
+
+# Run as non-root.
+User  daemon
+Group daemon
+
+ServerAdmin webmaster@localhost
+ServerName  localhost
+
+# Hide version and OS.
+ServerTokens Prod
+ServerSignature Off
+
+# Security headers.
+Header always set X-Content-Type-Options "nosniff"
+Header always set X-Frame-Options "DENY"
+Header always set X-XSS-Protection "1; mode=block"
+Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+# Health check endpoint (no proxy, local only).
+<Location "/health">
+    SetHandler server-status
+    Require local
+</Location>
+
+# Reverse proxy to Tomcat on port 8080.
+<VirtualHost *:{{ apache_container_port }}>
+    ProxyPreserveHost On
+    ProxyPass        /health !
+    ProxyPass        / http://{{ tomcat_backend_host | default('tomcat') }}:{{ tomcat_backend_port | default(8080) }}/
+    ProxyPassReverse / http://{{ tomcat_backend_host | default('tomcat') }}:{{ tomcat_backend_port | default(8080) }}/
+</VirtualHost>
+
+# Logging.
+LogFormat "%h %l %u %t \"%r\" %>s %b" combined
+CustomLog /proc/self/fd/1 combined
+ErrorLog  /proc/self/fd/2
+LogLevel  warn

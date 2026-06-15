@@ -1,0 +1,54 @@
+---
+# molecule/tomcat/prepare.yml
+
+- name: "Prepare tomcat test instance"
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: "Wait for connection"
+      ansible.builtin.wait_for_connection:
+        timeout: 30
+
+    - name: "Gather facts"
+      ansible.builtin.setup:
+
+    - name: "Install prerequisites"
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - python3-pip
+        state: present
+        update_cache: true
+
+    - name: "Install Docker Python SDK"
+      ansible.builtin.pip:
+        name:
+          - docker>=6.0.0
+          - requests
+        executable: pip3
+
+    - name: "Ensure /etc/tomcat-container exists"
+      ansible.builtin.file:
+        path: /etc/tomcat-container
+        state: directory
+        mode: "0750"
+
+    - name: "Ensure Tomcat webapps host dir exists"
+      ansible.builtin.file:
+        path: /opt/tomcat/webapps
+        state: directory
+        mode: "0750"
+
+    - name: "Stub AWS CLI"
+      ansible.builtin.copy:
+        dest: /usr/local/bin/aws
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          case "$*" in
+            *"get-login-password"*) echo "FAKETOKEN" ;;
+            *"ssm put-parameter"*) echo "Stubbed SSM put" ;;
+            *) echo "Stubbed AWS CLI: $*" ;;
+          esac
+          exit 0

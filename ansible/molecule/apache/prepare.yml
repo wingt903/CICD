@@ -1,0 +1,52 @@
+---
+# molecule/apache/prepare.yml
+# Pre-conditions: install Docker inside the Molecule container and
+# set up directories the role will manage.
+
+- name: "Prepare apache test instance"
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: "Wait for connection"
+      ansible.builtin.wait_for_connection:
+        timeout: 30
+
+    - name: "Gather facts"
+      ansible.builtin.setup:
+
+    - name: "Install Docker CE prerequisites"
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+          - python3-pip
+        state: present
+        update_cache: true
+
+    - name: "Install Docker Python SDK"
+      ansible.builtin.pip:
+        name:
+          - docker>=6.0.0
+          - requests
+        executable: pip3
+
+    - name: "Ensure /etc/apache-container exists"
+      ansible.builtin.file:
+        path: /etc/apache-container
+        state: directory
+        mode: "0750"
+
+    - name: "Stub AWS CLI (skip real SSM calls in test)"
+      ansible.builtin.copy:
+        dest: /usr/local/bin/aws
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          # Stub aws CLI for Molecule unit tests.
+          case "$*" in
+            *"get-login-password"*) echo "FAKETOKEN" ;;
+            *"ssm put-parameter"*) echo "Stubbed SSM put" ;;
+            *) echo "Stubbed AWS CLI: $*" ;;
+          esac
+          exit 0

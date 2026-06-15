@@ -108,11 +108,54 @@ jobs:
         with:
           directory: infrastructure/terraform
 
+  ansible-validate:
+    name: Ansible lint and Molecule tests
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('ansible/**') != '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [apache, tomcat]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Ansible, Molecule, and lint tools
+        run: |
+          pip install \
+            ansible>=9.0.0 \
+            molecule[docker]>=24.0.0 \
+            ansible-lint>=24.0.0 \
+            docker>=7.0.0 \
+            requests
+
+      - name: Install Ansible collections
+        run: ansible-galaxy collection install -r ansible/requirements.yml
+        working-directory: ${{ github.workspace }}
+
+      - name: Run ansible-lint on roles
+        run: ansible-lint roles/apache roles/tomcat
+        working-directory: ansible
+
+      - name: Run Molecule test scenario – ${{ matrix.scenario }}
+        run: molecule test -s ${{ matrix.scenario }}
+        working-directory: ansible
+        env:
+          MOLECULE_NO_LOG: "false"
+          RELEASE_SHA: ${{ github.sha }}
+          PY_COLORS: "1"
+          ANSIBLE_FORCE_COLOR: "1"
+
   release-manifest:
     name: Create release manifest
     runs-on: ubuntu-latest
-    needs: [validate-build-scan, iac-validate]
-    if: ${{ always() && needs.validate-build-scan.result == 'success' && (needs.iac-validate.result == 'success' || needs.iac-validate.result == 'skipped') }}
+    needs: [validate-build-scan, iac-validate, ansible-validate]
+    if: ${{ always() && needs.validate-build-scan.result == 'success' && (needs.iac-validate.result == 'success' || needs.iac-validate.result == 'skipped') && (needs.ansible-validate.result == 'success' || needs.ansible-validate.result == 'skipped') }}
     outputs:
       release_version: ${{ steps.manifest.outputs.release_version }}
     steps:

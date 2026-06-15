@@ -1,0 +1,37 @@
+---
+# molecule/tomcat/converge.yml
+
+- name: "Converge – deploy Tomcat role"
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: "TC-PRE-010 | Assert release_sha is set"
+      ansible.builtin.assert:
+        that:
+          - release_sha is defined
+          - release_sha | length > 0
+        fail_msg: "TC-PRE-010 FAILED: release_sha must be set."
+      tags: [tc_pre_010]
+
+    - name: "TC-PRE-011 | Assert Tomcat image references approved version"
+      ansible.builtin.assert:
+        that:
+          - tomcat_expected_version in tomcat_image
+          - tomcat_java_expected_version in tomcat_image
+        fail_msg: >
+          TC-PRE-011 FAILED: tomcat_image '{{ tomcat_image }}' must contain
+          approved versions tomcat={{ tomcat_expected_version }}
+          and java={{ tomcat_java_expected_version }}.
+      tags: [tc_pre_011]
+
+    - name: "TC-PRE-012 | Assert image tag is immutable (not a mutable alias)"
+      ansible.builtin.assert:
+        that:
+          - tomcat_image is not search(':(latest|main|master|dev|develop|staging|stable)$')
+        fail_msg: "TC-PRE-012 FAILED: Mutable image tags are not allowed."
+      tags: [tc_pre_012]
+
+  roles:
+    - role: tomcat

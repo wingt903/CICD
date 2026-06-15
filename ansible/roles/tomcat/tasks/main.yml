@@ -1,0 +1,150 @@
+---
+# tasks/main.yml – Tomcat containerised deployment role.
+# Implements: App_as_Code_001, App_as_Code_002, App_as_Code_003, App_as_Code_008.
+
+- name: "[RTCM] Validate Tomcat version against approved runtime compatibility matrix"
+  ansible.builtin.assert:
+    that:
+      - tomcat_expected_version is defined
+      - tomcat_expected_version in tomcat_image
+    fail_msg: >
+      Policy violation [RTCM-001]: Tomcat image '{{ tomcat_image }}' does not
+      satisfy approved version '{{ tomcat_expected_version }}'. Deployment blocked.
+    success_msg: "RTCM check passed: tomcat version {{ tomcat_expected_version }} confirmed."
+  tags: [rtcm, validate]
+
+- name: "[RTCM] Validate Java version declared in image tag"
+  ansible.builtin.assert:
+    that:
+      - tomcat_java_expected_version is defined
+      - tomcat_java_expected_version in tomcat_image
+    fail_msg: >
+      Policy violation [RTCM-001]: Tomcat image '{{ tomcat_image }}' does not
+      declare approved Java version '{{ tomcat_java_expected_version }}'. Deployment blocked.
+    success_msg: "RTCM check passed: java version {{ tomcat_java_expected_version }} confirmed."
+  tags: [rtcm, validate]
+
+- name: "[RTCM] Log RTCM validation result to SSM audit store"
+  ansible.builtin.command: >
+    aws ssm put-parameter
+    --name "{{ deployment_decision_prefix }}/ansible/{{ release_sha }}/tomcat/rtcm"
+    --type String
+    --value "passed"
+    --overwrite
+    --region "{{ aws_region }}"
+  changed_when: true
+  tags: [rtcm, audit]
+
+- name: "Login to Amazon ECR"
+  ansible.builtin.command: >
+    aws ecr get-login-password --region {{ aws_region }}
+  register: ecr_token
+  changed_when: false
+  no_log: true
+  tags: [deploy]
+
+- name: "Authenticate Docker to ECR"
+  community.docker.docker_login:
+    registry_url: "{{ ecr_registry }}"
+    username: AWS
+    password: "{{ ecr_token.stdout }}"
+    reauthorize: true
+  no_log: true
+  tags: [deploy]
+
+- name: "Pull approved Tomcat container image"
+  community.docker.docker_image:
+    name: "{{ tomcat_image }}"
+    source: pull
+    force_source: true
+  register: tomcat_pull_result
+  tags: [deploy]
+
+- name: "Ensure Tomcat webapp directory exists on host"
+  ansible.builtin.file:
+    path: "{{ tomcat_webapps_host_dir }}"
+    state: directory
+    owner: "{{ tomcat_uid }}"
+    group: "{{ tomcat_gid }}"
+    mode: "0750"
+  tags: [deploy, config]
+
+- name: "Render Tomcat server.xml from template"
+  ansible.builtin.template:
+    src: server.xml.j2
+    dest: /etc/tomcat-container/server.xml
+    owner: root
+    group: root
+    mode: "0640"
+  notify: restart tomcat container
+  tags: [deploy, config]
+
+- name: "Stop and remove existing Tomcat container (idempotent)"
+  community.docker.docker_container:
+    name: "{{ tomcat_container_name }}"
+    state: absent
+    force_kill: true
+  tags: [deploy]
+
+- name: "Deploy hardened Tomcat container"
+  community.docker.docker_container:
+    name: "{{ tomcat_container_name }}"
+    image: "{{ tomcat_image }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "{{ tomcat_host_port }}:{{ tomcat_container_port }}"
+    volumes:
+      - /etc/tomcat-container/server.xml:/usr/local/tomcat/conf/server.xml:ro
+      - "{{ tomcat_webapps_host_dir }}:/usr/local/tomcat/webapps:rw"
+    env:
+      JAVA_OPTS: "{{ tomcat_java_opts }}"
+      CATALINA_OPTS: "{{ tomcat_java_opts }}"
+    user: "{{ tomcat_uid }}:{{ tomcat_gid }}"
+    cap_drop:
+      - ALL
+    cap_add: []
+    security_opts:
+      - "no-new-privileges:true"
+    labels:
+      com.datadog.logs: '{"source": "{{ tomcat_datadog_log_label }}", "service": "tomcat"}'
+      app.release_sha: "{{ release_sha }}"
+      app.env: "{{ env }}"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:{{ tomcat_container_port }}/ || exit 1"]
+      interval: "{{ tomcat_healthcheck_interval }}s"
+      retries: "{{ tomcat_healthcheck_retries }}"
+      start_period: 30s
+  register: tomcat_container_result
+  tags: [deploy, harden]
+
+- name: "Wait for Tomcat container to be healthy"
+  community.docker.docker_container_info:
+    name: "{{ tomcat_container_name }}"
+  register: tomcat_info
+  until: tomcat_info.container.State.Health.Status == "healthy"
+  retries: "{{ tomcat_healthcheck_retries }}"
+  delay: "{{ tomcat_healthcheck_delay }}"
+  tags: [deploy, healthcheck]
+
+- name: "[DRIFT] Verify running Tomcat container matches expected image SHA"
+  ansible.builtin.assert:
+    that:
+      - tomcat_pull_result.image.Id is defined
+      - tomcat_info.container.Image == tomcat_pull_result.image.Id
+    fail_msg: >
+      Configuration drift detected: running Tomcat container does not match
+      approved release image '{{ tomcat_image }}'. Remediation required.
+    success_msg: "Drift check passed: running container matches approved image."
+  tags: [drift, validate]
+
+- name: "[EVIDENCE] Persist deployment decision for Tomcat"
+  ansible.builtin.command: >
+    aws ssm put-parameter
+    --name "{{ deployment_decision_prefix }}/ansible/{{ release_sha }}/tomcat/deploy"
+    --type String
+    --value "passed"
+    --overwrite
+    --region "{{ aws_region }}"
+  changed_when: true
+  tags: [audit, evidence]

@@ -1,0 +1,140 @@
+---
+# tasks/main.yml – Apache httpd containerised deployment role.
+# Implements: App_as_Code_001 (automated deployment), App_as_Code_002 (drift control),
+#             App_as_Code_003 (hardening), App_as_Code_008 (RTCM guardrail).
+
+- name: "[RTCM] Validate apache version against approved runtime compatibility matrix"
+  ansible.builtin.assert:
+    that:
+      - apache_expected_version is defined
+      - apache_expected_version in apache_image
+    fail_msg: >
+      Policy violation [RTCM-001]: Apache image '{{ apache_image }}' does not
+      satisfy the approved version '{{ apache_expected_version }}' in the
+      Runtime Technology Compatibility Matrix. Deployment blocked.
+    success_msg: "RTCM check passed: apache version {{ apache_expected_version }} confirmed."
+  tags: [rtcm, validate]
+
+- name: "[RTCM] Log RTCM validation result to S3 audit store"
+  ansible.builtin.command: >
+    aws ssm put-parameter
+    --name "{{ deployment_decision_prefix }}/ansible/{{ release_sha }}/apache/rtcm"
+    --type String
+    --value "passed"
+    --overwrite
+    --region "{{ aws_region }}"
+  changed_when: true
+  tags: [rtcm, audit]
+
+- name: "Login to Amazon ECR"
+  ansible.builtin.command: >
+    aws ecr get-login-password --region {{ aws_region }}
+  register: ecr_token
+  changed_when: false
+  no_log: true
+  tags: [deploy]
+
+- name: "Authenticate Docker to ECR"
+  community.docker.docker_login:
+    registry_url: "{{ ecr_registry }}"
+    username: AWS
+    password: "{{ ecr_token.stdout }}"
+    reauthorize: true
+  no_log: true
+  tags: [deploy]
+
+- name: "Pull approved Apache container image"
+  community.docker.docker_image:
+    name: "{{ apache_image }}"
+    source: pull
+    force_source: true
+  register: apache_pull_result
+  tags: [deploy]
+
+- name: "Ensure Apache container configuration directory exists"
+  ansible.builtin.file:
+    path: /etc/apache-container
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  tags: [deploy, config]
+
+- name: "Render Apache httpd.conf from template"
+  ansible.builtin.template:
+    src: httpd.conf.j2
+    dest: /etc/apache-container/httpd.conf
+    owner: root
+    group: root
+    mode: "0640"
+    validate: "docker run --rm -v %s:/usr/local/apache2/conf/httpd.conf:ro {{ apache_image }} httpd -t"
+  notify: restart apache container
+  tags: [deploy, config]
+
+- name: "Stop and remove existing Apache container (idempotent)"
+  community.docker.docker_container:
+    name: "{{ apache_container_name }}"
+    state: absent
+    force_kill: true
+  tags: [deploy]
+
+- name: "Deploy hardened Apache container"
+  community.docker.docker_container:
+    name: "{{ apache_container_name }}"
+    image: "{{ apache_image }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "{{ apache_host_port }}:{{ apache_container_port }}"
+      - "{{ apache_host_ssl_port }}:{{ apache_container_ssl_port }}"
+    volumes:
+      - /etc/apache-container/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
+    read_only: "{{ apache_read_only_rootfs }}"
+    user: "{{ apache_uid }}:{{ apache_gid }}"
+    cap_drop:
+      - ALL
+    cap_add: []
+    security_opts:
+      - "no-new-privileges:true"
+    labels:
+      com.datadog.logs: '{"source": "{{ apache_datadog_log_label }}", "service": "apache"}'
+      app.release_sha: "{{ release_sha }}"
+      app.env: "{{ env }}"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:{{ apache_container_port }}/health || exit 1"]
+      interval: "{{ apache_healthcheck_interval }}s"
+      retries: "{{ apache_healthcheck_retries }}"
+      start_period: 15s
+  register: apache_container_result
+  tags: [deploy, harden]
+
+- name: "Wait for Apache container to be healthy"
+  community.docker.docker_container_info:
+    name: "{{ apache_container_name }}"
+  register: apache_info
+  until: apache_info.container.State.Health.Status == "healthy"
+  retries: "{{ apache_healthcheck_retries }}"
+  delay: "{{ apache_healthcheck_delay }}"
+  tags: [deploy, healthcheck]
+
+- name: "[DRIFT] Verify running Apache container matches expected image SHA"
+  ansible.builtin.assert:
+    that:
+      - apache_pull_result.image.Id is defined
+      - apache_info.container.Image == apache_pull_result.image.Id
+    fail_msg: >
+      Configuration drift detected: running Apache container image does not match
+      the approved release image '{{ apache_image }}'. Remediation required.
+    success_msg: "Drift check passed: running container matches approved image."
+  tags: [drift, validate]
+
+- name: "[EVIDENCE] Persist deployment decision for Apache"
+  ansible.builtin.command: >
+    aws ssm put-parameter
+    --name "{{ deployment_decision_prefix }}/ansible/{{ release_sha }}/apache/deploy"
+    --type String
+    --value "passed"
+    --overwrite
+    --region "{{ aws_region }}"
+  changed_when: true
+  tags: [audit, evidence]

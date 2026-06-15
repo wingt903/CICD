@@ -1,0 +1,49 @@
+---
+# defaults/main.yml – Tomcat container role defaults.
+
+# Container image (overridden at runtime by the pipeline).
+tomcat_image: "tomcat:10.1-jdk17"
+
+# Approved runtime versions (validated against RTCM).
+tomcat_expected_version:  "10.1"
+tomcat_java_expected_version: "17"
+
+# Container settings.
+tomcat_container_name: tomcat-app
+tomcat_container_port: 8080
+tomcat_host_port: 8080
+
+# Application WAR/artefact.
+tomcat_app_name: ROOT
+tomcat_webapps_host_dir: /opt/tomcat/webapps
+
+# Security hardening.
+tomcat_run_as_root: false
+tomcat_read_only_rootfs: false   # Tomcat needs to write temp/work; managed dirs mounted rw.
+tomcat_drop_all_caps: true
+tomcat_uid: 1001
+tomcat_gid: 1001
+
+# JVM options.
+tomcat_java_opts: >-
+  -Djava.security.egd=file:/dev/./urandom
+  -Xms256m
+  -Xmx512m
+  -Dfile.encoding=UTF-8
+  -Duser.timezone=UTC
+
+# Shutdown port disabled (hardening).
+tomcat_shutdown_port: -1
+tomcat_shutdown_command: SHUTDOWN
+
+# Healthcheck.
+tomcat_healthcheck_url: "http://localhost:{{ tomcat_host_port }}"
+tomcat_healthcheck_retries: 6
+tomcat_healthcheck_delay: 10
+tomcat_healthcheck_interval: 10
+
+# Log forwarding.
+tomcat_datadog_log_label: "tomcat.catalina"
+
+# SSM / deployment decision.
+deployment_decision_prefix: /cicd/deployment-decisions

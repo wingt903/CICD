@@ -1,0 +1,33 @@
+---
+# Group variables for ALL hosts in dev.
+
+env: test
+aws_region: ap-southeast-1
+ecr_registry: "{{ lookup('env', 'AWS_ACCOUNT_ID') }}.dkr.ecr.{{ aws_region }}.amazonaws.com"
+ecr_repository_prefix: cicd-sample
+
+# Container image tags are pinned to the immutable release SHA by the pipeline.
+release_sha: "{{ lookup('env', 'RELEASE_SHA') }}"
+
+apache_image: "{{ ecr_registry }}/{{ ecr_repository_prefix }}/apache:{{ release_sha }}"
+tomcat_image: "{{ ecr_registry }}/{{ ecr_repository_prefix }}/tomcat:{{ release_sha }}"
+
+# Approved runtime versions (mirrored from RTCM).
+rtcm_tomcat_version: "10.1"
+rtcm_java_version:   "17"
+rtcm_apache_version: "2.4"
+
+# Runtime compatibility matrix SSM path (App_as_Code_008).
+rtcm_ssm_path: /cicd/rtcm/approved/current
+
+# Deployment decision SSM path prefix (no-redeploy-after-failure control).
+deployment_decision_prefix: /cicd/deployment-decisions
+
+# Datadog agent settings (observability).
+datadog_api_key_ssm: /cicd/datadog/api-key
+datadog_enabled: true
+
+# Hardening controls.
+container_run_as_root: false
+container_read_only_rootfs: true
+container_drop_all_caps: true

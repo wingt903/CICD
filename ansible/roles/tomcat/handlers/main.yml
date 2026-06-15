@@ -1,0 +1,7 @@
+---
+handlers:
+  - name: restart tomcat container
+    community.docker.docker_container:
+      name: "{{ tomcat_container_name }}"
+      state: started
+      restart: true
