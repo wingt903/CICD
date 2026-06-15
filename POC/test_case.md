@@ -118,3 +118,59 @@ This test case document captures the POC summary and validation scenarios for co
 - All eight POC test cases pass.
 - Deployment evidence is traceable to the GitHub Actions run and commit SHA.
 - No developer AWS console access is needed to complete the POC deployment.
+
+---
+
+## GitHub Actions Executable Procedure
+
+The executable workflow is defined in `/home/runner/work/CICD/CICD/wingt903/CICD/.github/workflows/poc-executable-tests.yml`.
+
+### How to run
+
+1. Open **GitHub Actions**.
+2. Select **POC Executable Tests**.
+3. Choose `workflow_dispatch`.
+4. Select the target environment (`dev`, `test`, or `prod`).
+5. Optionally override the application URL and expected smoke-test text.
+6. Start the workflow.
+
+### Required GitHub environment variables
+
+Configure these in the target GitHub Environment:
+
+| Variable | Purpose |
+|----------|---------|
+| `AWS_ROLE_ARN` | OIDC role assumed by the workflow for the selected environment |
+| `AWS_REGION` | AWS region for the validation run |
+| `POC_APP_URL` | Application URL for smoke validation |
+| `POC_ECS_CLUSTER` | ECS cluster name hosting the POC workload |
+| `POC_ECS_SERVICE` | ECS service name hosting the POC workload |
+| `POC_CLOUDWATCH_LOG_GROUP` | CloudWatch log group used for application log validation |
+
+Optional variables:
+
+| Variable | Purpose |
+|----------|---------|
+| `POC_EXPECTED_TEXT` | Expected text returned by the smoke-test page |
+| `POC_LOG_SEARCH_PATTERN` | Log pattern used to confirm recent application log events |
+| `POC_MIN_RUNNING_TASKS` | Minimum acceptable running task count |
+| `POC_ECR_REPOSITORY` | ECR repository name for image evidence collection |
+| `POC_AUTH_PROBE_URL` | URL used to validate Entra authentication redirect behavior |
+| `POC_AUTH_EXPECT_STATUS` | Expected HTTP status for the auth probe |
+| `POC_AUTH_EXPECT_LOCATION_REGEX` | Regex for the expected auth redirect target |
+| `POC_SESSION_PROBE_URL` | URL used for session validation |
+| `POC_SESSION_EXPECTED_REGEX` | Regex that extracts a stable session marker from the session probe response |
+| `POC_ENABLE_DESTRUCTIVE_SESSION_TEST` | Set to `true` only when you allow the workflow to force a new ECS deployment for session validation |
+
+### Automated coverage
+
+| Test Case | Workflow behavior |
+|-----------|-------------------|
+| `TC-POC-001` | Validates ECS service health and running task count |
+| `TC-POC-002` | Executes an HTTP smoke test and checks the expected response text |
+| `TC-POC-003` | Optional destructive session-persistence validation when a dedicated probe is configured |
+| `TC-POC-004` | Optional authentication redirect validation when a dedicated auth probe is configured |
+| `TC-POC-005` | Confirms recent application log events in CloudWatch Logs |
+| `TC-POC-006` | Verifies ECS Application Auto Scaling target and policy configuration |
+| `TC-POC-007` | Captures GitHub Actions run URL and commit SHA as deployment evidence |
+| `TC-POC-008` | Verifies the running task definition uses an immutable image reference |
