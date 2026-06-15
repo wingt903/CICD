@@ -153,6 +153,7 @@ Optional variables:
 |----------|---------|
 | `POC_EXPECTED_TEXT` | Expected text returned by the smoke-test page |
 | `POC_LOG_SEARCH_PATTERN` | Log pattern used to confirm recent application log events |
+| `POC_LOG_LOOKBACK_MINUTES` | Number of minutes to look back when searching CloudWatch log events |
 | `POC_MIN_RUNNING_TASKS` | Minimum acceptable running task count |
 | `POC_ECR_REPOSITORY` | ECR repository name for image evidence collection |
 | `POC_AUTH_PROBE_URL` | URL used to validate Entra authentication redirect behavior |

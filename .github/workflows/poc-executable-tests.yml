@@ -47,6 +47,7 @@ jobs:
       POC_ECS_SERVICE_VAR: ${{ vars.POC_ECS_SERVICE }}
       POC_CLOUDWATCH_LOG_GROUP_VAR: ${{ vars.POC_CLOUDWATCH_LOG_GROUP }}
       POC_LOG_SEARCH_PATTERN_VAR: ${{ vars.POC_LOG_SEARCH_PATTERN }}
+      POC_LOG_LOOKBACK_MINUTES_VAR: ${{ vars.POC_LOG_LOOKBACK_MINUTES }}
       POC_MIN_RUNNING_TASKS_VAR: ${{ vars.POC_MIN_RUNNING_TASKS }}
       POC_AUTH_PROBE_URL_VAR: ${{ vars.POC_AUTH_PROBE_URL }}
       POC_AUTH_EXPECT_STATUS_VAR: ${{ vars.POC_AUTH_EXPECT_STATUS }}
@@ -73,6 +74,7 @@ jobs:
           ecs_service="${POC_ECS_SERVICE_VAR:-}"
           log_group="${POC_CLOUDWATCH_LOG_GROUP_VAR:-}"
           log_pattern="${POC_LOG_SEARCH_PATTERN_VAR:-Tomcat}"
+          log_lookback_minutes="${POC_LOG_LOOKBACK_MINUTES_VAR:-30}"
           min_running_tasks="${POC_MIN_RUNNING_TASKS_VAR:-1}"
           auth_probe_url="${POC_AUTH_PROBE_URL_VAR:-}"
           auth_expect_status="${POC_AUTH_EXPECT_STATUS_VAR:-302}"
@@ -113,6 +115,7 @@ jobs:
             echo "ecs_service=$ecs_service"
             echo "log_group=$log_group"
             echo "log_pattern=$log_pattern"
+            echo "log_lookback_minutes=$log_lookback_minutes"
             echo "min_running_tasks=$min_running_tasks"
             echo "auth_probe_url=$auth_probe_url"
             echo "auth_expect_status=$auth_expect_status"
@@ -181,7 +184,7 @@ jobs:
           reason="Application URL did not return the expected content."
 
           for attempt in $(seq 1 10); do
-            http_code="$(curl -ksS -o poc-test-artifacts/tc002-body.html -D poc-test-artifacts/tc002-headers.txt -w '%{http_code}' "$APP_URL" || true)"
+            http_code="$(curl -fsS -o poc-test-artifacts/tc002-body.html -D poc-test-artifacts/tc002-headers.txt -w '%{http_code}' "$APP_URL" || true)"
             if [ "$http_code" = "200" ] && grep -Fq "$EXPECTED_TEXT" poc-test-artifacts/tc002-body.html; then
               status="passed"
               reason="Application returned HTTP 200 and contained the expected smoke-test text."
@@ -212,14 +215,14 @@ jobs:
             status="failed"
             reason="Session marker changed after forcing a new deployment."
 
-            curl -ksS -c poc-test-artifacts/tc003-cookies.txt "$SESSION_PROBE_URL" -o poc-test-artifacts/tc003-before.html
+            curl -fsS -c poc-test-artifacts/tc003-cookies.txt "$SESSION_PROBE_URL" -o poc-test-artifacts/tc003-before.html
             before_marker="$(grep -Eo "$SESSION_EXPECTED_REGEX" poc-test-artifacts/tc003-before.html | head -n 1 || true)"
             if [ -z "$before_marker" ]; then
               reason="Unable to find the configured session marker before task recycle."
             else
               aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" --force-new-deployment > poc-test-artifacts/tc003-force-deployment.json
               aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
-              curl -ksS -b poc-test-artifacts/tc003-cookies.txt "$SESSION_PROBE_URL" -o poc-test-artifacts/tc003-after.html
+              curl -fsS -b poc-test-artifacts/tc003-cookies.txt "$SESSION_PROBE_URL" -o poc-test-artifacts/tc003-after.html
               after_marker="$(grep -Eo "$SESSION_EXPECTED_REGEX" poc-test-artifacts/tc003-after.html | head -n 1 || true)"
               if [ -n "$after_marker" ] && [ "$before_marker" = "$after_marker" ]; then
                 status="passed"
@@ -248,7 +251,7 @@ jobs:
             status="failed"
             reason="Authentication response did not match the expected redirect behavior."
 
-            http_code="$(curl -ksS -I -o /dev/null -D poc-test-artifacts/tc004-headers.txt -w '%{http_code}' "$AUTH_PROBE_URL" || true)"
+            http_code="$(curl -fsS -I -o /dev/null -D poc-test-artifacts/tc004-headers.txt -w '%{http_code}' "$AUTH_PROBE_URL" || true)"
             location_header="$(awk 'tolower($1) == "location:" {print $2}' poc-test-artifacts/tc004-headers.txt | tr -d '\r' | tail -n 1)"
 
             if [ "$http_code" = "$AUTH_EXPECT_STATUS" ] && [ -n "$location_header" ] && echo "$location_header" | grep -Eq "$AUTH_EXPECT_LOCATION_REGEX"; then
@@ -267,12 +270,13 @@ jobs:
         env:
           LOG_GROUP: ${{ steps.config.outputs.log_group }}
           LOG_PATTERN: ${{ steps.config.outputs.log_pattern }}
+          LOG_LOOKBACK_MINUTES: ${{ steps.config.outputs.log_lookback_minutes }}
         run: |
           set -euo pipefail
           status="failed"
           reason="No recent matching application log events were found in CloudWatch Logs."
 
-          start_ms="$(( ($(date +%s) - 1800) * 1000 ))"
+          start_ms="$(( ($(date +%s) - (LOG_LOOKBACK_MINUTES * 60)) * 1000 ))"
           aws logs filter-log-events \
             --log-group-name "$LOG_GROUP" \
             --start-time "$start_ms" \
