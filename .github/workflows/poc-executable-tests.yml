@@ -1,0 +1,457 @@
+name: POC Executable Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: dev
+        type: choice
+        options:
+          - dev
+          - test
+          - prod
+      app_url:
+        description: Override application URL (otherwise use POC_APP_URL)
+        required: false
+        default: ""
+        type: string
+      expected_text:
+        description: Expected response text for smoke validation
+        required: false
+        default: "Tomcat CI/CD Migration Sample"
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  executable-poc-tests:
+    name: Execute POC validation
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      INPUT_ENVIRONMENT: ${{ inputs.environment }}
+      INPUT_APP_URL: ${{ inputs.app_url }}
+      INPUT_EXPECTED_TEXT: ${{ inputs.expected_text }}
+      AWS_REGION_VAR: ${{ vars.AWS_REGION }}
+      AWS_ROLE_ARN_VAR: ${{ vars.AWS_ROLE_ARN }}
+      AWS_DEV_ROLE_ARN_VAR: ${{ vars.AWS_DEV_ROLE_ARN }}
+      AWS_TEST_ROLE_ARN_VAR: ${{ vars.AWS_TEST_ROLE_ARN }}
+      AWS_PROD_ROLE_ARN_VAR: ${{ vars.AWS_PROD_ROLE_ARN }}
+      POC_APP_URL_VAR: ${{ vars.POC_APP_URL }}
+      POC_EXPECTED_TEXT_VAR: ${{ vars.POC_EXPECTED_TEXT }}
+      POC_ECS_CLUSTER_VAR: ${{ vars.POC_ECS_CLUSTER }}
+      POC_ECS_SERVICE_VAR: ${{ vars.POC_ECS_SERVICE }}
+      POC_CLOUDWATCH_LOG_GROUP_VAR: ${{ vars.POC_CLOUDWATCH_LOG_GROUP }}
+      POC_LOG_SEARCH_PATTERN_VAR: ${{ vars.POC_LOG_SEARCH_PATTERN }}
+      POC_LOG_LOOKBACK_MINUTES_VAR: ${{ vars.POC_LOG_LOOKBACK_MINUTES }}
+      POC_MIN_RUNNING_TASKS_VAR: ${{ vars.POC_MIN_RUNNING_TASKS }}
+      POC_AUTH_PROBE_URL_VAR: ${{ vars.POC_AUTH_PROBE_URL }}
+      POC_AUTH_EXPECT_STATUS_VAR: ${{ vars.POC_AUTH_EXPECT_STATUS }}
+      POC_AUTH_EXPECT_LOCATION_REGEX_VAR: ${{ vars.POC_AUTH_EXPECT_LOCATION_REGEX }}
+      POC_SESSION_PROBE_URL_VAR: ${{ vars.POC_SESSION_PROBE_URL }}
+      POC_SESSION_EXPECTED_REGEX_VAR: ${{ vars.POC_SESSION_EXPECTED_REGEX }}
+      POC_ENABLE_DESTRUCTIVE_SESSION_TEST_VAR: ${{ vars.POC_ENABLE_DESTRUCTIVE_SESSION_TEST }}
+      POC_ECR_REPOSITORY_VAR: ${{ vars.POC_ECR_REPOSITORY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve test configuration
+        id: config
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          environment="${INPUT_ENVIRONMENT}"
+          aws_region="${AWS_REGION_VAR:-ap-southeast-1}"
+          app_url="${INPUT_APP_URL:-${POC_APP_URL_VAR:-}}"
+          expected_text="${INPUT_EXPECTED_TEXT:-${POC_EXPECTED_TEXT_VAR:-Tomcat CI/CD Migration Sample}}"
+          ecs_cluster="${POC_ECS_CLUSTER_VAR:-}"
+          ecs_service="${POC_ECS_SERVICE_VAR:-}"
+          log_group="${POC_CLOUDWATCH_LOG_GROUP_VAR:-}"
+          log_pattern="${POC_LOG_SEARCH_PATTERN_VAR:-Tomcat}"
+          log_lookback_minutes="${POC_LOG_LOOKBACK_MINUTES_VAR:-30}"
+          min_running_tasks="${POC_MIN_RUNNING_TASKS_VAR:-1}"
+          auth_probe_url="${POC_AUTH_PROBE_URL_VAR:-}"
+          auth_expect_status="${POC_AUTH_EXPECT_STATUS_VAR:-302}"
+          auth_expect_location_regex="${POC_AUTH_EXPECT_LOCATION_REGEX_VAR:-login|entra|microsoftonline}"
+          session_probe_url="${POC_SESSION_PROBE_URL_VAR:-}"
+          session_expected_regex="${POC_SESSION_EXPECTED_REGEX_VAR:-}"
+          destructive_session_test="${POC_ENABLE_DESTRUCTIVE_SESSION_TEST_VAR:-false}"
+          ecr_repository="${POC_ECR_REPOSITORY_VAR:-}"
+
+          role_arn="${AWS_ROLE_ARN_VAR:-}"
+          if [ -z "$role_arn" ]; then
+            case "$environment" in
+              dev) role_arn="${AWS_DEV_ROLE_ARN_VAR:-}" ;;
+              test) role_arn="${AWS_TEST_ROLE_ARN_VAR:-}" ;;
+              prod) role_arn="${AWS_PROD_ROLE_ARN_VAR:-}" ;;
+            esac
+          fi
+
+          missing=()
+          [ -n "$role_arn" ] || missing+=("AWS_ROLE_ARN (or environment-specific AWS_*_ROLE_ARN)")
+          [ -n "$app_url" ] || missing+=("POC_APP_URL or workflow_dispatch input app_url")
+          [ -n "$ecs_cluster" ] || missing+=("POC_ECS_CLUSTER")
+          [ -n "$ecs_service" ] || missing+=("POC_ECS_SERVICE")
+          [ -n "$log_group" ] || missing+=("POC_CLOUDWATCH_LOG_GROUP")
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing required workflow configuration:\n- %s\n' "${missing[@]}"
+            exit 1
+          fi
+
+          {
+            echo "environment=$environment"
+            echo "aws_region=$aws_region"
+            echo "role_arn=$role_arn"
+            echo "app_url=$app_url"
+            echo "expected_text=$expected_text"
+            echo "ecs_cluster=$ecs_cluster"
+            echo "ecs_service=$ecs_service"
+            echo "log_group=$log_group"
+            echo "log_pattern=$log_pattern"
+            echo "log_lookback_minutes=$log_lookback_minutes"
+            echo "min_running_tasks=$min_running_tasks"
+            echo "auth_probe_url=$auth_probe_url"
+            echo "auth_expect_status=$auth_expect_status"
+            echo "auth_expect_location_regex=$auth_expect_location_regex"
+            echo "session_probe_url=$session_probe_url"
+            echo "session_expected_regex=$session_expected_regex"
+            echo "destructive_session_test=$destructive_session_test"
+            echo "ecr_repository=$ecr_repository"
+            printf 'run_url=%s\n' "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ steps.config.outputs.role_arn }}
+          aws-region: ${{ steps.config.outputs.aws_region }}
+
+      - name: Prepare artifact directory
+        shell: bash
+        run: mkdir -p poc-test-artifacts
+
+      - name: TC-POC-001 ECS deployment health
+        id: tc001
+        continue-on-error: true
+        shell: bash
+        env:
+          ECS_CLUSTER: ${{ steps.config.outputs.ecs_cluster }}
+          ECS_SERVICE: ${{ steps.config.outputs.ecs_service }}
+          MIN_RUNNING_TASKS: ${{ steps.config.outputs.min_running_tasks }}
+        run: |
+          set -euo pipefail
+          status="passed"
+          reason="ECS service is active and running the desired task count."
+
+          aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" > poc-test-artifacts/tc001-ecs-service.json
+
+          service_count="$(jq '.services | length' poc-test-artifacts/tc001-ecs-service.json)"
+          if [ "$service_count" -eq 0 ]; then
+            status="failed"
+            reason="ECS service '$ECS_SERVICE' was not found in cluster '$ECS_CLUSTER'."
+          else
+            service_status="$(jq -r '.services[0].status' poc-test-artifacts/tc001-ecs-service.json)"
+            desired_count="$(jq -r '.services[0].desiredCount' poc-test-artifacts/tc001-ecs-service.json)"
+            running_count="$(jq -r '.services[0].runningCount' poc-test-artifacts/tc001-ecs-service.json)"
+            if [ "$service_status" != "ACTIVE" ] || [ "$running_count" -lt "$desired_count" ] || [ "$running_count" -lt "$MIN_RUNNING_TASKS" ]; then
+              status="failed"
+              reason="Service status=$service_status desired=$desired_count running=$running_count minimum=$MIN_RUNNING_TASKS."
+            fi
+          fi
+
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "reason=$reason" >> "$GITHUB_OUTPUT"
+
+      - name: TC-POC-002 Apache to Tomcat smoke validation
+        id: tc002
+        continue-on-error: true
+        shell: bash
+        env:
+          APP_URL: ${{ steps.config.outputs.app_url }}
+          EXPECTED_TEXT: ${{ steps.config.outputs.expected_text }}
+        run: |
+          set -euo pipefail
+          status="failed"
+          reason="Application URL did not return the expected content."
+
+          for attempt in $(seq 1 10); do
+            curl_stderr="poc-test-artifacts/tc002-curl-stderr.txt"
+            http_code="$(curl -fsS -o poc-test-artifacts/tc002-body.html -D poc-test-artifacts/tc002-headers.txt -w '%{http_code}' "$APP_URL" 2>"$curl_stderr" || true)"
+            if [ "$http_code" = "200" ] && grep -Fq "$EXPECTED_TEXT" poc-test-artifacts/tc002-body.html; then
+              status="passed"
+              reason="Application returned HTTP 200 and contained the expected smoke-test text."
+              break
+            fi
+            if [ -s "$curl_stderr" ]; then
+              reason="Smoke test request failed: $(tail -n 1 "$curl_stderr")"
+            else
+              reason="Application returned HTTP status '${http_code:-unknown}' without the expected response text."
+            fi
+            sleep 10
+          done
+
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "reason=$reason" >> "$GITHUB_OUTPUT"
+
+      - name: TC-POC-003 Session persistence across task recycle
+        id: tc003
+        continue-on-error: true
+        shell: bash
+        env:
+          ECS_CLUSTER: ${{ steps.config.outputs.ecs_cluster }}
+          ECS_SERVICE: ${{ steps.config.outputs.ecs_service }}
+          SESSION_PROBE_URL: ${{ steps.config.outputs.session_probe_url }}
+          SESSION_EXPECTED_REGEX: ${{ steps.config.outputs.session_expected_regex }}
+          DESTRUCTIVE_SESSION_TEST: ${{ steps.config.outputs.destructive_session_test }}
+        run: |
+          set -euo pipefail
+          status="skipped"
+          reason="Session persistence test is optional and requires a dedicated probe endpoint plus destructive test enablement."
+
+          if [ -n "$SESSION_PROBE_URL" ] && [ -n "$SESSION_EXPECTED_REGEX" ] && [ "$DESTRUCTIVE_SESSION_TEST" = "true" ]; then
+            status="failed"
+            reason="Session marker changed after forcing a new deployment."
+
+            curl -fsS -c poc-test-artifacts/tc003-cookies.txt "$SESSION_PROBE_URL" -o poc-test-artifacts/tc003-before.html
+            before_marker="$(grep -Eo "$SESSION_EXPECTED_REGEX" poc-test-artifacts/tc003-before.html | head -n 1 || true)"
+            if [ -z "$before_marker" ]; then
+              reason="Unable to find the configured session marker before task recycle."
+            else
+              aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" --force-new-deployment > poc-test-artifacts/tc003-force-deployment.json
+              aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+              curl -fsS -b poc-test-artifacts/tc003-cookies.txt "$SESSION_PROBE_URL" -o poc-test-artifacts/tc003-after.html
+              after_marker="$(grep -Eo "$SESSION_EXPECTED_REGEX" poc-test-artifacts/tc003-after.html | head -n 1 || true)"
+              if [ -n "$after_marker" ] && [ "$before_marker" = "$after_marker" ]; then
+                status="passed"
+                reason="Session marker remained stable after ECS forced deployment."
+              fi
+            fi
+          fi
+
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "reason=$reason" >> "$GITHUB_OUTPUT"
+
+      - name: TC-POC-004 Entra ID authentication probe
+        id: tc004
+        continue-on-error: true
+        shell: bash
+        env:
+          AUTH_PROBE_URL: ${{ steps.config.outputs.auth_probe_url }}
+          AUTH_EXPECT_STATUS: ${{ steps.config.outputs.auth_expect_status }}
+          AUTH_EXPECT_LOCATION_REGEX: ${{ steps.config.outputs.auth_expect_location_regex }}
+        run: |
+          set -euo pipefail
+          status="skipped"
+          reason="Authentication probe is optional and requires an application-specific auth URL."
+
+          if [ -n "$AUTH_PROBE_URL" ]; then
+            status="failed"
+            reason="Authentication response did not match the expected redirect behavior."
+
+            curl_stderr="poc-test-artifacts/tc004-curl-stderr.txt"
+            http_code="$(curl -fsS -I -o /dev/null -D poc-test-artifacts/tc004-headers.txt -w '%{http_code}' "$AUTH_PROBE_URL" 2>"$curl_stderr" || true)"
+            location_header="$(awk 'tolower($1) == "location:" {print $2}' poc-test-artifacts/tc004-headers.txt | tr -d '\r' | tail -n 1)"
+
+            if [ "$http_code" = "$AUTH_EXPECT_STATUS" ] && [ -n "$location_header" ] && echo "$location_header" | grep -Eq "$AUTH_EXPECT_LOCATION_REGEX"; then
+              status="passed"
+              reason="Authentication probe returned the expected status and redirect target."
+            elif [ -s "$curl_stderr" ]; then
+              reason="Authentication probe failed: $(tail -n 1 "$curl_stderr")"
+            else
+              reason="Authentication probe returned HTTP status '${http_code:-unknown}' and redirect '${location_header:-none}'."
+            fi
+          fi
+
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "reason=$reason" >> "$GITHUB_OUTPUT"
+
+      - name: TC-POC-005 CloudWatch log routing
+        id: tc005
+        continue-on-error: true
+        shell: bash
+        env:
+          LOG_GROUP: ${{ steps.config.outputs.log_group }}
+          LOG_PATTERN: ${{ steps.config.outputs.log_pattern }}
+          LOG_LOOKBACK_MINUTES: ${{ steps.config.outputs.log_lookback_minutes }}
+        run: |
+          set -euo pipefail
+          status="failed"
+          reason="No recent matching application log events were found in CloudWatch Logs."
+
+          start_ms="$(( ($(date +%s) - (LOG_LOOKBACK_MINUTES * 60)) * 1000 ))"
+          aws logs filter-log-events \
+            --log-group-name "$LOG_GROUP" \
+            --start-time "$start_ms" \
+            --filter-pattern "$LOG_PATTERN" > poc-test-artifacts/tc005-log-events.json
+
+          event_count="$(jq '.events | length' poc-test-artifacts/tc005-log-events.json)"
+          if [ "$event_count" -gt 0 ]; then
+            status="passed"
+            reason="CloudWatch log group contains recent events matching the configured log pattern."
+          fi
+
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "reason=$reason" >> "$GITHUB_OUTPUT"
+
+      - name: TC-POC-006 ECS auto scaling configuration
+        id: tc006
+        continue-on-error: true
+        shell: bash
+        env:
+          ECS_CLUSTER: ${{ steps.config.outputs.ecs_cluster }}
+          ECS_SERVICE: ${{ steps.config.outputs.ecs_service }}
+        run: |
+          set -euo pipefail
+          status="failed"
+          reason="No ECS Application Auto Scaling target or scaling policy was found."
+
+          resource_id="service/${ECS_CLUSTER}/${ECS_SERVICE}"
+          aws application-autoscaling describe-scalable-targets \
+            --service-namespace ecs \
+            --resource-ids "$resource_id" \
+            --scalable-dimension ecs:service:DesiredCount > poc-test-artifacts/tc006-scalable-targets.json
+          aws application-autoscaling describe-scaling-policies \
+            --service-namespace ecs \
+            --resource-id "$resource_id" \
+            --scalable-dimension ecs:service:DesiredCount > poc-test-artifacts/tc006-scaling-policies.json
+
+          target_count="$(jq '.ScalableTargets | length' poc-test-artifacts/tc006-scalable-targets.json)"
+          policy_count="$(jq '.ScalingPolicies | length' poc-test-artifacts/tc006-scaling-policies.json)"
+
+          if [ "$target_count" -gt 0 ] && [ "$policy_count" -gt 0 ]; then
+            status="passed"
+            reason="ECS service has Application Auto Scaling targets and policies configured."
+          fi
+
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "reason=$reason" >> "$GITHUB_OUTPUT"
+
+      - name: TC-POC-007 GitHub Actions deployment evidence
+        id: tc007
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > poc-test-artifacts/tc007-run-metadata.json <<JSON
+          {
+            "repository": "${GITHUB_REPOSITORY}",
+            "runId": "${GITHUB_RUN_ID}",
+            "runAttempt": "${GITHUB_RUN_ATTEMPT}",
+            "sha": "${GITHUB_SHA}",
+            "runUrl": "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          }
+          JSON
+          echo "status=passed" >> "$GITHUB_OUTPUT"
+          echo "reason=GitHub Actions run metadata and commit SHA were recorded as deployment evidence." >> "$GITHUB_OUTPUT"
+
+      - name: TC-POC-008 Immutable image reference baseline
+        id: tc008
+        continue-on-error: true
+        shell: bash
+        env:
+          ECS_CLUSTER: ${{ steps.config.outputs.ecs_cluster }}
+          ECS_SERVICE: ${{ steps.config.outputs.ecs_service }}
+          ECR_REPOSITORY: ${{ steps.config.outputs.ecr_repository }}
+        run: |
+          set -euo pipefail
+          status="failed"
+          reason="The running task definition does not use an immutable image reference."
+
+          aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" > poc-test-artifacts/tc008-service.json
+          task_definition_arn="$(jq -r '.services[0].taskDefinition' poc-test-artifacts/tc008-service.json)"
+          aws ecs describe-task-definition \
+            --task-definition "$task_definition_arn" > poc-test-artifacts/tc008-task-definition.json
+
+          image_ref="$(jq -r '.taskDefinition.containerDefinitions[0].image' poc-test-artifacts/tc008-task-definition.json)"
+          if echo "$image_ref" | grep -Eq '@sha256:[a-f0-9]{64}$|:[a-f0-9]{40}$'; then
+            status="passed"
+            reason="Task definition image reference is pinned by digest or full commit SHA tag."
+          fi
+
+          if [ "$status" = "passed" ] && [ -n "$ECR_REPOSITORY" ] && echo "$image_ref" | grep -Eq ':[a-f0-9]{40}$'; then
+            image_tag="${image_ref##*:}"
+            aws ecr describe-images \
+              --repository-name "$ECR_REPOSITORY" \
+              --image-ids imageTag="$image_tag" > poc-test-artifacts/tc008-ecr-image.json
+          fi
+
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "reason=$reason" >> "$GITHUB_OUTPUT"
+
+      - name: Publish test summary
+        if: ${{ always() }}
+        shell: bash
+        env:
+          RUN_URL: ${{ steps.config.outputs.run_url }}
+        run: |
+          set -euo pipefail
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          # POC Executable Test Results
+
+          | Test Case | Status | Summary |
+          |-----------|--------|---------|
+          | TC-POC-001 | ${{ steps.tc001.outputs.status }} | ${{ steps.tc001.outputs.reason }} |
+          | TC-POC-002 | ${{ steps.tc002.outputs.status }} | ${{ steps.tc002.outputs.reason }} |
+          | TC-POC-003 | ${{ steps.tc003.outputs.status }} | ${{ steps.tc003.outputs.reason }} |
+          | TC-POC-004 | ${{ steps.tc004.outputs.status }} | ${{ steps.tc004.outputs.reason }} |
+          | TC-POC-005 | ${{ steps.tc005.outputs.status }} | ${{ steps.tc005.outputs.reason }} |
+          | TC-POC-006 | ${{ steps.tc006.outputs.status }} | ${{ steps.tc006.outputs.reason }} |
+          | TC-POC-007 | ${{ steps.tc007.outputs.status }} | ${{ steps.tc007.outputs.reason }} |
+          | TC-POC-008 | ${{ steps.tc008.outputs.status }} | ${{ steps.tc008.outputs.reason }} |
+
+          **Environment:** ${{ steps.config.outputs.environment }}  
+          **Run URL:** $RUN_URL  
+          **Application URL:** ${{ steps.config.outputs.app_url }}
+          EOF
+
+          cat > poc-test-artifacts/test-results.json <<JSON
+          {
+            "environment": "${{ steps.config.outputs.environment }}",
+            "runUrl": "$RUN_URL",
+            "applicationUrl": "${{ steps.config.outputs.app_url }}",
+            "results": {
+              "TC-POC-001": {"status": "${{ steps.tc001.outputs.status }}", "summary": "${{ steps.tc001.outputs.reason }}"},
+              "TC-POC-002": {"status": "${{ steps.tc002.outputs.status }}", "summary": "${{ steps.tc002.outputs.reason }}"},
+              "TC-POC-003": {"status": "${{ steps.tc003.outputs.status }}", "summary": "${{ steps.tc003.outputs.reason }}"},
+              "TC-POC-004": {"status": "${{ steps.tc004.outputs.status }}", "summary": "${{ steps.tc004.outputs.reason }}"},
+              "TC-POC-005": {"status": "${{ steps.tc005.outputs.status }}", "summary": "${{ steps.tc005.outputs.reason }}"},
+              "TC-POC-006": {"status": "${{ steps.tc006.outputs.status }}", "summary": "${{ steps.tc006.outputs.reason }}"},
+              "TC-POC-007": {"status": "${{ steps.tc007.outputs.status }}", "summary": "${{ steps.tc007.outputs.reason }}"},
+              "TC-POC-008": {"status": "${{ steps.tc008.outputs.status }}", "summary": "${{ steps.tc008.outputs.reason }}"}
+            }
+          }
+          JSON
+
+      - name: Upload test evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: poc-executable-test-artifacts-${{ inputs.environment }}
+          path: poc-test-artifacts/
+
+      - name: Fail if required checks did not pass
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed=0
+          [ "${{ steps.tc001.outputs.status }}" = "passed" ] || { echo "Required check tc001 failed."; failed=1; }
+          [ "${{ steps.tc002.outputs.status }}" = "passed" ] || { echo "Required check tc002 failed."; failed=1; }
+          [ "${{ steps.tc005.outputs.status }}" = "passed" ] || { echo "Required check tc005 failed."; failed=1; }
+          [ "${{ steps.tc006.outputs.status }}" = "passed" ] || { echo "Required check tc006 failed."; failed=1; }
+          [ "${{ steps.tc007.outputs.status }}" = "passed" ] || { echo "Required check tc007 failed."; failed=1; }
+          [ "${{ steps.tc008.outputs.status }}" = "passed" ] || { echo "Required check tc008 failed."; failed=1; }
+          if [ "$failed" -ne 0 ]; then
+            exit 1
+          fi

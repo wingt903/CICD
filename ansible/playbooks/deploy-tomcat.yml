@@ -1,0 +1,52 @@
+---
+# deploy-tomcat.yml – Deploy the Tomcat container via the App as Code pipeline.
+#
+# Usage:
+#   ansible-playbook playbooks/deploy-tomcat.yml \
+#     -i inventories/{{ env }}/hosts.ini \
+#     -e "release_sha={{ RELEASE_SHA }}" \
+#     -e "tomcat_image={{ ECR_URI }}/tomcat:{{ RELEASE_SHA }}"
+
+- name: "Deploy Tomcat container"
+  hosts: tomcat
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: "Assert required variables are provided"
+      ansible.builtin.assert:
+        that:
+          - release_sha is defined and release_sha | length > 0
+          - tomcat_image is defined and tomcat_image | length > 0
+          - env is defined and env in ['dev', 'test', 'prod']
+        fail_msg: "Required variables release_sha, tomcat_image, and env must be set."
+      tags: [always]
+
+    - name: "Assert image tag is not mutable"
+      ansible.builtin.assert:
+        that:
+          - tomcat_image is not search(':(latest|main|master|dev|develop|staging|stable)$')
+        fail_msg: >
+          Policy violation [CTRL-007-IMMUTABLE-IMAGE]: Mutable image tags are
+          not permitted. Image must be tagged with an immutable release SHA.
+      tags: [always]
+
+  roles:
+    - role: tomcat
+
+  post_tasks:
+    - name: "Smoke test – verify Tomcat responds on host port"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ tomcat_host_port }}/"
+        status_code: 200
+        timeout: 30
+      register: tomcat_smoke_result
+      retries: 6
+      delay: 10
+      until: tomcat_smoke_result.status == 200
+      tags: [smoke]
+
+    - name: "Smoke test result"
+      ansible.builtin.debug:
+        msg: "Tomcat smoke test passed – status {{ tomcat_smoke_result.status }}"
+      tags: [smoke]

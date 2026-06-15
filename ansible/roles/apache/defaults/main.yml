@@ -1,0 +1,41 @@
+---
+# defaults/main.yml – Apache httpd container role defaults.
+# Values here can be overridden by inventory group_vars or the pipeline.
+
+# Container image (overridden at runtime by the pipeline).
+apache_image: "httpd:2.4"
+
+# Port the httpd container listens on inside the container.
+apache_container_port: 80
+apache_container_ssl_port: 443
+
+# Port published on the host.
+apache_host_port: 80
+apache_host_ssl_port: 443
+
+# Container name.
+apache_container_name: apache-httpd
+
+# Runtime version expected (validated against RTCM).
+apache_expected_version: "2.4"
+
+# TLS/SSL settings.
+apache_tls_enabled: true
+apache_tls_cert_ssm: /cicd/tls/apache/cert
+apache_tls_key_ssm: /cicd/tls/apache/key
+
+# Security hardening flags.
+apache_run_as_root: false
+apache_read_only_rootfs: true
+apache_drop_all_caps: true
+apache_uid: 1000
+apache_gid: 1000
+
+# Healthcheck.
+apache_healthcheck_url: http://localhost:{{ apache_host_port }}/health
+apache_healthcheck_retries: 5
+apache_healthcheck_delay: 5
+apache_healthcheck_interval: 10
+
+# Log forwarding to Datadog.
+apache_datadog_log_label: "apache.access"

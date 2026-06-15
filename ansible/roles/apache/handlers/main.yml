@@ -1,0 +1,7 @@
+---
+handlers:
+  - name: restart apache container
+    community.docker.docker_container:
+      name: "{{ apache_container_name }}"
+      state: started
+      restart: true

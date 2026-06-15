@@ -1,0 +1,38 @@
+---
+# molecule/apache/converge.yml
+# Applies the apache role to the test instance.
+# Covers: TC-ANS-001 (idempotency run 1), TC-ANS-004 (container lifecycle).
+
+- name: "Converge – deploy Apache role"
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: "TC-PRE-001 | Assert release_sha is set and not mutable"
+      ansible.builtin.assert:
+        that:
+          - release_sha is defined
+          - release_sha | length > 0
+          - release_sha is not search(':(latest|main|master|dev|staging)$')
+        fail_msg: "TC-PRE-001 FAILED: release_sha must be set to an immutable SHA."
+      tags: [tc_pre_001]
+
+    - name: "TC-PRE-002 | Assert env is a known value"
+      ansible.builtin.assert:
+        that:
+          - env is defined
+          - env in ['dev', 'test', 'prod']
+        fail_msg: "TC-PRE-002 FAILED: env must be dev, test, or prod."
+      tags: [tc_pre_002]
+
+    - name: "TC-PRE-003 | Assert apache_image references the expected version"
+      ansible.builtin.assert:
+        that:
+          - apache_image is defined
+          - apache_expected_version in apache_image
+        fail_msg: "TC-PRE-003 FAILED: apache_image must reference approved version {{ apache_expected_version }}."
+      tags: [tc_pre_003]
+
+  roles:
+    - role: apache

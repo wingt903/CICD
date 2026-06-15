@@ -1,0 +1,53 @@
+---
+# deploy-apache.yml – Deploy the Apache httpd container via the App as Code pipeline.
+# Triggered by the CI/CD pipeline after image build and RTCM checks pass.
+#
+# Usage:
+#   ansible-playbook playbooks/deploy-apache.yml \
+#     -i inventories/{{ env }}/hosts.ini \
+#     -e "release_sha={{ RELEASE_SHA }}" \
+#     -e "apache_image={{ ECR_URI }}/apache:{{ RELEASE_SHA }}"
+
+- name: "Deploy Apache httpd container"
+  hosts: apache
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: "Assert required variables are provided"
+      ansible.builtin.assert:
+        that:
+          - release_sha is defined and release_sha | length > 0
+          - apache_image is defined and apache_image | length > 0
+          - env is defined and env in ['dev', 'test', 'prod']
+        fail_msg: "Required variables release_sha, apache_image, and env must be set."
+      tags: [always]
+
+    - name: "Assert image tag is not mutable"
+      ansible.builtin.assert:
+        that:
+          - apache_image is not search(':(latest|main|master|dev|develop|staging|stable)$')
+        fail_msg: >
+          Policy violation [CTRL-007-IMMUTABLE-IMAGE]: Mutable image tags are
+          not permitted. Image must be tagged with an immutable release SHA.
+      tags: [always]
+
+  roles:
+    - role: apache
+
+  post_tasks:
+    - name: "Smoke test – verify Apache responds on host port"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ apache_host_port }}/health"
+        status_code: 200
+        timeout: 30
+      register: apache_smoke_result
+      retries: 5
+      delay: 5
+      until: apache_smoke_result.status == 200
+      tags: [smoke]
+
+    - name: "Smoke test result"
+      ansible.builtin.debug:
+        msg: "Apache smoke test passed – status {{ apache_smoke_result.status }}"
+      tags: [smoke]

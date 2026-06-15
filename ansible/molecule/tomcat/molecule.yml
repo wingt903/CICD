@@ -1,0 +1,51 @@
+---
+# molecule/tomcat/molecule.yml
+
+dependency:
+  name: galaxy
+  options:
+    requirements-file: requirements.yml
+
+driver:
+  name: docker
+
+platforms:
+  - name: tomcat-test-instance
+    image: geerlingguy/docker-ubuntu2204-ansible:latest
+    pre_build_image: true
+    privileged: false
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: ""
+
+provisioner:
+  name: ansible
+  playbooks:
+    prepare: prepare.yml
+    converge: converge.yml
+    verify: verify.yml
+  inventory:
+    host_vars:
+      tomcat-test-instance:
+        env: dev
+        aws_region: ap-southeast-1
+        ecr_registry: "123456789012.dkr.ecr.ap-southeast-1.amazonaws.com"
+        release_sha: "abc123def456abc123def456abc123def456abc1"
+        tomcat_image: "tomcat:10.1-jdk17"
+        tomcat_expected_version: "10.1"
+        tomcat_java_expected_version: "17"
+        tomcat_container_name: tomcat-app-test
+        tomcat_host_port: 8082
+        tomcat_container_port: 8080
+        tomcat_drop_all_caps: false   # Docker-in-Docker limitation.
+        deployment_decision_prefix: /cicd/deployment-decisions
+        tomcat_java_opts: "-Djava.security.egd=file:/dev/./urandom -Xms128m -Xmx256m"
+        tomcat_shutdown_port: -1
+        tomcat_shutdown_command: SHUTDOWN
+
+verifier:
+  name: ansible
+
+lint: |
+  set -e
+  ansible-lint roles/tomcat

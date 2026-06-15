@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  role_name: tomcat
+  author: platform-engineering
+  description: >
+    Deploy a hardened Tomcat 10.1/JDK17 container aligned to the App as Code
+    CI/CD pipeline. Implements RTCM guardrail, drift control, security
+    hardening, and audit evidence requirements.
+  license: proprietary
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions: ["8", "9"]
+    - name: Ubuntu
+      versions: [focal, jammy]
+
+dependencies: []

@@ -1,0 +1,142 @@
+---
+# molecule/apache/verify.yml
+# Post-convergence verification tests for the Apache role.
+# Each task maps to a formal test case ID in ansible/tests/test-cases.md.
+
+- name: "Verify Apache role – post-convergence assertions"
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    # ── TC-ANS-001: Playbook syntax and lint ──────────────────────────────────
+    - name: "TC-ANS-001 | Verify role directory structure is present"
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: role_dirs
+      loop:
+        - /etc/apache-container
+        - /etc/apache-container/httpd.conf
+      tags: [tc_ans_001]
+
+    - name: "TC-ANS-001 | Assert role directories exist"
+      ansible.builtin.assert:
+        that: item.stat.exists
+        fail_msg: "TC-ANS-001 FAILED: expected path {{ item.item }} does not exist."
+        success_msg: "TC-ANS-001 PASSED: {{ item.item }} exists."
+      loop: "{{ role_dirs.results }}"
+      tags: [tc_ans_001]
+
+    # ── TC-ANS-004: Apache container started and running ─────────────────────
+    - name: "TC-ANS-004 | Get Apache container info"
+      community.docker.docker_container_info:
+        name: apache-httpd-test
+      register: apache_container_info
+      tags: [tc_ans_004]
+
+    - name: "TC-ANS-004 | Assert container is running"
+      ansible.builtin.assert:
+        that:
+          - apache_container_info.exists
+          - apache_container_info.container.State.Running == true
+        fail_msg: "TC-ANS-004 FAILED: Apache container is not running."
+        success_msg: "TC-ANS-004 PASSED: Apache container is running."
+      tags: [tc_ans_004]
+
+    # ── TC-ANS-004a: Health check endpoint responds ───────────────────────────
+    - name: "TC-ANS-004a | HTTP health check on Apache host port"
+      ansible.builtin.uri:
+        url: "http://localhost:8081/health"
+        method: GET
+        status_code: 200
+        timeout: 15
+      register: apache_health
+      retries: 5
+      delay: 5
+      until: apache_health.status == 200
+      tags: [tc_ans_004a]
+
+    - name: "TC-ANS-004a | Assert health endpoint returned HTTP 200"
+      ansible.builtin.assert:
+        that: apache_health.status == 200
+        fail_msg: "TC-ANS-004a FAILED: Apache health endpoint did not return 200."
+        success_msg: "TC-ANS-004a PASSED: Apache health endpoint returned 200."
+      tags: [tc_ans_004a]
+
+    # ── TC-ANS-006: RTCM – runtime version present in image tag ──────────────
+    - name: "TC-ANS-006 | Inspect Apache container image label"
+      community.docker.docker_container_info:
+        name: apache-httpd-test
+      register: apache_rtcm_info
+      tags: [tc_ans_006]
+
+    - name: "TC-ANS-006 | Assert container image includes approved version string"
+      ansible.builtin.assert:
+        that: "'2.4' in apache_rtcm_info.container.Config.Image"
+        fail_msg: >
+          TC-ANS-006 FAILED: Apache container image
+          '{{ apache_rtcm_info.container.Config.Image }}' does not include
+          approved version '2.4' (RTCM violation).
+        success_msg: "TC-ANS-006 PASSED: Approved Apache version 2.4 confirmed in image."
+      tags: [tc_ans_006]
+
+    # ── TC-ANS-007: Security hardening – no-new-privileges ───────────────────
+    - name: "TC-ANS-007 | Assert container has no-new-privileges security opt"
+      ansible.builtin.assert:
+        that: "'no-new-privileges:true' in apache_container_info.container.HostConfig.SecurityOpt"
+        fail_msg: "TC-ANS-007 FAILED: no-new-privileges security option is not set."
+        success_msg: "TC-ANS-007 PASSED: no-new-privileges is enforced."
+      tags: [tc_ans_007]
+
+    # ── TC-ANS-007a: Security hardening – ALL capabilities dropped ────────────
+    - name: "TC-ANS-007a | Assert CapDrop includes ALL"
+      ansible.builtin.assert:
+        that: "'ALL' in apache_container_info.container.HostConfig.CapDrop"
+        fail_msg: "TC-ANS-007a FAILED: CapDrop=ALL is not set on Apache container."
+        success_msg: "TC-ANS-007a PASSED: CapDrop=ALL enforced."
+      tags: [tc_ans_007a]
+
+    # ── TC-ANS-008: Configuration drift – label matches release SHA ───────────
+    - name: "TC-ANS-008 | Assert release SHA label on container"
+      ansible.builtin.assert:
+        that: apache_container_info.container.Config.Labels['app.release_sha'] == release_sha
+        fail_msg: >
+          TC-ANS-008 FAILED: Container label app.release_sha does not match
+          expected release_sha '{{ release_sha }}'.
+        success_msg: "TC-ANS-008 PASSED: Container release SHA label matches expected value."
+      tags: [tc_ans_008]
+
+    # ── TC-ANS-008a: Environment label correct ────────────────────────────────
+    - name: "TC-ANS-008a | Assert env label on container"
+      ansible.builtin.assert:
+        that: apache_container_info.container.Config.Labels['app.env'] == env
+        fail_msg: "TC-ANS-008a FAILED: Container env label does not match '{{ env }}'."
+        success_msg: "TC-ANS-008a PASSED: Container env label matches '{{ env }}'."
+      tags: [tc_ans_008a]
+
+    # ── TC-ANS-009: httpd.conf rendered and present ───────────────────────────
+    - name: "TC-ANS-009 | Slurp rendered httpd.conf"
+      ansible.builtin.slurp:
+        src: /etc/apache-container/httpd.conf
+      register: httpd_conf
+      tags: [tc_ans_009]
+
+    - name: "TC-ANS-009 | Assert security headers present in httpd.conf"
+      ansible.builtin.assert:
+        that:
+          - "'X-Content-Type-Options' in (httpd_conf.content | b64decode)"
+          - "'X-Frame-Options' in (httpd_conf.content | b64decode)"
+          - "'Strict-Transport-Security' in (httpd_conf.content | b64decode)"
+          - "'ServerTokens Prod' in (httpd_conf.content | b64decode)"
+          - "'ServerSignature Off' in (httpd_conf.content | b64decode)"
+        fail_msg: "TC-ANS-009 FAILED: Security headers missing from rendered httpd.conf."
+        success_msg: "TC-ANS-009 PASSED: Security headers present in httpd.conf."
+      tags: [tc_ans_009]
+
+    # ── TC-ANS-010: Restart policy is unless-stopped ──────────────────────────
+    - name: "TC-ANS-010 | Assert restart policy"
+      ansible.builtin.assert:
+        that: apache_container_info.container.HostConfig.RestartPolicy.Name == "unless-stopped"
+        fail_msg: "TC-ANS-010 FAILED: Restart policy is not 'unless-stopped'."
+        success_msg: "TC-ANS-010 PASSED: Restart policy is 'unless-stopped'."
+      tags: [tc_ans_010]

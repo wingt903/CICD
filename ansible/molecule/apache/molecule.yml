@@ -1,0 +1,61 @@
+---
+# molecule/apache/molecule.yml
+# Molecule test scenario for the apache role using the Docker driver.
+# Runs in CI via the ansible-validate GitHub Actions job.
+
+dependency:
+  name: galaxy
+  options:
+    requirements-file: requirements.yml
+
+driver:
+  name: docker
+
+platforms:
+  - name: apache-test-instance
+    image: geerlingguy/docker-ubuntu2204-ansible:latest
+    pre_build_image: true
+    privileged: false
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: ""
+    environment:
+      # Simulate pipeline-injected variables.
+      RELEASE_SHA: "abc123def456abc123def456abc123def456abc1"
+      AWS_DEFAULT_REGION: ap-southeast-1
+
+provisioner:
+  name: ansible
+  playbooks:
+    prepare: prepare.yml
+    converge: converge.yml
+    verify: verify.yml
+  inventory:
+    host_vars:
+      apache-test-instance:
+        env: dev
+        aws_region: ap-southeast-1
+        ecr_registry: "123456789012.dkr.ecr.ap-southeast-1.amazonaws.com"
+        release_sha: "abc123def456abc123def456abc123def456abc1"
+        # Use public Docker Hub image in test; replace with ECR URI in prod.
+        apache_image: "httpd:2.4"
+        apache_expected_version: "2.4"
+        apache_container_name: apache-httpd-test
+        apache_host_port: 8081
+        apache_host_ssl_port: 8444
+        apache_container_port: 80
+        apache_container_ssl_port: 443
+        apache_read_only_rootfs: false   # Container tmpfs not set up in test driver.
+        apache_drop_all_caps: false      # Docker-in-Docker limitations.
+        apache_uid: 0
+        apache_gid: 0
+        deployment_decision_prefix: /cicd/deployment-decisions
+        # Skip AWS SSM calls in unit tests.
+        skip_aws_calls: true
+
+verifier:
+  name: ansible
+
+lint: |
+  set -e
+  ansible-lint roles/apache
