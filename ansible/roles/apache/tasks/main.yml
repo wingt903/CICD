@@ -15,7 +15,7 @@
     success_msg: "RTCM check passed: apache version {{ apache_expected_version }} confirmed."
   tags: [rtcm, validate]
 
-- name: "[RTCM] Log RTCM validation result to S3 audit store"
+- name: "[RTCM] Log RTCM validation result to SSM audit store"
   ansible.builtin.command: >
     aws ssm put-parameter
     --name "{{ deployment_decision_prefix }}/ansible/{{ release_sha }}/apache/rtcm"
