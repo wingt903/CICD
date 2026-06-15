@@ -1,0 +1,53 @@
+flowchart TD
+
+    subgraph SRC["Data Sources"]
+        direction TB
+        CT["CloudTrail"]
+        CW["CloudWatch Logs"]
+        GD["GuardDuty"]
+        GA["GitHub Actions\nWorkflow Logs"]
+        PM["GitHub Actions\nPipeline Metadata"]
+        SSM["SSM Parameter Store\n/cicd/rtcm/approved/current"]
+        RTCM["Runtime Compatibility\nMatrix JSON"]
+        IB["Image Build\nAMI Registration"]
+    end
+
+    subgraph AWSLOG_PATH["AWS Log Path"]
+        EB_AWS["EventBridge\nRule"]
+    end
+
+    subgraph DIRECT["Direct S3 Delivery"]
+        CT -- "native delivery" --> S3_AUDIT["S3 Audit Log Bucket\nObject Lock - Compliance mode"]
+    end
+
+    subgraph PIPELINE["Evidence Ingest Pipeline"]
+        EB["EventBridge\ncompliance-evidence-bus"]
+        LAMBDA["Evidence Ingestor Lambda\nvalidate · normalize · KMS-sign"]
+    end
+
+    subgraph STORE["Central Immutable Store"]
+        S3["S3 Evidence Bucket\nObject Lock · SSE-KMS · Versioning\ncompliance-evidence-account"]
+    end
+
+    subgraph FORWARD["Datadog Ingestion"]
+        FWD["Datadog Forwarder Lambda\nS3 event notification trigger"]
+        DD["Datadog\nSearch · Dashboards · Alerts"]
+    end
+
+    CW -- "EventBridge rule" --> EB_AWS
+    GD -- "finding event" --> EB_AWS
+    EB_AWS --> EB
+
+    GA -- "aws s3 cp\nat workflow end" --> S3
+
+    PM -- "normalized event\nper pipeline stage" --> EB
+    SSM -- "baseline snapshot event" --> EB
+    RTCM -- "baseline snapshot event" --> EB
+    IB -- "AMI metadata event" --> EB
+
+    EB --> LAMBDA
+    LAMBDA --> S3
+    S3_AUDIT --> S3
+
+    S3 -- "S3 PutObject notification" --> FWD
+    FWD --> DD
