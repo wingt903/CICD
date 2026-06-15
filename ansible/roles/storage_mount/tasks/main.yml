@@ -111,11 +111,10 @@
   when: storage_mount_enabled | bool
 
 - name: "Create filesystem with label when missing"
-  ansible.builtin.command: >
-    mkfs -t {{ storage_mount_filesystem_type_effective }}
-    -L {{ storage_mount_filesystem_label_effective }}
-    {{ storage_mount_device_path }}
-  changed_when: true
+  community.general.filesystem:
+    dev: "{{ storage_mount_device_path }}"
+    fstype: "{{ storage_mount_filesystem_type_effective }}"
+    opts: "-L {{ storage_mount_filesystem_label_effective }}"
   when:
     - storage_mount_enabled | bool
     - storage_mount_existing_fs.rc != 0 or storage_mount_existing_fs.stdout | length == 0
@@ -152,16 +151,11 @@
     backup: false
   when: storage_mount_enabled | bool
 
-- name: "Check whether application data mount point is already mounted"
-  ansible.builtin.command: "mountpoint -q {{ storage_mount_point_effective }}"
-  register: storage_mount_mountpoint_check
-  changed_when: false
-  failed_when: false
+- name: "Mount application data volume by UUID"
+  ansible.posix.mount:
+    path: "{{ storage_mount_point_effective }}"
+    src: "UUID={{ storage_mount_uuid_result.stdout }}"
+    fstype: "{{ storage_mount_filesystem_type_effective }}"
+    opts: defaults,nofail
+    state: mounted
   when: storage_mount_enabled | bool
-
-- name: "Mount application data volume from fstab" # noqa: command-instead-of-module
-  ansible.builtin.command: "mount {{ storage_mount_point_effective }}"
-  changed_when: true
-  when:
-    - storage_mount_enabled | bool
-    - storage_mount_mountpoint_check.rc != 0

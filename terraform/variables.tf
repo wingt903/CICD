@@ -23,6 +23,10 @@ variable "approved_ami_id" {
 variable "app_instance_id" {
   type        = string
   description = "EC2 instance ID for application host that receives the mandatory secondary data volume"
+  validation {
+    condition     = can(regex("^i-[0-9a-f]{17}$", var.app_instance_id))
+    error_message = "app_instance_id must be a valid EC2 instance ID format (for example: i-0123456789abcdef0)."
+  }
 }
 
 variable "app_volume_availability_zone" {
