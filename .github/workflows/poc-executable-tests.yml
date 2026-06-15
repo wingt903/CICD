@@ -124,7 +124,7 @@ jobs:
             echo "session_expected_regex=$session_expected_regex"
             echo "destructive_session_test=$destructive_session_test"
             echo "ecr_repository=$ecr_repository"
-            echo "run_url=https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            printf 'run_url=%s\n' "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           } >> "$GITHUB_OUTPUT"
 
       - name: Configure AWS credentials
