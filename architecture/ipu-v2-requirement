@@ -1,0 +1,444 @@
+IPU_v2_001
+
+Self-Service OS Upgrade Initiation
+As an Application Team Engineer,
+I want to be able to self-service trigger an OS upgrade for my EC2 instances without raising a manual request to the platform team,
+So that I can upgrade my servers at a time that suits my application schedule and reduce dependency on third-party operational teams.
+
+Scenario: Application team triggers an upgrade for a target instance
+
+Given an application team engineer has access to the OS Upgrade as a Service platform
+
+When they select a target EC2 instance and initiate an upgrade request
+
+Then the platform must automatically begin the upgrade workflow without requiring manual intervention from the platform team
+
+And the requesting engineer must receive confirmation that the upgrade has been initiated.
+
+Scenario: Upgrade is rejected when the target instance does not meet pre-upgrade eligibility criteria
+
+Given an application team engineer initiates an upgrade request
+
+When the pre-upgrade eligibility checks run
+
+Then any instance that does not meet the required criteria (e.g., not in approved scope, unsupported OS family) must be rejected with a clear reason
+
+And no upgrade workflow must proceed for the rejected instance.
+
+
+
+
+ 
+
+IPU_v2_002
+
+Multi-Cloud Upgrade Coverage
+As a Platform Engineer,
+I want the OS upgrade service to operate consistently across both the BA and IAG AWS cloud environments,
+So that application teams across both clouds can benefit from the same governed, automated upgrade capability without requiring separate tooling or manual processes per cloud.
+
+Scenario: Upgrade is executed successfully in the BA cloud environment
+
+Given a target EC2 instance exists in the BA cloud
+
+When an upgrade is initiated
+
+Then the platform must provision, configure, and validate the new instance within the BA cloud environment using the correct account, networking, and IAM configuration.
+
+Scenario: Upgrade is executed successfully in the IAG cloud environment
+
+Given a target EC2 instance exists in the IAG cloud
+
+When an upgrade is initiated
+
+Then the platform must provision, configure, and validate the new instance within the IAG cloud environment using the correct account, networking, and IAM configuration.
+
+Scenario: Cloud boundary is enforced
+
+Given an upgrade request targets an instance in one cloud
+
+When the platform executes the upgrade workflow
+
+Then all new resources must be created within the same cloud boundary as the source instance
+
+And no cross-cloud resource movement must occur.
+
+
+
+
+ 
+
+IPU_v2_003
+
+IaC and Non-IaC Workload Support
+As an Application Team Engineer,
+I want the upgrade service to work regardless of whether my EC2 instance is managed by Infrastructure as Code or was provisioned manually,
+So that both modern IaC-managed workloads and legacy manually-provisioned servers can be upgraded through the same service without requiring me to first introduce IaC.
+
+Scenario: Upgrade succeeds for an IaC-managed instance
+
+Given a target EC2 instance is managed by Terraform or another approved IaC tool
+
+When an upgrade is initiated
+
+Then the platform must use IaC state and manifests to inform the new instance configuration
+
+And the upgrade must complete successfully without requiring the application team to manually reconstruct instance configuration.
+
+Scenario: Upgrade succeeds for a non-IaC instance
+
+Given a target EC2 instance was provisioned manually and has no associated IaC state
+
+When an upgrade is initiated
+
+Then the platform must discover the source instance configuration (tags, IAM instance profile, security groups, network settings) through the AWS API
+
+And use this discovered configuration to provision the replacement instance
+
+And the upgrade must complete successfully without requiring the application team to first write IaC.
+
+Scenario: Discovery of instance configuration is auditable
+
+Given an upgrade is performed for a non-IaC instance
+
+When the platform reads the source instance configuration
+
+Then all discovered configuration values used to provision the replacement must be recorded as part of the upgrade evidence record.
+
+
+
+
+ 
+
+IPU_v2_004
+
+RedHat and Windows Operating System Support
+As a Platform Engineer,
+I want the OS upgrade service to support both RedHat Enterprise Linux and Windows Server operating systems,
+So that the widest possible range of application workloads can be upgraded through a single governed service regardless of their OS family.
+
+Scenario: Upgrade succeeds for a RedHat Enterprise Linux instance
+
+Given a target EC2 instance runs a supported version of RedHat Enterprise Linux (including RHEL 6)
+
+When an upgrade is initiated
+
+Then the platform must provision a replacement instance using the latest ECP-approved RHEL golden image
+
+And apply all required BA policy and security controls for the RHEL OS family
+
+And complete the upgrade workflow successfully.
+
+Scenario: Upgrade succeeds for a Windows Server instance
+
+Given a target EC2 instance runs a supported version of Windows Server
+
+When an upgrade is initiated
+
+Then the platform must provision a replacement instance using the latest ECP-approved Windows golden image
+
+And apply all required BA policy and security controls for the Windows OS family
+
+And complete the upgrade workflow successfully.
+
+Scenario: Unsupported OS version is rejected at pre-check
+
+Given a target EC2 instance runs an OS version that is not listed in the approved upgrade matrix
+
+When the pre-upgrade eligibility check runs
+
+Then the platform must reject the upgrade request with a clear message identifying the unsupported OS version
+
+And no new instance must be provisioned.
+
+
+
+
+ 
+
+IPU_v2_005
+
+BA Policy and Standards Compliance via ECP Golden Image
+As a Cyber Security Engineer,
+I want every upgraded EC2 instance to start from the latest ECP-approved golden image so that it is fully compliant with all British Airways policies and security standards from the moment it is provisioned,
+So that we eliminate the risk of configuration drift, inherited vulnerabilities, and policy gaps that exist on long-running servers.
+
+Scenario: New instance is provisioned from the latest ECP golden image
+
+Given an upgrade is initiated for any EC2 instance regardless of OS family
+
+When the replacement instance is provisioned
+
+Then the platform must use the latest version of the ECP-approved golden image for the target OS family as the base AMI
+
+And the golden image version used must be recorded as part of the upgrade evidence record.
+
+Scenario: Policy compliance is validated after provisioning
+
+Given a replacement instance has been provisioned from the ECP golden image
+
+When post-provisioning compliance checks run
+
+Then all BA mandatory security controls and hardening requirements must be confirmed as present on the new instance
+
+And any failed control must block the upgrade workflow and trigger a rollback or remediation.
+
+Scenario: Golden image version is traceable across all upgrades
+
+Given multiple upgrades are performed over time using different golden image versions
+
+When compliance evidence is reviewed
+
+Then each upgrade record must identify the exact golden image version used
+
+And allow auditors to confirm that the approved ECP baseline was applied for every upgrade.
+
+
+
+
+ 
+
+IPU_v2_006
+
+Automated Upgrade Orchestration
+As a Platform Engineer,
+I want the upgrade process to be automated end-to-end — from pre-checks through provisioning, configuration, data copy, and post-upgrade validation — with minimal manual steps required from the application team,
+So that the upgrade service can scale across a large number of instances without proportional operational effort and produce consistent, predictable outcomes every time.
+
+Scenario: Pre-upgrade checks are performed automatically
+
+Given an upgrade is initiated for a target EC2 instance
+
+When the upgrade workflow starts
+
+Then the platform must automatically run all required pre-upgrade eligibility and health checks (OS family, version eligibility, account health, available IP/quota, policy compliance) before any new resource is created
+
+And the result of each pre-check must be recorded.
+
+Scenario: Replacement instance is provisioned automatically
+
+Given all pre-upgrade checks have passed
+
+When the upgrade workflow proceeds to provisioning
+
+Then the platform must automatically provision a new EC2 instance using the approved golden image, copying metadata, IAM instance profile, security groups, and network configuration from the source instance
+
+And the application team must not be required to manually configure the replacement instance.
+
+Scenario: Data and configuration are copied automatically
+
+Given the replacement instance has been provisioned
+
+When the data migration step runs
+
+Then the platform must automatically create new storage volumes that mirror the source instance's attached volumes and copy all data across to the replacement instance
+
+And the copy operation must be validated before the workflow proceeds.
+
+Scenario: Post-upgrade validation is performed automatically
+
+Given data and configuration have been copied to the replacement instance
+
+When the validation step runs
+
+Then the platform must automatically verify that the replacement instance is healthy, compliant with BA policies, and ready for the application team to test
+
+And the validation result must be recorded as compliance evidence.
+
+
+
+
+ 
+
+IPU_v2_007
+
+Side-by-Side Upgrade Model — No Instance Introduction or Termination
+As an Application Team Engineer,
+I want the upgrade service to provision the new instance alongside the existing one — keeping both running at the same time — without the platform service introducing or terminating instances into or from my live stack,
+So that I retain full control over when traffic is moved to the new server and when the old server is decommissioned, allowing me to validate the new environment at my own pace.
+
+Scenario: Source instance remains running throughout the upgrade
+
+Given an upgrade has been initiated for a target EC2 instance
+
+When the platform provisions and configures the replacement instance
+
+Then the source instance must continue running and be accessible throughout the entire upgrade process
+
+And the platform must not stop, terminate, or modify the source instance.
+
+Scenario: Replacement instance is delivered but not inserted into the live stack
+
+Given the replacement instance is ready and validated
+
+When the upgrade workflow completes its platform steps
+
+Then the replacement instance must be available to the application team for testing
+
+And the platform must not automatically redirect traffic, update load balancer target groups, or change any DNS or routing configuration
+
+And the application team retains full control over when and how to introduce the replacement instance into their live environment.
+
+Scenario: Platform does not terminate the source or replacement instance
+
+Given the upgrade workflow has completed or encountered a failure
+
+When the workflow reaches its final state
+
+Then the platform must not terminate either the source instance or the replacement instance
+
+And decommissioning of the source instance remains the sole responsibility of the application team.
+
+Scenario: Blue-green testing window is supported
+
+Given both source and replacement instances are running concurrently
+
+When the application team performs validation testing on the replacement instance
+
+Then both instances must remain available simultaneously for as long as the application team requires before they decide to commit to the change.
+
+
+
+
+ 
+
+IPU_v2_008
+
+Instance Metadata, IAM, Security Group, and Data Migration
+As an Application Team Engineer,
+I want the upgrade service to automatically replicate the source instance's metadata, IAM instance profile, security groups, and attached data to the replacement instance,
+So that the replacement instance is as close to the source configuration as possible without requiring me to manually reconstruct settings or risk losing data.
+
+Scenario: Instance metadata is copied to the replacement instance
+
+Given a source EC2 instance has tags and metadata applied
+
+When the replacement instance is provisioned
+
+Then all tags and relevant metadata must be copied from the source instance to the replacement instance
+
+And any platform-managed upgrade tags must be added to the replacement instance to identify it as a replacement.
+
+Scenario: IAM instance profile is applied to the replacement instance
+
+Given a source EC2 instance has an IAM instance profile attached
+
+When the replacement instance is provisioned
+
+Then the same IAM instance profile must be applied to the replacement instance
+
+And the assignment must be validated as part of the provisioning step.
+
+Scenario: Security groups are applied to the replacement instance
+
+Given a source EC2 instance has one or more security groups attached
+
+When the replacement instance is provisioned
+
+Then the same security groups must be applied to the replacement instance
+
+And the security group configuration must be validated before the workflow proceeds.
+
+Scenario: Storage volumes are mirrored and data is copied to the replacement
+
+Given a source EC2 instance has one or more attached EBS volumes
+
+When the data migration step runs
+
+Then new EBS volumes of equivalent type and size must be created for the replacement instance
+
+And all data must be copied from the source volumes to the replacement volumes
+
+And a checksum or equivalence validation must be performed to confirm data integrity before the workflow proceeds.
+
+
+
+
+ 
+
+IPU_v2_009
+
+Safe Rollback via Source Instance Retention
+As an Application Team Engineer,
+I want the source EC2 instance to remain fully intact and available throughout the upgrade process so that if the new instance does not work as expected I can immediately continue using the original,
+So that the upgrade service provides a safe exit path that does not risk service availability for the application.
+
+Scenario: Source instance is available for rollback at any point during the upgrade
+
+Given an upgrade workflow is in progress or has completed
+
+When the application team determines that the replacement instance does not meet their requirements
+
+Then the application team must be able to immediately return to using the source instance
+
+And the source instance must be in the same state as before the upgrade began (unchanged by the platform).
+
+Scenario: No irreversible changes are made to the source instance
+
+Given an upgrade workflow is running
+
+When any step in the workflow executes
+
+Then no step must modify, reconfigure, stop, or otherwise alter the source EC2 instance
+
+And any changes required by the upgrade must be applied only to the replacement instance.
+
+Scenario: Upgrade evidence records the rollback decision
+
+Given an application team decides not to adopt the replacement instance and returns to the source
+
+When the rollback decision is recorded
+
+Then the platform must record the rollback outcome as part of the upgrade evidence
+
+And the evidence must capture the reason, timestamp, and actor who initiated the rollback.
+
+
+
+
+ 
+
+IPU_v2_010
+
+Compliance Evidence and Auditability
+As a Cyber Security Engineer,
+I want every step of the OS upgrade process — pre-checks, provisioning, configuration, data migration, validation, and rollback — to produce tamper-evident, auditable compliance evidence,
+So that the organisation can demonstrate that every upgraded instance was built from an approved golden image, is compliant with BA policies, and that the upgrade was performed in a controlled, governed manner.
+
+Scenario: Evidence is produced for every upgrade workflow step
+
+Given an upgrade workflow is executing
+
+When each workflow step completes (pass or fail)
+
+Then the platform must publish a compliance evidence record for that step
+
+And the record must include the step name, outcome, timestamp, source instance identifier, replacement instance identifier, golden image version, and any relevant policy check results.
+
+Scenario: Evidence is stored in a tamper-evident, immutable store
+
+Given compliance evidence records are produced by the upgrade workflow
+
+When each record is written
+
+Then it must be stored in an immutable evidence store with write-once protection and cryptographic integrity controls
+
+And the evidence must remain retrievable for the minimum required retention period.
+
+Scenario: Audit trail covers all access and changes to evidence records
+
+Given compliance evidence is stored
+
+When an auditor or operator accesses or queries evidence records
+
+Then a complete access and change audit trail must be maintained
+
+And the trail must include who accessed the record, when, and what action was taken.
+
+Scenario: Compliance evidence supports regulatory audit on demand
+
+Given an auditor requests evidence of upgrade compliance for a specific instance or time period
+
+When the report or evidence query is executed
+
+Then the platform must be able to provide a complete, exportable record of all upgrade steps, policy check outcomes, golden image versions, and final instance state for the requested scope.
