@@ -73,7 +73,7 @@ The following components and capabilities are net new for IPU v2 and have no dir
 | **Rollback playbook (in-place)** | An Ansible playbook that restores the instance to the pre-upgrade snapshot state, using package manager rollback, config file restore, or service-level recovery. | Baseline rollback uses AMI swap or IaC revert. In-place rollback is a distinct operation requiring new tooling. |
 | **Upgrade campaign management** | If upgrades are applied across a fleet of instances, IPU v2 requires batching, sequencing, and rollout controls (e.g., canary percentage, pause-on-failure, per-environment approvals) that are not needed in the single-release AMI model. | Not modelled in the baseline; needed for large-scale in-place upgrade coordination. |
 | **Pre-upgrade compatibility check** | Before executing the upgrade, verify that the target OS/middleware version is compatible with the running application version using the RTCM. Fail closed if the combination is not approved. | RTCM validation in the baseline checks incoming stack versions before image build, not runtime compatibility of existing app + new OS version combinations. |
-| **IPU v2 Requirement Traceability Matrix** | A separate RTM mapping IPU v2-specific requirements (to be defined) to flow IDs, design decisions, and evidence sources. | The baseline RTM (`requirement-traceability.md`) covers App_as_Code_001–008 only and must not be modified for IPU v2. |
+| **IPU v2 Requirement Traceability Matrix** | A separate RTM mapping IPU v2-specific requirements (to be defined) to flow IDs, design decisions, and evidence sources. | The baseline RTM (`requirement-traceability.md`) covers App as Code 001–008 only and must not be modified for IPU v2. |
 
 ---
 

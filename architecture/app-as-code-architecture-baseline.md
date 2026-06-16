@@ -29,7 +29,7 @@ This document serves as the single entry point for the App as Code Architecture 
 
 | Area | Description |
 |---|---|
-| CI/CD Orchestration | GitHub Actions-based pipeline for build, scan, test, release, and environment promotion. |
+| CI/CD Pipeline Orchestration | GitHub Actions-based pipeline for build, scan, test, release, and environment promotion. |
 | Identity & Trust | AWS IAM OIDC federation for GitHub Actions; no long-lived pipeline credentials. |
 | Image Build & Configuration | Ansible-driven AMI build and OS/middleware configuration; golden AMI registry in EC2 AMI Registry. |
 | Runtime Baseline Governance | Runtime Technology Compatibility Matrix (RTCM) stored in `architecture/runtime-compatibility-matrix.json` and SSM Parameter Store. |
