@@ -64,9 +64,9 @@ graph TB
     orch -->|"emit stage evidence [EventBridge]"| evidencePlatform
 
     %% Eligibility checker
-    eligibility -->|"check OS/version vs RTCM [AWS SSM]"| rtcmGate
-    eligibility -->|"read source config (IaC) [EC2 API]"| awsBA
-    eligibility -->|"read source config (IaC) [EC2 API]"| awsIAG
+    eligibility -->|"check OS/version vs RTCM [AWS API/SSM Parameter Store]"| rtcmGate
+    eligibility -->|"read source config [EC2 API]"| awsBA
+    eligibility -->|"read source config [EC2 API]"| awsIAG
     eligibility -->|"invoke non-IaC discovery [internal]"| discovery
 
     %% Discovery engine - non-IaC instance configuration
@@ -79,8 +79,8 @@ graph TB
 
     %% Replacement instance provisioner
     provisioner -->|"fetch latest approved AMI [AWS API]"| ecpRegistry
-    provisioner -->|"launch replacement + copy meta/IAM/SG/network - BA [AWS API]"| awsBA
-    provisioner -->|"launch replacement + copy meta/IAM/SG/network - IAG [AWS API]"| awsIAG
+    provisioner -->|"launch replacement + copy metadata/IAM/SG/network - BA [AWS API]"| awsBA
+    provisioner -->|"launch replacement + copy metadata/IAM/SG/network - IAG [AWS API]"| awsIAG
 
     %% Data and configuration migration
     migration -->|"mirror EBS + data check - BA [AWS API/DataSync]"| awsBA
