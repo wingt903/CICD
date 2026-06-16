@@ -1,0 +1,354 @@
+OSaaS-01
+
+Self Serve Capability
+As an Application Team member,
+I want to be able to request the upgrade of my EC2 instances using ServiceNow,
+So that upgrades don't have to be done manually, saving British Airways significant time and money as well as ensuring that mandatory Cyber security and patching standards are adhered to through ECP provided tooling.
+
+Scenario: Accessing the request form
+
+Given that I am an authenticated and authorised user
+
+When I access the OS Upgrade ServiceNow form
+
+Then I am presented with a drop-down list of AWS accounts that are valid for upgrades.
+
+Scenario: Instance selection and metadata display
+
+Given that I am on the OS Upgrade ServiceNow form
+
+When I select a valid AWS account
+
+Then I am presented with a list of EC2 Instances including their OS, Instance Type, IP Address, Tags, Security Groups, and Volumes.
+
+Scenario: Target Operating System selection
+
+Given that I have selected one or more EC2 Instances
+
+When I select a target operating system
+
+Then the options are restricted to the correct OS family based on the available Cyber-authorised Golden Images provided by ECP.
+
+Scenario: Middleware selection
+
+Given that I have selected a valid target operating system
+
+When I am prompted for software requirements
+
+Then I am presented with a list of appropriate middleware compatible with that OS.
+
+Scenario: Production Workload Acknowledgement
+
+Given that I have selected an EC2 instance tagged as 'Production'
+
+When I attempt to proceed with the request
+
+Then the system displays a mandatory warning box regarding Production risk.
+
+Scenario: Production Responsibility Acceptance
+
+Given that the Production warning box is displayed
+
+When I attempt to submit the form
+
+Then the system requires a mandatory "I accept responsibility for this Production upgrade" tick-box to be checked.
+
+Scenario: Data-Containing Server Acknowledgement
+
+Given that I am submitting an upgrade request
+
+When I proceed to the final submission step
+
+Then the system displays a mandatory warning box regarding local persistent data.
+
+Scenario: Data Loss Responsibility Acceptance
+
+Given that the data-containing server warning is displayed
+
+When I attempt to submit the form
+
+Then the system requires a mandatory "I confirm this server stores no local persistent data and I accept responsibility for any data loss" tick-box to be checked.
+
+Scenario: Form submitted
+
+Given that I have successfully submitted the form
+
+When it is a valid and complete instruction set
+
+Then a ServiceNow upgrade task is created and triggered.
+
+
+
+
+OSaaS-02
+
+Automated Infrastructure Provisioning
+As an Application Team member,
+I want the system to automatically provision a new instance that meets the mandatory Cyber security and patching standards implemented via ECP tooling,
+So that my application is moved away from insecure, legacy operating systems.
+
+Scenario: Provisioning with Latest Golden Image
+
+Given that a valid upgrade task has been triggered
+
+When the system starts the build
+
+Then a new EC2 instance is created using the latest ECP-provided Golden Image authorised by Cyber for the selected OS.
+
+Scenario: Enforcement of Cyber Patching Standards
+
+Given that a new EC2 instance is provisioned
+
+When the instance is initialised
+
+Then the system applies the Cyber-authorised patching configuration using ECP platform tooling.
+
+Scenario: Instance Type Matching
+
+Given that the new EC2 instance is being provisioned
+
+When the system selects the hardware size
+
+Then the Instance Type of the new server matches the Instance Type of the source server.
+
+Scenario: Notification of new Golden Image
+
+Given that a new version of the golden image has been produced by the ECP team
+
+When the golden image is approved and published
+
+Then a notification must be sent to relevant teams
+
+And the notification must include the golden image version
+
+And the notification must include the release date.
+
+
+
+
+OSaaS-03
+
+Access and Metadata Replication
+As an Application Team member,
+I want the new instance to retain the access permissions of the original server,
+So that network and identity connectivity is maintained while the underlying OS is upgraded to a secure standard.
+
+Scenario: Tag replication
+
+Given that the new EC2 instance is being provisioned
+
+When the build process is active
+
+Then the system copies all Tags from the source instance to the target instance.
+
+Scenario: Security Group replication
+
+Given that the new EC2 instance is being provisioned
+
+When the system configures network access
+
+Then the system applies the exact Security Groups from the source instance to the target instance.
+
+Scenario: IAM Role replication
+
+Given that the new EC2 instance is being provisioned
+
+When the system configures identity access
+
+Then the system applies the exact IAM Role from the source instance to the target instance.
+
+
+
+
+OSaaS-04
+
+Storage and Configuration Replication
+As an Application Team member,
+I want my storage volumes and application settings to be replicated to the new secure instance,
+So that the service can be validated quickly.
+
+Scenario: EBS Volume replication
+
+Given that the new EC2 instance has been created
+
+When the system identifies the EBS volumes on the source instance
+
+Then the system creates new EBS volumes of the same size and type as the source.
+
+Scenario: EBS Volume attachment
+
+Given that new EBS volumes have been created
+
+When the target instance is ready for storage
+
+Then the system attaches these volumes to the target instance in the correct mount positions.
+
+Scenario: Middleware installation
+
+Given that the new EC2 instance is running
+
+When the build reaches the software phase
+
+Then the system installs the middleware packages selected in the ServiceNow form.
+
+Scenario: Configuration file transfer
+
+Given that the new EC2 instance has been created
+
+And the middleware has been installed
+
+When the system initiates the data sync
+
+Then the system copies the relevant application configuration files to the equivalent locations on the target instance.
+
+Scenario: Service initiation
+
+Given that the configuration files have been copied
+
+When the configuration phase is complete
+
+Then the system attempts to start the application services on the target instance.
+
+
+
+
+OSaaS-05
+
+Server Compliance and Security Enablement
+As an Application Team member,
+I want servers to be automatically configured, validated, and enrolled into operational and security services,
+So that they are consistently compliant, secure, and ready for use without manual intervention or risk exposure.
+
+Scenario: Compliance Visibility
+
+Given that multiple servers have been onboarded
+
+When compliance status is reviewed
+
+Then each server has a visible compliance status
+
+And non-compliant servers clearly identify failed steps.
+
+Scenario: End-to-End Compliance Validation
+
+Given that all onboarding steps have been executed
+
+When the server is assessed for readiness
+
+Then the server is marked as compliant only if all steps have passed
+
+And any failed step results in a non-compliant status
+
+And the failure reason is visible and traceable.
+
+Scenario: Enrolment into Patching Service
+
+Given that the server is successfully registered
+
+When the onboarding process completes
+
+Then the server is enrolled into the patching service
+
+And only validated and registered servers are eligible for enrolment
+
+And any enrolment failures are identified and flagged.
+
+Scenario: Relevant Services Started
+
+Given that the OS and middleware baseline is successfully established
+
+When the onboarding process continues
+
+Then all services relevant to the server role are started
+
+And services not relevant to the server role are not started
+
+And any failure to start a required service is logged and flagged.
+
+Scenario: OS and Middleware Baseline Established
+
+Given that a server has been provisioned
+
+When the onboarding process is initiated
+
+Then the required operating system services are running
+
+And the required middleware components are active
+
+And any missing or failed services are identified and flagged.
+
+
+
+
+OSaaS-06
+
+Handover and Status Reporting
+As an Application Team member,
+I want to be notified of the build status via ServiceNow,
+So that I can manage my manual testing and cutover activities.
+
+Scenario: Build Progress Update
+
+Given that the OSaaS system is performing the build
+
+When an automated step completes
+
+Then the system updates the ServiceNow task status log.
+
+Scenario: Technical detail handover - Instance ID
+
+Given that the build is marked as complete
+
+When the user views the ServiceNow task
+
+Then the system displays the New Instance ID.
+
+Scenario: Technical detail handover - IP Address
+
+Given that the build is marked as complete
+
+When the user views the ServiceNow task
+
+Then the system displays the New IP Address.
+
+
+
+
+OSaaS-07
+
+Controlled Decommissioning
+As an Application Team member,
+I want to control the lifecycle of the legacy server,
+So that I can ensure the old, insecure OS is removed from the network once I have confirmed the new server is functional.
+
+Scenario: Stopping the legacy instance
+
+Given that the user has confirmed the upgrade is successful in ServiceNow
+
+When the system processes the confirmation
+
+Then the system triggers a "Stop" command on the source EC2 instance.
+
+Scenario: Verification of Stop state
+
+Given that the system has issued a Stop command
+
+When the instance reaches the 'Stopped' state
+
+Then the system updates the ServiceNow task status to "Old Instance Stopped."
+
+Scenario: Rejection - Instance Termination
+
+Given that the user finds a fault and rejects the upgrade
+
+When the rejection is processed
+
+Then the system terminates the new EC2 instance.
+
+Scenario: Rejection - Mandatory Feedback
+
+Given that the user rejects the upgrade
+
+When the user clicks "Reject"
+
+Then the system requires a mandatory text reason to be provided before the action completes.
