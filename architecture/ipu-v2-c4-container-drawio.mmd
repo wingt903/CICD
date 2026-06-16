@@ -38,71 +38,71 @@ graph TB
     end
 
     %% External actor to intake
-    appTeamEngineer -->|"self-service upgrade request [HTTPS/GitHub]"| intake
-    sn -.->|"optional Phase 2 - ITSM change order upgrade dispatch [HTTPS/API]"| intake
+    appTeamEngineer -->|"upgrade request [HTTPS]"| intake
+    sn -.->|"phase 2 trigger [HTTPS/API]"| intake
 
     %% Intake to orchestrator
-    intake -->|"initiates upgrade workflow [GitHub Actions trigger]"| orch
+    intake -->|"start workflow [Actions]"| orch
 
     %% Platform engineer manages campaigns
-    platformEngineer -->|"configures playbook baselines and campaign schedules [HTTPS/Git]"| campaign
-    campaign -->|"sequences and batches upgrade workflow runs [GitHub Actions matrix]"| orch
+    platformEngineer -->|"manage baselines and schedule [HTTPS/Git]"| campaign
+    campaign -->|"batch and sequence runs [Actions matrix]"| orch
 
     %% Application team approvals
-    appTeamEngineer -.->|"optional manual approval for validation outcome and rollback [HTTPS/GitHub API]"| orch
+    appTeamEngineer -.->|"optional approval [HTTPS/API]"| orch
 
     %% Orchestrator - trust and credentials
-    orch -->|"exchanges OIDC token for short-lived STS credentials [HTTPS/OIDC]"| oidcTrust
+    orch -->|"OIDC to STS creds [HTTPS/OIDC]"| oidcTrust
 
     %% Orchestrator - step sequencing
-    orch -->|"triggers pre-upgrade eligibility checks [AWS API]"| eligibility
-    orch -->|"triggers pre-upgrade snapshot capture [AWS SSM]"| snapshot
-    orch -->|"triggers replacement instance provisioning [AWS API/Terraform]"| provisioner
-    orch -->|"triggers data and configuration migration [AWS API/Ansible]"| migration
-    orch -->|"triggers post-upgrade validation checks [AWS API/Lambda]"| validation
-    orch -->|"triggers rollback when validation fails or team requests rollback [AWS API/Ansible]"| rollback
-    orch -->|"emits pipeline stage evidence at each step [AWS EventBridge]"| evidencePlatform
+    orch -->|"run pre-checks [AWS API]"| eligibility
+    orch -->|"capture pre-snapshot [AWS SSM]"| snapshot
+    orch -->|"provision replacement [AWS API/Terraform]"| provisioner
+    orch -->|"run data migration [AWS API/Ansible]"| migration
+    orch -->|"run post-validation [AWS API/Lambda]"| validation
+    orch -->|"run rollback [AWS API/Ansible]"| rollback
+    orch -->|"emit stage evidence [EventBridge]"| evidencePlatform
 
     %% Eligibility checker
-    eligibility -->|"validates OS family and version against approved upgrade matrix [AWS SSM]"| rtcmGate
-    eligibility -->|"reads source instance configuration for IaC-managed instances [AWS EC2 API]"| awsBA
-    eligibility -->|"reads source instance configuration for IaC-managed instances [AWS EC2 API]"| awsIAG
-    eligibility -->|"invokes discovery engine for non-IaC instances [internal]"| discovery
+    eligibility -->|"check OS/version vs RTCM [AWS SSM]"| rtcmGate
+    eligibility -->|"read source config (IaC) [EC2 API]"| awsBA
+    eligibility -->|"read source config (IaC) [EC2 API]"| awsIAG
+    eligibility -->|"invoke non-IaC discovery [internal]"| discovery
 
     %% Discovery engine - non-IaC instance configuration
-    discovery -->|"discovers tags, IAM profile, security groups, and network config via API [AWS EC2 API]"| awsBA
-    discovery -->|"discovers tags, IAM profile, security groups, and network config via API [AWS EC2 API]"| awsIAG
+    discovery -->|"discover tags/IAM/SG/network [EC2 API]"| awsBA
+    discovery -->|"discover tags/IAM/SG/network [EC2 API]"| awsIAG
 
     %% Pre-upgrade snapshot - captures pre-change state as rollback reference
-    snapshot -->|"captures OS version, installed packages, running services, and config - BA cloud [AWS SSM]"| awsBA
-    snapshot -->|"captures OS version, installed packages, running services, and config - IAG cloud [AWS SSM]"| awsIAG
+    snapshot -->|"capture OS/pkg/service/config - BA [AWS SSM]"| awsBA
+    snapshot -->|"capture OS/pkg/service/config - IAG [AWS SSM]"| awsIAG
 
     %% Replacement instance provisioner
-    provisioner -->|"fetches latest ECP-approved golden AMI for target OS family [AWS API]"| ecpRegistry
-    provisioner -->|"provisions replacement EC2 with copied metadata, IAM profile, security groups, and network - BA cloud [AWS API]"| awsBA
-    provisioner -->|"provisions replacement EC2 with copied metadata, IAM profile, security groups, and network - IAG cloud [AWS API]"| awsIAG
+    provisioner -->|"fetch latest approved AMI [AWS API]"| ecpRegistry
+    provisioner -->|"launch replacement + copy meta/IAM/SG/network - BA [AWS API]"| awsBA
+    provisioner -->|"launch replacement + copy meta/IAM/SG/network - IAG [AWS API]"| awsIAG
 
     %% Data and configuration migration
-    migration -->|"mirrors EBS volumes to replacement and validates data integrity - BA cloud [AWS API/DataSync]"| awsBA
-    migration -->|"mirrors EBS volumes to replacement and validates data integrity - IAG cloud [AWS API/DataSync]"| awsIAG
+    migration -->|"mirror EBS + data check - BA [AWS API/DataSync]"| awsBA
+    migration -->|"mirror EBS + data check - IAG [AWS API/DataSync]"| awsIAG
 
     %% Post-upgrade validation gate
-    validation -->|"validates OS version, service health, and BA policy compliance on replacement - BA cloud [AWS SSM]"| awsBA
-    validation -->|"validates OS version, service health, and BA policy compliance on replacement - IAG cloud [AWS SSM]"| awsIAG
-    validation -->|"confirms replacement instance is compliant with approved OS version matrix [AWS SSM]"| rtcmGate
-    validation -->|"emits pass-fail validation evidence record [AWS EventBridge]"| evidencePlatform
+    validation -->|"check OS/health/policy - BA [AWS SSM]"| awsBA
+    validation -->|"check OS/health/policy - IAG [AWS SSM]"| awsIAG
+    validation -->|"confirm RTCM compliance [AWS SSM]"| rtcmGate
+    validation -->|"emit validation evidence [EventBridge]"| evidencePlatform
 
     %% Rollback engine - source instance is never modified; replacement is restored or retired
-    rollback -->|"restores pre-upgrade state on replacement using snapshot reference - BA cloud [AWS SSM/Ansible]"| awsBA
-    rollback -->|"restores pre-upgrade state on replacement using snapshot reference - IAG cloud [AWS SSM/Ansible]"| awsIAG
-    rollback -->|"emits rollback outcome, actor, and timestamp evidence record [AWS EventBridge]"| evidencePlatform
+    rollback -->|"restore replacement from snapshot - BA [AWS SSM/Ansible]"| awsBA
+    rollback -->|"restore replacement from snapshot - IAG [AWS SSM/Ansible]"| awsIAG
+    rollback -->|"emit rollback evidence [EventBridge]"| evidencePlatform
 
     %% Evidence to audit reporting
-    evidencePlatform -->|"stores and indexes signed upgrade audit records [HTTPS/S3]"| auditReporting
-    evidencePlatform -.->|"optional Phase 2 - evidence and status updates [HTTPS/API]"| sn
+    evidencePlatform -->|"store/index signed audit records [HTTPS/S3]"| auditReporting
+    evidencePlatform -.->|"phase 2 status updates [HTTPS/API]"| sn
 
     %% Cyber security analyst access
-    cyberSecEngineer -->|"read-only compliance dashboard and audit access [HTTPS]"| auditReporting
+    cyberSecEngineer -->|"read-only audit dashboards [HTTPS]"| auditReporting
 
     %% Styling - internal containers (IPU v2)
     style intake fill:#85BBF0,color:#000000,stroke:#5D82A8
