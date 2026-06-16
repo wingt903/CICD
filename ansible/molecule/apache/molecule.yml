@@ -52,6 +52,7 @@ provisioner:
         deployment_decision_prefix: /cicd/deployment-decisions
         # Skip AWS SSM calls in unit tests.
         skip_aws_calls: true
+        app_data_mount_enabled: false
 
 verifier:
   name: ansible

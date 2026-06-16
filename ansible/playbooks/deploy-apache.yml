@@ -33,6 +33,7 @@
       tags: [always]
 
   roles:
+    - role: storage_mount
     - role: apache
 
   post_tasks:

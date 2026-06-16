@@ -13,3 +13,12 @@ datadog_enabled: true
 container_run_as_root: false
 container_read_only_rootfs: true
 container_drop_all_caps: true
+app_data_mount_enabled: true
+app_mount_config_ssm_path: "/{{ env }}/app/storage/mount-config"
+app_data_volume_id_ssm_path: "/{{ env }}/app/storage/app-data-volume-id"
+app_data_volume_id: "{{ lookup('env', 'APP_DATA_VOLUME_ID') | default('', true) }}"
+app_mount_read_from_ssm: true
+app_mount_point: /webserver
+app_filesystem_type: xfs
+app_filesystem_label: WEBAPPDATA
+app_data_allow_format: true
