@@ -1,0 +1,55 @@
+%%{init: {'themeVariables': {'fontSize': 10}, 'flowchart': {'nodeSpacing': 8, 'rankSpacing': 12, 'diagramPadding': 2, 'curve': 'linear'}}}%%
+graph LR
+    %% C4 Context Level 1 - IPU v2 OS Upgrade as a Service Platform - draw.io compatible
+    %% NOTE: This diagram is separate from the App as Code C4 context (c4-context-drawio.mmd).
+    %%       It must not overwrite that diagram. All shared patterns are inherited from the
+    %%       App as Code architecture baseline (architecture/app-as-code-architecture-baseline.md).
+
+    %% People
+    appTeamEngineer[Application Team Engineer<br/><i>Person Role</i><br/>Self-service triggers OS upgrades, validates the replacement instance, and controls rollback decisions]
+    platformEngineer[Platform Engineer<br/><i>Person Role</i><br/>Maintains upgrade playbooks, OS baselines, and fleet campaign configurations]
+    cyberSecEngineer[Cyber Security Engineer<br/><i>Person Role</i><br/>Monitors upgrade compliance evidence and audit posture across both clouds]
+
+    %% System under design
+    ipuv2[IPU v2 - OS Upgrade as a Service Platform<br/><i>Software System</i><br/>Automates governed side-by-side OS upgrades on EC2 instances with pre-checks, golden-image provisioning, data migration, post-upgrade validation, and tamper-evident compliance evidence]
+
+    %% External systems
+    aacPlatform[App as Code CI/CD Platform<br/><i>External System</i><br/>Provides GitHub Actions orchestration, OIDC trust, EventBridge evidence bus, immutable S3 evidence store, RTCM gate, and Datadog audit reporting]
+    awsBA[AWS Target Accounts - BA Cloud<br/><i>External System</i><br/>Hosts source and replacement EC2 instances targeted for OS upgrade in the BA cloud environment]
+    awsIAG[AWS Target Accounts - IAG Cloud<br/><i>External System</i><br/>Hosts source and replacement EC2 instances targeted for OS upgrade in the IAG cloud environment]
+    ecpRegistry[ECP Golden Image Registry<br/><i>External System</i><br/>Provides BA-approved hardened golden AMIs as the OS baseline for all replacement instances]
+    datadog[Datadog<br/><i>External System</i><br/>Upgrade posture, compliance dashboards, and audit reporting for both clouds]
+    sn[ServiceNow - Phase 2<br/><i>External System</i><br/>Optional ITSM change order intake and upgrade status notification integration]
+
+    %% Relationships - actors to IPU v2
+    appTeamEngineer -->|Self-service triggers upgrade request| ipuv2
+    appTeamEngineer -->|Validates replacement instance and decides rollback| ipuv2
+    platformEngineer -->|Manages playbook baselines and fleet upgrade campaigns| ipuv2
+    cyberSecEngineer -->|Reviews compliance evidence and upgrade audit posture| ipuv2
+
+    %% Relationships - IPU v2 to external systems
+    ipuv2 -->|Runs upgrade workflows via GitHub Actions orchestration and OIDC trust| aacPlatform
+    ipuv2 -->|Reads source EC2 configuration and provisions replacement instances in BA cloud| awsBA
+    ipuv2 -->|Reads source EC2 configuration and provisions replacement instances in IAG cloud| awsIAG
+    ipuv2 -->|Fetches latest ECP-approved golden AMI for target OS family| ecpRegistry
+    ipuv2 -->|Streams upgrade posture and compliance evidence events| datadog
+
+    %% Optional ServiceNow flows
+    sn -.->|Optional Phase 2 - ITSM-triggered upgrade dispatch| ipuv2
+    ipuv2 -.->|Optional Phase 2 - change order and upgrade status updates| sn
+
+    %% Styling - system under design
+    style ipuv2 fill:#1168BD,color:#ffffff,stroke:#0b4884
+
+    %% Styling - people
+    style appTeamEngineer fill:#08427B,color:#ffffff,stroke:#052E56
+    style platformEngineer fill:#08427B,color:#ffffff,stroke:#052E56
+    style cyberSecEngineer fill:#08427B,color:#ffffff,stroke:#052E56
+
+    %% Styling - external systems
+    style aacPlatform fill:#999999,color:#ffffff,stroke:#666666
+    style awsBA fill:#999999,color:#ffffff,stroke:#666666
+    style awsIAG fill:#999999,color:#ffffff,stroke:#666666
+    style ecpRegistry fill:#999999,color:#ffffff,stroke:#666666
+    style datadog fill:#999999,color:#ffffff,stroke:#666666
+    style sn fill:#999999,color:#ffffff,stroke:#666666

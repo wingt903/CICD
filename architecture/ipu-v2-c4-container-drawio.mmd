@@ -1,0 +1,134 @@
+%%{init: {'themeVariables': {'fontSize': 9}, 'flowchart': {'nodeSpacing': 8, 'rankSpacing': 10, 'diagramPadding': 2, 'curve': 'linear'}}}%%
+graph TB
+    %% C4 Container Level 2 - IPU v2 OS Upgrade as a Service Platform - draw.io compatible
+    %% NOTE: This diagram is separate from the App as Code C4 container (c4-container-drawio.mmd).
+    %%       It must not overwrite that diagram. Shared platform components from the App as Code
+    %%       baseline are modelled as external to the IPU v2 system boundary.
+    %%       Baseline reference: architecture/app-as-code-architecture-baseline.md v1.0
+
+    %% External actors
+    appTeamEngineer([Application Team Engineer])
+    platformEngineer([Platform Engineer])
+    cyberSecEngineer([Cyber Security Engineer])
+
+    %% Shared platform infrastructure - App as Code baseline components
+    oidcTrust["[Shared] Identity and Trust Broker<br/>AWS IAM OIDC Provider"]
+    rtcmGate["[Shared] RTCM Compatibility Gate<br/>RTCM Engine + SSM Parameter Store"]
+    evidencePlatform["[Shared] Audit Evidence Platform<br/>EventBridge + Lambda + S3 Object Lock + KMS"]
+    auditReporting["[Shared] Audit Reporting Platform<br/>Datadog + CloudTrail + S3"]
+
+    %% Other external systems
+    awsBA["AWS EC2 Target Instances - BA Cloud<br/>EC2 + EBS + IAM Instance Profile + VPC + Security Groups"]
+    awsIAG["AWS EC2 Target Instances - IAG Cloud<br/>EC2 + EBS + IAM Instance Profile + VPC + Security Groups"]
+    ecpRegistry["ECP Golden Image Registry<br/>EC2 AMI Registry - BA-Approved Hardened Golden AMIs"]
+    sn["ServiceNow - Phase 2"]
+
+    %% IPU v2 System Boundary
+    subgraph ipuv2 ["IPU v2 - OS Upgrade as a Service Platform"]
+        intake["[1] Self-Service Upgrade Interface<br/>GitHub workflow-dispatch + Catalog Form"]
+        orch["[2] IPU v2 Pipeline Orchestrator<br/>GitHub Actions IPU v2 Workflows"]
+        campaign["[3] Upgrade Campaign Manager<br/>GitHub Actions Matrix + EventBridge Scheduler"]
+        eligibility["[4] Pre-Upgrade Eligibility Checker<br/>Lambda + AWS Config + EC2 Describe APIs"]
+        discovery["[5] Instance Configuration Discovery Engine<br/>AWS EC2 API + SSM Inventory - Non-IaC Instance Support"]
+        snapshot["[6] Pre-Upgrade Snapshot Engine<br/>SSM Run Command + S3 Snapshot Store"]
+        provisioner["[7] Replacement Instance Provisioner<br/>Terraform + Ansible + EC2 Launch from Golden AMI"]
+        migration["[8] Data and Configuration Migration Engine<br/>Ansible + EBS Snapshot + AWS DataSync"]
+        validation["[9] Post-Upgrade Validation Gate<br/>Lambda + AWS Config + SSM Run Command"]
+        rollback["[10] Rollback Engine<br/>Ansible + EBS Volume Restore + SSM Run Command"]
+    end
+
+    %% External actor to intake
+    appTeamEngineer -->|"self-service upgrade request [HTTPS/GitHub]"| intake
+    sn -.->|"optional Phase 2 - ITSM change order upgrade dispatch [HTTPS/API]"| intake
+
+    %% Intake to orchestrator
+    intake -->|"initiates upgrade workflow [GitHub Actions trigger]"| orch
+
+    %% Platform engineer manages campaigns
+    platformEngineer -->|"configures playbook baselines and campaign schedules [HTTPS/Git]"| campaign
+    campaign -->|"sequences and batches upgrade workflow runs [GitHub Actions matrix]"| orch
+
+    %% Application team approvals
+    appTeamEngineer -.->|"optional manual approval for validation outcome and rollback [HTTPS/GitHub API]"| orch
+
+    %% Orchestrator - trust and credentials
+    orch -->|"exchanges OIDC token for short-lived STS credentials [HTTPS/OIDC]"| oidcTrust
+
+    %% Orchestrator - step sequencing
+    orch -->|"triggers pre-upgrade eligibility checks [AWS API]"| eligibility
+    orch -->|"triggers pre-upgrade snapshot capture [AWS SSM]"| snapshot
+    orch -->|"triggers replacement instance provisioning [AWS API/Terraform]"| provisioner
+    orch -->|"triggers data and configuration migration [AWS API/Ansible]"| migration
+    orch -->|"triggers post-upgrade validation checks [AWS API/Lambda]"| validation
+    orch -->|"triggers rollback when validation fails or team requests rollback [AWS API/Ansible]"| rollback
+    orch -->|"emits pipeline stage evidence at each step [AWS EventBridge]"| evidencePlatform
+
+    %% Eligibility checker
+    eligibility -->|"validates OS family and version against approved upgrade matrix [AWS SSM]"| rtcmGate
+    eligibility -->|"reads source instance configuration for IaC-managed instances [AWS EC2 API]"| awsBA
+    eligibility -->|"reads source instance configuration for IaC-managed instances [AWS EC2 API]"| awsIAG
+    eligibility -->|"invokes discovery engine for non-IaC instances [internal]"| discovery
+
+    %% Discovery engine - non-IaC instance configuration
+    discovery -->|"discovers tags, IAM profile, security groups, and network config via API [AWS EC2 API]"| awsBA
+    discovery -->|"discovers tags, IAM profile, security groups, and network config via API [AWS EC2 API]"| awsIAG
+
+    %% Pre-upgrade snapshot - captures pre-change state as rollback reference
+    snapshot -->|"captures OS version, installed packages, running services, and config - BA cloud [AWS SSM]"| awsBA
+    snapshot -->|"captures OS version, installed packages, running services, and config - IAG cloud [AWS SSM]"| awsIAG
+
+    %% Replacement instance provisioner
+    provisioner -->|"fetches latest ECP-approved golden AMI for target OS family [AWS API]"| ecpRegistry
+    provisioner -->|"provisions replacement EC2 with copied metadata, IAM profile, security groups, and network - BA cloud [AWS API]"| awsBA
+    provisioner -->|"provisions replacement EC2 with copied metadata, IAM profile, security groups, and network - IAG cloud [AWS API]"| awsIAG
+
+    %% Data and configuration migration
+    migration -->|"mirrors EBS volumes to replacement and validates data integrity - BA cloud [AWS API/DataSync]"| awsBA
+    migration -->|"mirrors EBS volumes to replacement and validates data integrity - IAG cloud [AWS API/DataSync]"| awsIAG
+
+    %% Post-upgrade validation gate
+    validation -->|"validates OS version, service health, and BA policy compliance on replacement - BA cloud [AWS SSM]"| awsBA
+    validation -->|"validates OS version, service health, and BA policy compliance on replacement - IAG cloud [AWS SSM]"| awsIAG
+    validation -->|"confirms replacement instance is compliant with approved OS version matrix [AWS SSM]"| rtcmGate
+    validation -->|"emits pass-fail validation evidence record [AWS EventBridge]"| evidencePlatform
+
+    %% Rollback engine - source instance is never modified; replacement is restored or retired
+    rollback -->|"restores pre-upgrade state on replacement using snapshot reference - BA cloud [AWS SSM/Ansible]"| awsBA
+    rollback -->|"restores pre-upgrade state on replacement using snapshot reference - IAG cloud [AWS SSM/Ansible]"| awsIAG
+    rollback -->|"emits rollback outcome, actor, and timestamp evidence record [AWS EventBridge]"| evidencePlatform
+
+    %% Evidence to audit reporting
+    evidencePlatform -->|"stores and indexes signed upgrade audit records [HTTPS/S3]"| auditReporting
+    evidencePlatform -.->|"optional Phase 2 - evidence and status updates [HTTPS/API]"| sn
+
+    %% Cyber security analyst access
+    cyberSecEngineer -->|"read-only compliance dashboard and audit access [HTTPS]"| auditReporting
+
+    %% Styling - internal containers (IPU v2)
+    style intake fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style orch fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style campaign fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style eligibility fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style discovery fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style snapshot fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style provisioner fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style migration fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style validation fill:#85BBF0,color:#000000,stroke:#5D82A8
+    style rollback fill:#85BBF0,color:#000000,stroke:#5D82A8
+
+    %% Styling - people
+    style appTeamEngineer fill:#08427B,color:#ffffff,stroke:#052E56
+    style platformEngineer fill:#08427B,color:#ffffff,stroke:#052E56
+    style cyberSecEngineer fill:#08427B,color:#ffffff,stroke:#052E56
+
+    %% Styling - shared App as Code platform components
+    style oidcTrust fill:#6B8E6B,color:#ffffff,stroke:#4A6A4A
+    style rtcmGate fill:#6B8E6B,color:#ffffff,stroke:#4A6A4A
+    style evidencePlatform fill:#6B8E6B,color:#ffffff,stroke:#4A6A4A
+    style auditReporting fill:#6B8E6B,color:#ffffff,stroke:#4A6A4A
+
+    %% Styling - other external systems
+    style awsBA fill:#999999,color:#ffffff,stroke:#666666
+    style awsIAG fill:#999999,color:#ffffff,stroke:#666666
+    style ecpRegistry fill:#999999,color:#ffffff,stroke:#666666
+    style sn fill:#999999,color:#ffffff,stroke:#666666
