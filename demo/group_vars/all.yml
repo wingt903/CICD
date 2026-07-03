@@ -1,0 +1,38 @@
+---
+# group_vars/all.yml – Variables for the Tomcat demo deployment.
+# Override any value on the command line with -e "var=value".
+
+# ── Java ─────────────────────────────────────────────────────────────────────
+java_package: java-17-amazon-corretto-headless   # Amazon Linux 2023
+# java_package: openjdk-17-jdk-headless          # Ubuntu
+
+# ── Tomcat ───────────────────────────────────────────────────────────────────
+tomcat_version: "10.1.39"
+tomcat_major:   "10"
+tomcat_install_dir: /opt/tomcat
+tomcat_user: tomcat
+tomcat_group: tomcat
+tomcat_uid: 1001
+tomcat_gid: 1001
+
+# Download mirror – Apache CDN
+tomcat_download_url: >-
+  https://dlcdn.apache.org/tomcat/tomcat-{{ tomcat_major }}/v{{ tomcat_version }}/bin/apache-tomcat-{{ tomcat_version }}.tar.gz
+
+# ── Connector / ports ────────────────────────────────────────────────────────
+tomcat_http_port: 8080
+tomcat_shutdown_port: -1          # disabled (hardening)
+tomcat_shutdown_command: SHUTDOWN
+
+# ── JVM ──────────────────────────────────────────────────────────────────────
+tomcat_java_opts: >-
+  -Djava.security.egd=file:/dev/./urandom
+  -Xms256m
+  -Xmx512m
+  -Dfile.encoding=UTF-8
+  -Duser.timezone=UTC
+
+# ── Application WAR ──────────────────────────────────────────────────────────
+# Set to the local path of the WAR you want deployed, or leave empty to skip.
+tomcat_war_src: ""         # e.g. "../sample-code/tomcat/myapp.war"
+tomcat_app_name: ROOT      # deployed as ROOT.war → accessible at /

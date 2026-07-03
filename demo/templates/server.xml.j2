@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- server.xml – rendered by Ansible demo playbook. -->
+<Server port="{{ tomcat_shutdown_port }}" shutdown="{{ tomcat_shutdown_command }}">
+
+  <Listener className="org.apache.catalina.startup.VersionLoggerListener" />
+  <Listener className="org.apache.catalina.core.AprLifecycleListener" SSLEngine="on" />
+  <Listener className="org.apache.catalina.core.JreMemoryLeakPreventionListener" />
+  <Listener className="org.apache.catalina.mbeans.GlobalResourcesLifecycleListener" />
+  <Listener className="org.apache.catalina.core.ThreadLocalLeakPreventionListener" />
+
+  <Service name="Catalina">
+
+    <Connector port="{{ tomcat_http_port }}"
+               protocol="HTTP/1.1"
+               connectionTimeout="20000"
+               redirectPort="8443"
+               maxThreads="150"
+               minSpareThreads="10"
+               server="Apache Tomcat"
+               xpoweredBy="false"
+               allowTrace="false" />
+
+    <Engine name="Catalina" defaultHost="localhost">
+
+      <Host name="localhost" appBase="webapps"
+            unpackWARs="true" autoDeploy="false"
+            xmlValidation="false" xmlNamespaceAware="false">
+
+        <Valve className="org.apache.catalina.valves.AccessLogValve"
+               directory="logs"
+               prefix="localhost_access_log"
+               suffix=".txt"
+               pattern="%h %l %u %t &quot;%r&quot; %s %b %D" />
+
+        <Valve className="org.apache.catalina.valves.RemoteIpValve"
+               remoteIpHeader="x-forwarded-for"
+               proxiesHeader="x-forwarded-by"
+               protocolHeader="x-forwarded-proto" />
+
+      </Host>
+    </Engine>
+  </Service>
+</Server>

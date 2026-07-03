@@ -1,0 +1,247 @@
+---
+# deploy-tomcat.yml – Demo playbook: install and start Apache Tomcat on an AWS EC2 instance.
+#
+# Prerequisites
+# ─────────────
+# 1. EC2 instance running Amazon Linux 2023 (or Ubuntu 22.04).
+# 2. Security Group allows inbound TCP on port 8080 from your IP.
+# 3. SSH key pair – update inventory.ini with the public IP and .pem path.
+# 4. Ansible ≥ 2.15 installed on your local machine.
+#
+# Usage
+# ─────
+#   ansible-playbook -i inventory.ini deploy-tomcat.yml
+#
+# Override variables at runtime:
+#   ansible-playbook -i inventory.ini deploy-tomcat.yml \
+#     -e "tomcat_version=10.1.39" \
+#     -e "tomcat_war_src=../sample-code/tomcat/myapp.war"
+
+- name: "Deploy Apache Tomcat to AWS EC2"
+  hosts: tomcat
+  become: true
+  gather_facts: true
+
+  # ── Pre-flight checks ────────────────────────────────────────────────────
+  pre_tasks:
+    - name: "Verify target OS family is supported"
+      ansible.builtin.assert:
+        that:
+          - ansible_os_family in ['RedHat', 'Debian']
+        fail_msg: >
+          Unsupported OS family '{{ ansible_os_family }}'.
+          This playbook supports Amazon Linux (RedHat) and Ubuntu (Debian).
+
+    - name: "Print deployment summary"
+      ansible.builtin.debug:
+        msg:
+          - "Host        : {{ inventory_hostname }} ({{ ansible_host }})"
+          - "OS          : {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "Tomcat      : {{ tomcat_version }}"
+          - "Install dir : {{ tomcat_install_dir }}"
+          - "HTTP port   : {{ tomcat_http_port }}"
+
+  # ── Tasks ────────────────────────────────────────────────────────────────
+  tasks:
+
+    # ── 1. Java ──────────────────────────────────────────────────────────
+    - name: "Install Java (Amazon Linux / RedHat)"
+      ansible.builtin.package:
+        name: "{{ java_package }}"
+        state: present
+      when: ansible_os_family == 'RedHat'
+
+    - name: "Install Java (Ubuntu / Debian)"
+      ansible.builtin.apt:
+        name: "{{ java_package | replace('amazon-corretto', 'openjdk-17-jdk') }}"
+        state: present
+        update_cache: true
+      when: ansible_os_family == 'Debian'
+
+    - name: "Verify java binary is present"
+      ansible.builtin.command: java -version
+      register: java_version_check
+      changed_when: false
+      failed_when: java_version_check.rc != 0
+
+    # ── 2. Tomcat user and group ─────────────────────────────────────────
+    - name: "Create tomcat group"
+      ansible.builtin.group:
+        name: "{{ tomcat_group }}"
+        gid: "{{ tomcat_gid }}"
+        system: true
+        state: present
+
+    - name: "Create tomcat system user"
+      ansible.builtin.user:
+        name: "{{ tomcat_user }}"
+        uid: "{{ tomcat_uid }}"
+        group: "{{ tomcat_group }}"
+        system: true
+        shell: /sbin/nologin
+        home: "{{ tomcat_install_dir }}"
+        create_home: false
+        state: present
+
+    # ── 3. Download and install Tomcat ───────────────────────────────────
+    - name: "Create Tomcat installation directory"
+      ansible.builtin.file:
+        path: "{{ tomcat_install_dir }}"
+        state: directory
+        owner: "{{ tomcat_user }}"
+        group: "{{ tomcat_group }}"
+        mode: "0755"
+
+    - name: "Download Apache Tomcat {{ tomcat_version }}"
+      ansible.builtin.get_url:
+        url: "{{ tomcat_download_url }}"
+        dest: "/tmp/apache-tomcat-{{ tomcat_version }}.tar.gz"
+        mode: "0644"
+        timeout: 60
+
+    - name: "Extract Tomcat archive"
+      ansible.builtin.unarchive:
+        src: "/tmp/apache-tomcat-{{ tomcat_version }}.tar.gz"
+        dest: "{{ tomcat_install_dir }}"
+        remote_src: true
+        extra_opts: ["--strip-components=1"]
+        owner: "{{ tomcat_user }}"
+        group: "{{ tomcat_group }}"
+        creates: "{{ tomcat_install_dir }}/bin/catalina.sh"
+
+    - name: "Remove Tomcat download archive"
+      ansible.builtin.file:
+        path: "/tmp/apache-tomcat-{{ tomcat_version }}.tar.gz"
+        state: absent
+
+    # ── 4. Harden default installation ──────────────────────────────────
+    - name: "Remove default Tomcat web applications"
+      ansible.builtin.file:
+        path: "{{ tomcat_install_dir }}/webapps/{{ item }}"
+        state: absent
+      loop:
+        - ROOT
+        - examples
+        - host-manager
+        - manager
+        - docs
+
+    - name: "Set ownership on Tomcat directories"
+      ansible.builtin.file:
+        path: "{{ tomcat_install_dir }}/{{ item }}"
+        owner: "{{ tomcat_user }}"
+        group: "{{ tomcat_group }}"
+        recurse: true
+        state: directory
+      loop:
+        - bin
+        - conf
+        - lib
+        - logs
+        - temp
+        - webapps
+        - work
+
+    - name: "Set executable permission on Tomcat scripts"
+      ansible.builtin.file:
+        path: "{{ tomcat_install_dir }}/bin/{{ item }}"
+        mode: "0750"
+        owner: "{{ tomcat_user }}"
+        group: "{{ tomcat_group }}"
+      loop:
+        - catalina.sh
+        - startup.sh
+        - shutdown.sh
+
+    # ── 5. Render server.xml ─────────────────────────────────────────────
+    - name: "Deploy hardened server.xml"
+      ansible.builtin.template:
+        src: templates/server.xml.j2
+        dest: "{{ tomcat_install_dir }}/conf/server.xml"
+        owner: "{{ tomcat_user }}"
+        group: "{{ tomcat_group }}"
+        mode: "0640"
+      notify: Restart tomcat
+
+    # ── 6. Deploy application WAR (optional) ─────────────────────────────
+    - name: "Deploy application WAR"
+      ansible.builtin.copy:
+        src: "{{ tomcat_war_src }}"
+        dest: "{{ tomcat_install_dir }}/webapps/{{ tomcat_app_name }}.war"
+        owner: "{{ tomcat_user }}"
+        group: "{{ tomcat_group }}"
+        mode: "0640"
+      when: tomcat_war_src | length > 0
+      notify: Restart tomcat
+
+    # ── 7. systemd service ───────────────────────────────────────────────
+    - name: "Create Tomcat systemd unit file"
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/tomcat.service
+        mode: "0644"
+        owner: root
+        group: root
+        content: |
+          [Unit]
+          Description=Apache Tomcat {{ tomcat_version }} Web Application Server
+          After=network.target
+
+          [Service]
+          Type=forking
+          User={{ tomcat_user }}
+          Group={{ tomcat_group }}
+          Environment="JAVA_HOME=/usr"
+          Environment="CATALINA_HOME={{ tomcat_install_dir }}"
+          Environment="CATALINA_BASE={{ tomcat_install_dir }}"
+          Environment="CATALINA_PID={{ tomcat_install_dir }}/temp/tomcat.pid"
+          Environment="JAVA_OPTS={{ tomcat_java_opts }}"
+          ExecStart={{ tomcat_install_dir }}/bin/startup.sh
+          ExecStop={{ tomcat_install_dir }}/bin/shutdown.sh
+          Restart=on-failure
+          RestartSec=10
+          SuccessExitStatus=143
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Restart tomcat
+
+    - name: "Enable and start Tomcat service"
+      ansible.builtin.systemd:
+        name: tomcat
+        state: started
+        enabled: true
+        daemon_reload: true
+
+  # ── Handlers ─────────────────────────────────────────────────────────────
+  handlers:
+    - name: Restart tomcat
+      ansible.builtin.systemd:
+        name: tomcat
+        state: restarted
+        daemon_reload: true
+
+  # ── Post-deploy smoke test ───────────────────────────────────────────────
+  post_tasks:
+    - name: "Wait for Tomcat to become available on port {{ tomcat_http_port }}"
+      ansible.builtin.wait_for:
+        host: localhost
+        port: "{{ tomcat_http_port }}"
+        delay: 5
+        timeout: 60
+
+    - name: "Smoke test – HTTP GET to Tomcat root"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ tomcat_http_port }}/"
+        method: GET
+        status_code: [200, 404]   # 404 is OK when no ROOT app is deployed
+        timeout: 30
+      register: smoke_result
+      retries: 5
+      delay: 10
+      until: smoke_result.status in [200, 404]
+
+    - name: "Smoke test result"
+      ansible.builtin.debug:
+        msg: >
+          Tomcat is UP – HTTP {{ smoke_result.status }} on port {{ tomcat_http_port }}.
+          Access it at: http://{{ ansible_host }}:{{ tomcat_http_port }}/
